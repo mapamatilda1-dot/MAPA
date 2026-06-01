@@ -11,6 +11,7 @@ import LiquidacionesTab from './components/LiquidacionesTab';
 import Implementaciones from './components/Implementaciones';
 import AdminPanel from './components/AdminPanel';
 import Proformas from './components/Proformas';
+import Solicitudes from './components/Solicitudes';
 
 // Placeholders — se reemplazarán en las fases siguientes
 const Placeholder = ({ nombre }) => (
@@ -84,7 +85,7 @@ export default function App() {
       case 'propuestas':       return <Propuestas userRole={role} userEmail={email} />;
       case 'proformas':        return <Proformas userRole={role} userEmail={email} />;
       case 'presupuestos':     return <Presupuestos userRole={role} userEmail={email} logoUrl={null} />;
-      case 'solicitudes':      return <Placeholder nombre="Solicitudes — En construcción" />;
+      case 'solicitudes':      return <Solicitudes userRole={role} userEmail={email} userName={email.split('@')[0]} />;
       case 'liquidaciones':    return <LiquidacionesTab userRole={role} />;
       case 'calendario':       return <Calendario />;
       case 'implementaciones': return <Implementaciones userRole={role} />;
