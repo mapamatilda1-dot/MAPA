@@ -327,7 +327,7 @@ export default function Proformas({ userRole, userEmail }) {
   if (editing !== null) {
     return <ProformaEditor
       initial={editing === 'new' ? null : editing}
-      clientes={clientes} ejecutivos={ejecs} briefs={briefs} cfg={cfg}
+      clientes={clientes} ejecutivos={ejecutivos} briefs={briefs} cfg={cfg}
       onSave={saveProforma} onCancel={()=>setEditing(null)}
     />;
   }
