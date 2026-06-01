@@ -4,8 +4,11 @@ import { S, Label, Badge, Toast } from '../styles.jsx';
 import { calcItem, calcPpto, genNomenclatura, fmt, fmtPct } from '../calc';
 import { generatePdfClienteHTML, generatePdfFinancieroHTML, generateExcelFinancieroData } from './PdfCliente';
 import {
-  ESTADOS_PPTO, ESTADOS_PPTO_LABELS,
+  ESTADOS_PPTO, ESTADOS_PPTO_LABELS, ESTADOS_PPTO_COLORS,
   canChangeEstadoPpto, canEditPpto, canApproveCostoReal, canEditBcoReal,
+  canMarkEjecutado, canMarkCerradoProduccion,
+  canDownloadPdfFinanciero, canDownloadExcel, canDownloadPdfCliente,
+  getFlujoBtnLabel, getFlujoBtnNextEstado, getFeeForCliente,
 } from '../roles';
 
 const SESSION_KEY = 'matilda_editor_draft';
@@ -79,7 +82,18 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
   function showToast(m){setToast(m);setTimeout(()=>setToast(''),2500);}
   function setField(k,v){setP(prev=>({...prev,[k]:v}));}
   function setNum(k,v){setP(prev=>({...prev,[k]:v===''?0:parseFloat(v)??0}));}
-  function setCliente(n){setP(prev=>({...prev,cliente:n,apply_rebate:n.toUpperCase().includes('TESALIA')}));}
+  function setCliente(n) {
+    const feeData = getFeeForCliente(n);
+    setP(prev => ({
+      ...prev,
+      cliente: n,
+      apply_rebate: n.toUpperCase().includes('TESALIA'),
+      ...(feeData ? {
+        fee_agencia: feeData.fee,
+        apply_rebate: feeData.bco,
+      } : {}),
+    }));
+  }
 
   function selectBrief(briefId) {
     if (!briefId) { setP(prev=>({...prev, brief_id:''})); return; }
@@ -332,8 +346,8 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
           {ESTADOS_PPTO.map(e=><option key={e} value={e} disabled={!canChangeEstadoPpto(userRole,e)&&p.estado!==e}>{ESTADOS_PPTO_LABELS[e]}</option>)}
         </select>
         <button style={S.btnSecondary} onClick={openPdfCliente}>📄 PDF cliente</button>
-        <button style={{...S.btnSecondary,color:'#c8264a',borderColor:'#c8264a44'}} onClick={openPdfFinanciero}>📊 PDF financiero</button>
-        <button style={S.btnSecondary} onClick={downloadExcel}>📥 Excel</button>
+        {canDownloadPdfFinanciero(userRole) && <button style={{...S.btnSecondary,color:'#c8264a',borderColor:'#c8264a44'}} onClick={openPdfFinanciero}>📊 PDF financiero</button>}
+        {canDownloadExcel(userRole) && <button style={S.btnSecondary} onClick={downloadExcel}>📥 Excel</button>}
         <button style={S.btnPrimary} onClick={save} disabled={saving}>{saving?'Guardando…':'💾 Guardar'}</button>
       </div>
 
@@ -793,8 +807,8 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             <button style={{...S.btnSecondary,opacity:previewMode==='financiero'?1:0.55,border:'1px solid #0d3b5e',color:'#0d3b5e'}} onClick={()=>setPreviewMode('financiero')}>💼 Vista financiera</button>
             <div style={{flex:1}}/>
             <button style={{...S.btnPrimary,background:'#c8264a'}} onClick={openPdfCliente}>📄 PDF cliente</button>
-            <button style={{...S.btnSecondary,color:'#c8264a',borderColor:'#c8264a44'}} onClick={openPdfFinanciero}>📊 PDF financiero</button>
-            <button style={S.btnSecondary} onClick={downloadExcel}>📥 Excel</button>
+            {canDownloadPdfFinanciero(userRole) && <button style={{...S.btnSecondary,color:'#c8264a',borderColor:'#c8264a44'}} onClick={openPdfFinanciero}>📊 PDF financiero</button>}
+            {canDownloadExcel(userRole) && <button style={S.btnSecondary} onClick={downloadExcel}>📥 Excel</button>}
           </div>
           {!previewMode&&<div style={S.empty}>Selecciona una vista arriba para previsualizar</div>}
           {previewMode&&(()=>{

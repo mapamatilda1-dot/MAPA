@@ -5,6 +5,7 @@ import { calcPpto, fmt, fmtPct } from '../calc';
 import {
   ESTADOS_PPTO, ESTADOS_PPTO_LABELS, ESTADOS_PPTO_COLORS,
   canChangeEstadoPpto, canEditPpto, canMarkEjecutado, canViewPresupuestos,
+  canDownloadPdfFinanciero, canDownloadExcel, canDownloadPdfCliente,
 } from '../roles';
 import EditorPpto from './EditorPpto';
 import { generatePdfClienteHTML, generatePdfFinancieroHTML } from './PdfCliente';
@@ -211,7 +212,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
             </select>
           )}
           <input type="number" style={{ ...S.input, width:80 }} value={exportPeriod.anio} onChange={e => setExportPeriod(p => ({...p, anio:parseInt(e.target.value)||anioActual}))}/>
-          <button style={S.btnPrimary} onClick={exportExcel}>📊 Exportar</button>
+          {canDownloadExcel(userRole) && <button style={S.btnPrimary} onClick={exportExcel}>📊 Exportar</button>}
           <button style={{ ...S.btnPrimary, background:'#c8264a' }} onClick={() => setEditing('new')}>+ Nuevo presupuesto</button>
         </div>
       </div>
@@ -316,8 +317,8 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
               )}
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap' }}>
-              <button style={S.btnPrimary} onClick={() => { const html=generatePdfClienteHTML(popupPpto,logoUrl); const w=window.open('','_blank'); w.document.write(html); w.document.close(); }}>📄 PDF cliente</button>
-              <button style={{ ...S.btnSecondary, color:'#c8264a', borderColor:'#c8264a44' }} onClick={() => { const html=generatePdfFinancieroHTML(popupPpto,logoUrl); const w=window.open('','_blank'); w.document.write(html); w.document.close(); }}>📊 PDF financiero</button>
+              {canDownloadPdfCliente(userRole) && <button style={S.btnPrimary} onClick={() => { const html=generatePdfClienteHTML(popupPpto,logoUrl); const w=window.open('','_blank'); w.document.write(html); w.document.close(); }}>📄 PDF cliente</button>}
+              {canDownloadPdfFinanciero(userRole) && <button style={{ ...S.btnSecondary, color:'#c8264a', borderColor:'#c8264a44' }} onClick={() => { const html=generatePdfFinancieroHTML(popupPpto,logoUrl); const w=window.open('','_blank'); w.document.write(html); w.document.close(); }}>📊 PDF financiero</button>}
               <button style={S.btnSecondary} onClick={() => { setEditing(popupPpto); setPopupPpto(null); }}>✏️ Editar</button>
               <button style={S.btnSm} onClick={() => { duplicatePpto(popupPpto); setPopupPpto(null); }}>📋 Duplicar</button>
             </div>

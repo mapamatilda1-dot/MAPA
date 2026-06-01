@@ -28,9 +28,11 @@ const TAB_CONFIG = {
   propuestas:       { label: 'Propuestas',      icon: '◈' },
   proformas:        { label: 'Proformas',       icon: '📋' },
   presupuestos:     { label: 'Presupuestos',    icon: '💰' },
+  solicitudes:      { label: 'Solicitudes',     icon: '📤' },
   liquidaciones:    { label: 'Liquidaciones',   icon: '🧾' },
   calendario:       { label: 'Calendario',      icon: '📅' },
   implementaciones: { label: 'Implementac.',    icon: '⚙️' },
+  dashboard:        { label: 'Dashboard',       icon: '📊' },
   admin_panel:      { label: 'Admin',           icon: '⚙' },
 };
 
@@ -82,9 +84,11 @@ export default function App() {
       case 'propuestas':       return <Propuestas userRole={role} userEmail={email} />;
       case 'proformas':        return <Proformas userRole={role} userEmail={email} />;
       case 'presupuestos':     return <Presupuestos userRole={role} userEmail={email} logoUrl={null} />;
+      case 'solicitudes':      return <Placeholder nombre="Solicitudes — En construcción" />;
       case 'liquidaciones':    return <LiquidacionesTab userRole={role} />;
       case 'calendario':       return <Calendario />;
       case 'implementaciones': return <Implementaciones userRole={role} />;
+      case 'dashboard':        return <Placeholder nombre="Dashboard financiero — En construcción" />;
       case 'admin_panel':      return <AdminPanel />;
       default:                 return <Placeholder nombre="Seleccioná una sección" />;
     }
