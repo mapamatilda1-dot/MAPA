@@ -4,7 +4,7 @@ const SMTP_HOST = Deno.env.get('SMTP_HOST')!;
 const SMTP_PORT = parseInt(Deno.env.get('SMTP_PORT') || '465');
 const SMTP_USER = Deno.env.get('SMTP_USER')!;
 const SMTP_PASS = Deno.env.get('SMTP_PASS')!;
-const APP_URL   = 'https://subtle-platypus-1041ce.netlify.app';
+const APP_URL   = 'https://mapa-zeta.vercel.app';
 const DESTINOS  = ['melanie@matilda.agency', 'mariajose@matilda.agency', 'taylor@matilda.agency', 'johanna@matilda.agency'];
 
 function fmt(n: number) {

@@ -33,6 +33,7 @@ export default function Calendario() {
   const [expedienteId, setExpedienteId] = useState(null);
   const [briefs, setBriefs]   = useState([]);
   const [impls, setImpls]     = useState([]);
+  const [gcalEvents, setGcalEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,6 +45,19 @@ export default function Calendario() {
       ]);
       setBriefs(br || []);
       setImpls(im || []);
+
+      // Cargar eventos de Google Calendar via Edge Function
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar?days=90`,
+          { headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` } }
+        );
+        const data = await res.json();
+        if (data.ok) setGcalEvents(data.events || []);
+      } catch (e) {
+        console.warn('Google Calendar no disponible:', e);
+      }
+
       setLoading(false);
     }
     load();
@@ -56,6 +70,18 @@ export default function Calendario() {
     return impls.filter(i => {
       const fin = i.fecha_evento_fin || i.fecha_evento;
       return (dateStr >= i.fecha_evento && dateStr <= fin) || i.fecha_montaje === dateStr;
+    });
+  }
+
+  function gcalForDay(dateStr) {
+    return gcalEvents.filter(e => {
+      if (!e.start) return false;
+      const end = e.end || e.start;
+      // Para eventos de todo el día Google pone end = día siguiente, ajustar
+      const endAdj = e.allDay && end > e.start ? end.slice(0,10) <= dateStr ? end : (() => {
+        const d = new Date(end + 'T12:00'); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10);
+      })() : end.slice(0,10);
+      return dateStr >= e.start.slice(0,10) && dateStr <= endAdj;
     });
   }
   function implLabel(impl, dateStr) {
@@ -84,6 +110,11 @@ export default function Calendario() {
               {implLabel(i, dateStr)}
             </div>
           ))}
+          {dayGcal.slice(0,2).map(e => (
+            <div key={'g'+e.id} style={{ fontSize:10, padding:'1px 5px', borderRadius:4, background:'#fce8f3', color:'#9d174d', borderLeft:'2px solid #db2777', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+              📅 {e.title}
+            </div>
+          ))}
           {dayBriefs.slice(0,2).map(b => {
             const c = getColor(b.estado);
             return <div key={'b'+b.id} style={{ fontSize:10, padding:'1px 5px', borderRadius:4, background:c.bg, color:c.text, borderLeft:`2px solid ${c.border}`, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>📋 {b.nombre}</div>;
@@ -99,7 +130,8 @@ export default function Calendario() {
     const dayImpls     = implsForDay(dateStr);
     const fecha = new Date(dateStr+'T12:00').toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
 
-    if (!dayBriefs.length && !dayImpls.length) {
+    const dayGcalD = gcalForDay(dateStr);
+    if (!dayBriefs.length && !dayImpls.length && !dayGcalD.length) {
       return <div style={{ marginTop:'1rem', background:'#fff', border:'1px solid #e8e8e8', borderRadius:10, padding:'1rem' }}>
         <div style={{ fontSize:14, fontWeight:500, marginBottom:8, textTransform:'capitalize' }}>{fecha}</div>
         <div style={{ fontSize:13, color:'#aaa' }}>Sin eventos este día</div>
@@ -117,6 +149,17 @@ export default function Calendario() {
               {i.ciudad && <div style={{ fontSize:12, color:'#7c3aed', marginTop:1 }}>📍 {i.ciudad}</div>}
             </div>
             <span style={{ fontSize:11, padding:'2px 8px', borderRadius:999, background:'#ede9fe', color:'#5b21b6', fontWeight:500 }}>Implementación</span>
+          </div>
+        ))}
+        {dayGcalD.map(e => (
+          <div key={e.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, background:'#fdf2f8', border:'1px solid #fbcfe8', marginBottom:6, cursor:'pointer' }}
+            onClick={()=>e.htmlLink&&window.open(e.htmlLink,'_blank')}>
+            <div style={{ width:3, height:36, borderRadius:2, background:'#db2777', flexShrink:0 }}/>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:14, fontWeight:500 }}>📅 {e.title}</div>
+              {e.location && <div style={{ fontSize:12, color:'#888', marginTop:1 }}>📍 {e.location}</div>}
+            </div>
+            <span style={{ fontSize:11, padding:'2px 8px', borderRadius:999, background:'#fce8f3', color:'#9d174d', fontWeight:500 }}>Google Cal</span>
           </div>
         ))}
         {dayBriefs.map(b => {
@@ -190,6 +233,7 @@ export default function Calendario() {
             const dayBriefs = briefsForDay(dateStr);
             const dayImpls  = implsForDay(dateStr);
             const dayProps  = [];
+            const dayGcalW  = gcalForDay(dateStr);
             return (
               <div key={dateStr} onClick={()=>setSelected(s=>s===dateStr?null:dateStr)} style={{ minHeight:120, padding:8, borderRadius:10, cursor:'pointer', overflow:'hidden', border:isSelected?'2px solid #1a1a1a':isToday?'2px solid #3b82f6':'1px solid #e8e8e8', background:isSelected?'#f9f9f7':isToday?'#eff6ff':'#fff' }}>
                 <div style={{ textAlign:'center', marginBottom:6 }}>
@@ -198,6 +242,7 @@ export default function Calendario() {
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
                   {dayImpls.map(i=><div key={'i'+i.id} style={{ fontSize:11, padding:'3px 6px', borderRadius:5, background:'#ede9fe', color:'#5b21b6', borderLeft:'2px solid #7c3aed', lineHeight:1.3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{implLabel(i,dateStr)}</div>)}
+                  {dayGcalW.map(e=><div key={'g'+e.id} style={{ fontSize:11, padding:'3px 6px', borderRadius:5, background:'#fce8f3', color:'#9d174d', borderLeft:'2px solid #db2777', lineHeight:1.3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>📅 {e.title}</div>)}
                   {dayBriefs.map(b=>{ const c=getColor(b.estado); return <div key={'b'+b.id} style={{ fontSize:11, padding:'3px 6px', borderRadius:5, background:c.bg, color:c.text, borderLeft:`2px solid ${c.border}`, lineHeight:1.3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>📋 {b.nombre}</div>; })}                </div>
               </div>
             );
@@ -226,7 +271,9 @@ export default function Calendario() {
         {/* Leyenda */}
         <div style={{ marginLeft:'auto', display:'flex', gap:12, flexWrap:'wrap', alignItems:'center' }}>
           {[
-            { label:'Entrega brief', bg:'#dcfce7', border:'#22c55e' },            { label:'Implementación', bg:'#ede9fe', border:'#7c3aed' },
+            { label:'Entrega brief', bg:'#dcfce7', border:'#22c55e' },
+            { label:'Implementación', bg:'#ede9fe', border:'#7c3aed' },
+            { label:'Google Calendar', bg:'#fce8f3', border:'#db2777' },
           ].map(l=>(
             <div key={l.label} style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, color:'#555' }}>
               <div style={{ width:10, height:10, borderRadius:3, background:l.bg, border:`2px solid ${l.border}` }}/>
