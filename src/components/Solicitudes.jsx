@@ -44,6 +44,7 @@ function EstadoBadge({ estado }) {
 function SolicitudEditor({ solicitud, presupuestos, userEmail, userName, onSave, onCancel, onEnviar }) {
   const [form, setForm] = useState(() => solicitud || {
     presupuesto_id: '', presupuesto_nombre: '', cliente_nombre: '', fecha_evento: null,
+    lugar: '', dias_evento: 1,
     items: [], notas: '', estado: 'borrador', created_by: userEmail, created_by_nombre: userName,
   });
   const [ppto, setPpto]   = useState(null);
@@ -78,6 +79,8 @@ function SolicitudEditor({ solicitud, presupuestos, userEmail, userName, onSave,
       presupuesto_nombre: data.nombre || data.cliente,
       cliente_nombre:    data.cliente,
       fecha_evento:      data.fecha_evento,
+      lugar:             data.lugar || '',
+      dias_evento:       data.dias_evento || 1,
       items,
     }));
   }
@@ -139,6 +142,14 @@ function SolicitudEditor({ solicitud, presupuestos, userEmail, userName, onSave,
               <div style={{ fontSize:10, color:'#888', marginBottom:2 }}>Fecha evento</div>
               <div style={{ fontSize:13, fontWeight:600 }}>{fmtDate(ppto.fecha_evento)}</div>
             </div>
+            {ppto.lugar && <div style={{ background:'#f8fafc', borderRadius:8, padding:'10px 14px' }}>
+              <div style={{ fontSize:10, color:'#888', marginBottom:2 }}>Lugar</div>
+              <div style={{ fontSize:13, fontWeight:600 }}>{ppto.lugar}</div>
+            </div>}
+            {ppto.dias_evento > 1 && <div style={{ background:'#f8fafc', borderRadius:8, padding:'10px 14px' }}>
+              <div style={{ fontSize:10, color:'#888', marginBottom:2 }}>Días</div>
+              <div style={{ fontSize:13, fontWeight:600 }}>{ppto.dias_evento} día(s)</div>
+            </div>}
           </>}
         </div>
       </div>
@@ -271,7 +282,7 @@ export default function Solicitudes({ userRole, userEmail, userName }) {
     setLoading(true);
     const [solR, ppR] = await Promise.all([
       supabase.from('solicitudes').select('*').order('created_at', { ascending:false }),
-      supabase.from('presupuestos').select('id, nombre, cliente, nomenclatura, fecha_evento, items').order('created_at', { ascending:false }),
+      supabase.from('presupuestos').select('id, nombre, cliente, nomenclatura, fecha_evento, lugar, dias_evento, items').order('created_at', { ascending:false }),
     ]);
     setSolicitudes(solR.data || []);
     setPresupuestos(ppR.data || []);
