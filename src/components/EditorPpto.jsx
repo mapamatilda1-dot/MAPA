@@ -157,7 +157,9 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     setSaving(false);
     if(error){showToast('Error: '+error.message);return;}
     try{sessionStorage.removeItem(SESSION_KEY);sessionStorage.removeItem(SESSION_TAB);}catch{}
-    showToast('Guardado ✓');onSave();
+    showToast('Guardado ✓');
+    // Nos quedamos en la página para seguir editando
+  }
   }
 
   function openPdfCliente(){

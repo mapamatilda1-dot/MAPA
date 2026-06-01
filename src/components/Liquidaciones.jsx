@@ -9,7 +9,7 @@ function emptyGasto() {
     id: crypto.randomUUID(),
     concepto: '', categoria: CATS_LIQUIDACION[0],
     subtotal15: 0, subtotal0: 0, iva: 0, total: 0,
-    ruc_proveedor: '', nombre_proveedor: '', num_factura: '', num_autorizacion: '',
+    ruc_proveedor: '', nombre_proveedor: '', num_factura: '', num_autorizacion: '', fecha_factura: '',
     valor_asignado: 0, valor_justificado: 0, notas: '',
   };
 }
@@ -84,10 +84,13 @@ export default function Liquidaciones({ presupuestos, userRole }) {
     setSaving(true);
     let error;
     if(editing.id){({error}=await supabase.from('liquidaciones').update(editing).eq('id',editing.id));}
-    else{({error}=await supabase.from('liquidaciones').insert(editing));}
+    else{let data2;({data:data2,error}=await supabase.from('liquidaciones').insert(editing).select().single());if(data2)setEditing(prev=>({...prev,id:data2.id}));}
     setSaving(false);
     if(error){showToast('Error: '+error.message);return;}
-    showToast('Guardado ✓');setEditing(null);fetchAll();
+    showToast('Guardado ✓');
+    // Quedarse en la página para seguir editando
+    if (!editing.id && data?.id) setEditing(prev => ({ ...prev, id: data.id }));
+    fetchAll();
   }
 
   async function deleteLiq(id){
@@ -320,7 +323,8 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                   <div><Label>IVA (auto)</Label><input style={S.inputRO} readOnly value={fmt(g.iva)}/></div>
                   <div><Label>Total (auto)</Label><input style={{...S.inputRO,fontWeight:700}} readOnly value={fmt(g.total)}/></div>
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8}}>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr',gap:8}}>
+                  <div><Label>Fecha factura</Label><input type="date" style={S.input} value={g.fecha_factura||''} onChange={e=>updGasto(g.id,'fecha_factura',e.target.value)}/></div>
                   <div><Label>RUC proveedor</Label><input style={S.input} value={g.ruc_proveedor||''} onChange={e=>updGasto(g.id,'ruc_proveedor',e.target.value)}/></div>
                   <div><Label>Nombre proveedor</Label><input style={S.input} value={g.nombre_proveedor||''} onChange={e=>updGasto(g.id,'nombre_proveedor',e.target.value)}/></div>
                   <div><Label># Factura</Label><input style={S.input} value={g.num_factura||''} onChange={e=>updGasto(g.id,'num_factura',e.target.value)}/></div>

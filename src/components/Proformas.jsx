@@ -658,8 +658,9 @@ function buildPDFHtml(pf) {
       </div>`).join('')}
   </div>
   ${opcionesHtml}
-  <div style="margin-top:24px;padding:16px;background:#f8fafc;border-radius:8px;font-size:12px;color:#888;">
-    Los valores presentados tienen una vigencia de 30 días calendario a partir de la fecha de emisión.
+  <div style="margin-top:24px;padding:16px;background:#fdf8ee;border:1px solid #e8d8a0;border-radius:8px;font-size:12px;color:#7a5500;line-height:1.7;">
+    <strong>NOTA:</strong> LA PRESENTE COTIZACIÓN TIENE UNA VIGENCIA DE 30 DÍAS CALENDARIO A PARTIR DE LA FECHA DE EMISIÓN.<br>
+    VENCIDO ESTE PLAZO, LOS VALORES PODRÁN SER AJUSTADOS SEGÚN LAS CONDICIONES DEL MERCADO.
   </div>
   </body></html>`;
 }

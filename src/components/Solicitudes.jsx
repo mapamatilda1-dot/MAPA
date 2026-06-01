@@ -282,11 +282,12 @@ export default function Solicitudes({ userRole, userEmail, userName }) {
     if (data.id) {
       await supabase.from('solicitudes').update(data).eq('id', data.id);
     } else {
-      await supabase.from('solicitudes').insert({ ...data, created_by: userEmail, created_by_nombre: userName });
+      const { data: newSol } = await supabase.from('solicitudes').insert({ ...data, created_by: userEmail, created_by_nombre: userName }).select().single();
+      if (newSol) { setEditing(newSol); loadAll(); showToast('Solicitud guardada ✓'); return; }
     }
-    setEditing(null);
     loadAll();
     showToast('Solicitud guardada ✓');
+    // Nos quedamos en la página para seguir editando
   }
 
   async function enviarSolicitud(data) {

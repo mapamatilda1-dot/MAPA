@@ -147,7 +147,13 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride) {
     <div style="font-size:9px;color:#3dbfb8;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">Nota</div>
     <div style="font-size:12px;color:#1a1a2e;line-height:1.6;">${ppto.notas}</div>
   </div>` : ''}
-  <!-- FOOTER — solo frase, sin contacto -->
+  <div style="margin:0 36px 16px;background:#fdf8ee;border:1px solid #e8d8a0;border-radius:6px;padding:12px 16px;">
+    <div style="font-size:10px;color:#7a5500;line-height:1.7;">
+      <strong>NOTA:</strong> LA PRESENTE COTIZACIÓN TIENE UNA VIGENCIA DE 30 DÍAS CALENDARIO A PARTIR DE LA FECHA DE EMISIÓN.<br>
+      VENCIDO ESTE PLAZO, LOS VALORES PODRÁN SER AJUSTADOS SEGÚN LAS CONDICIONES DEL MERCADO.
+    </div>
+  </div>
+  <!-- FOOTER -->
   <div style="background:#0d3b5e;padding:12px 36px;display:flex;justify-content:center;align-items:center;margin-top:8px;">
     <div style="font-size:10px;color:#3dbfb8;letter-spacing:1px;font-style:italic;">"Donde la estrategia se convierte en experiencia."</div>
   </div>

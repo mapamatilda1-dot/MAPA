@@ -83,9 +83,10 @@ export function canChangeEstadoPpto(role, nuevoEstado) {
   if (role === 'admin') return true;
   const soloFinanciero = ['pendiente_facturar', 'facturado'];
   if (soloFinanciero.includes(nuevoEstado)) return role === 'financiero';
-  const soloAdmin = ['aprobacion_majo'];
-  if (soloAdmin.includes(nuevoEstado)) return ['admin', 'produccion'].includes(role);
-  return ['admin', 'produccion', 'financiero'].includes(role);
+  // Solo admin puede mover a aprobacion_majo y enviado_cliente
+  const soloAdmin = ['aprobacion_majo', 'enviado_cliente'];
+  if (soloAdmin.includes(nuevoEstado)) return false;
+  return ['produccion', 'financiero'].includes(role);
 }
 export function canApproveCostoReal(role)  { return ['admin', 'financiero', 'produccion'].includes(role); }
 export function canEditBcoReal(role)       { return ['admin', 'financiero', 'produccion'].includes(role); }

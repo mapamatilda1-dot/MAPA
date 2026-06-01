@@ -230,11 +230,12 @@ export default function Briefs({ userRole, userEmail }) {
   async function saveBrief(data) {
     if (editBrief) {
       await supabase.from('briefs').update(data).eq('id', editBrief.id);
+      setEditBrief(prev => ({ ...prev, ...data }));
     } else {
-      await supabase.from('briefs').insert({ ...data, created_by: userEmail });
+      const { data: newBrief } = await supabase.from('briefs').insert({ ...data, created_by: userEmail }).select().single();
+      if (newBrief) setEditBrief(newBrief);
     }
-    setView('list');
-    setEditBrief(null);
+    // Nos quedamos en el formulario para seguir editando
     loadAll();
   }
 
