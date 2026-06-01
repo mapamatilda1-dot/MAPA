@@ -69,17 +69,39 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
     const { count } = await supabase.from('presupuestos').select('*', { count:'exact', head:true });
     const { genNomenclatura } = await import('../calc');
     const newNom = genNomenclatura(ppto.nombre, ppto.cliente, (count || 0) + 1);
+
+    // Mantener todos los ítems con sus costos intactos
+    // Solo resetear campos de trazabilidad de ejecución
     const items = (ppto.items || []).map(it => {
       if (it._type === 'subcat') return { ...it, id: crypto.randomUUID() };
-      return { ...it, id: crypto.randomUUID(), costo_real_unit: null, bco_real_pct: null, costo_aprobado: false, num_factura_prov: '', foto_referencia: null };
+      return {
+        ...it,
+        id:              crypto.randomUUID(),
+        costo_real_unit: null,
+        bco_real_pct:    null,
+        costo_aprobado:  false,
+        num_factura_prov: '',
+        foto_referencia: null,
+        // costo_unit se mantiene igual al original
+      };
     });
+
     const { error } = await supabase.from('presupuestos').insert({
-      ...ppto, id: undefined, nomenclatura: newNom,
-      nombre: `COPIA - ${ppto.nombre || ''}`, estado: 'borrador',
-      ejecutado: false, items, created_at: undefined, updated_at: undefined,
+      ...ppto,
+      id:           undefined,
+      nomenclatura: newNom,
+      nombre:       '',          // título vacío — es un nuevo presupuesto
+      fecha_evento: null,        // fecha limpia
+      brief_id:     null,        // proyecto vinculado limpio
+      estado:       'borrador',
+      ejecutado:    false,
+      created_at:   undefined,
+      updated_at:   undefined,
+      items,
     });
     if (error) { showToast('Error: ' + error.message); return; }
-    showToast('Presupuesto duplicado ✓'); fetchAll();
+    showToast('Presupuesto duplicado ✓ — editá el nombre y la fecha');
+    fetchAll();
   }
 
   async function deletePpto(id) {
