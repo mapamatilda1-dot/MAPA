@@ -73,6 +73,7 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
         oh_pct:      cfg?.oh_pct      ?? 15,
         bco_pct:     cfg?.bco_pct     ?? 5.5,
         apply_rebate:false, estado:'borrador', notas:'', items:[], nomenclatura:'',
+        ejecutado: false, cerrado_produccion: false,
         ejecutivo_nombre:'', ejecutivo_email:'',
       });
     }
@@ -803,6 +804,43 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
       {/* ══ VISTA PREVIA ══ */}
       {tab==='vista'&&(
         <div>
+          {/* Botón de flujo de trabajo */}
+          {getFlujoBtnLabel(p.estado) && (
+            <div style={{marginBottom:14,padding:'14px 16px',background:'#eef4fb',border:'1px solid #c8d8e8',borderRadius:10,display:'flex',alignItems:'center',gap:12}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,color:'#5a7a9a',marginBottom:2}}>Siguiente paso en el flujo</div>
+                <div style={{fontSize:13,fontWeight:600,color:'#0d3b5e'}}>{ESTADOS_PPTO_LABELS[getFlujoBtnNextEstado(p.estado)]}</div>
+              </div>
+              <button
+                style={{...S.btnPrimary,background:'#0d3b5e',padding:'10px 20px',fontSize:13}}
+                onClick={async () => {
+                  const nextEstado = getFlujoBtnNextEstado(p.estado);
+                  if (!nextEstado) return;
+                  if (!canChangeEstadoPpto(userRole, nextEstado)) { showToast('⚠️ Sin permiso'); return; }
+                  setField('estado', nextEstado);
+                  await supabase.from('presupuestos').update({ estado: nextEstado }).eq('id', p.id);
+                  showToast(`Estado actualizado: ${ESTADOS_PPTO_LABELS[nextEstado]}`);
+                }}
+              >
+                {getFlujoBtnLabel(p.estado)} →
+              </button>
+            </div>
+          )}
+
+          {/* Check cerrado por producción */}
+          {canMarkCerradoProduccion(userRole) && ESTADOS_CIERRE.includes(p.estado) && p.ejecutado && (
+            <div style={{marginBottom:14,padding:'12px 16px',background: p.cerrado_produccion?'#e8f5ee':'#f8fafc',border:`1px solid ${p.cerrado_produccion?'#2e8b4e':'#dde6ef'}`,borderRadius:10,display:'flex',alignItems:'center',gap:12}}>
+              <input type="checkbox" id="cerrado_prod" checked={!!p.cerrado_produccion}
+                onChange={e => setField('cerrado_produccion', e.target.checked)}
+                style={{width:18,height:18,cursor:'pointer',accentColor:'#2e8b4e'}}
+              />
+              <label htmlFor="cerrado_prod" style={{fontSize:13,fontWeight:600,cursor:'pointer',color: p.cerrado_produccion?'#2e8b4e':'#0d3b5e'}}>
+                {p.cerrado_produccion ? '✅ Cerrado por producción' : 'Cerrar por producción'}
+              </label>
+              {p.cerrado_produccion && <span style={{fontSize:11,color:'#2e8b4e',marginLeft:'auto'}}>Notificación enviada a Financiero</span>}
+            </div>
+          )}
+
           <div style={{display:'flex',gap:8,marginBottom:16}}>
             <button style={{...S.btnPrimary,opacity:previewMode==='cliente'?1:0.55}} onClick={()=>setPreviewMode('cliente')}>👤 Vista cliente</button>
             <button style={{...S.btnSecondary,opacity:previewMode==='financiero'?1:0.55,border:'1px solid #0d3b5e',color:'#0d3b5e'}} onClick={()=>setPreviewMode('financiero')}>💼 Vista financiera</button>
