@@ -12,6 +12,7 @@ import Implementaciones from './components/Implementaciones';
 import AdminPanel from './components/AdminPanel';
 import Proformas from './components/Proformas';
 import Solicitudes from './components/Solicitudes';
+import Dashboard from './components/Dashboard';
 
 // Placeholders — se reemplazarán en las fases siguientes
 const Placeholder = ({ nombre }) => (
@@ -89,7 +90,7 @@ export default function App() {
       case 'liquidaciones':    return <LiquidacionesTab userRole={role} />;
       case 'calendario':       return <Calendario />;
       case 'implementaciones': return <Implementaciones userRole={role} />;
-      case 'dashboard':        return <Placeholder nombre="Dashboard financiero — En construcción" />;
+      case 'dashboard':        return <Dashboard />;
       case 'admin_panel':      return <AdminPanel />;
       default:                 return <Placeholder nombre="Seleccioná una sección" />;
     }
