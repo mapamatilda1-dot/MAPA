@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { ESTADOS_BRIEF_COLORS, ESTADOS_PROPUESTA_COLORS } from '../roles';
+import ExpedientePanel from './ExpedientePanel';
 
 const DAYS   = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -29,21 +30,19 @@ export default function Calendario() {
   const [view, setView]       = useState('month');
   const [current, setCurrent] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected] = useState(null);
+  const [expedienteId, setExpedienteId] = useState(null);
   const [briefs, setBriefs]   = useState([]);
-  const [propuestas, setPropuestas] = useState([]);
   const [impls, setImpls]     = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const [{ data: br }, { data: pr }, { data: im }] = await Promise.all([
+      const [{ data: br }, { data: im }] = await Promise.all([
         supabase.from('briefs').select('id, nombre, cliente_nombre, fecha_entrega, estado'),
-        supabase.from('propuestas').select('id, titulo, cliente_nombre, estado, created_at'),
         supabase.from('implementaciones').select('*').order('fecha_evento'),
       ]);
       setBriefs(br || []);
-      setPropuestas(pr || []);
       setImpls(im || []);
       setLoading(false);
     }
@@ -52,9 +51,6 @@ export default function Calendario() {
 
   function briefsForDay(dateStr) {
     return briefs.filter(b => b.fecha_entrega === dateStr);
-  }
-  function propuestasForDay(dateStr) {
-    return propuestas.filter(p => p.created_at?.slice(0,10) === dateStr);
   }
   function implsForDay(dateStr) {
     return impls.filter(i => {
@@ -71,9 +67,9 @@ export default function Calendario() {
 
   function DayCell({ dateStr, day, isToday, isSelected, onClick }) {
     const dayBriefs    = briefsForDay(dateStr);
-    const dayPropuestas = propuestasForDay(dateStr);
+    const dayPropuestas = [];
     const dayImpls     = implsForDay(dateStr);
-    const total = dayBriefs.length + dayPropuestas.length + dayImpls.length;
+    const total = dayBriefs.length + dayImpls.length;
 
     return (
       <div onClick={onClick} style={{
@@ -91,12 +87,7 @@ export default function Calendario() {
           {dayBriefs.slice(0,2).map(b => {
             const c = getColor(b.estado);
             return <div key={'b'+b.id} style={{ fontSize:10, padding:'1px 5px', borderRadius:4, background:c.bg, color:c.text, borderLeft:`2px solid ${c.border}`, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>📋 {b.nombre}</div>;
-          })}
-          {dayPropuestas.slice(0,1).map(p => {
-            const c = getColor(p.estado);
-            return <div key={'p'+p.id} style={{ fontSize:10, padding:'1px 5px', borderRadius:4, background:c.bg, color:c.text, borderLeft:`2px solid ${c.border}`, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>🎨 {p.titulo}</div>;
-          })}
-          {total > 3 && <div style={{ fontSize:10, color:'#888' }}>+{total-3} más</div>}
+          })}          {total > 3 && <div style={{ fontSize:10, color:'#888' }}>+{total-3} más</div>}
         </div>
       </div>
     );
@@ -104,11 +95,11 @@ export default function Calendario() {
 
   function DayDetail({ dateStr }) {
     const dayBriefs    = briefsForDay(dateStr);
-    const dayPropuestas = propuestasForDay(dateStr);
+    const dayPropuestas = [];
     const dayImpls     = implsForDay(dateStr);
     const fecha = new Date(dateStr+'T12:00').toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
 
-    if (!dayBriefs.length && !dayPropuestas.length && !dayImpls.length) {
+    if (!dayBriefs.length && !dayImpls.length) {
       return <div style={{ marginTop:'1rem', background:'#fff', border:'1px solid #e8e8e8', borderRadius:10, padding:'1rem' }}>
         <div style={{ fontSize:14, fontWeight:500, marginBottom:8, textTransform:'capitalize' }}>{fecha}</div>
         <div style={{ fontSize:13, color:'#aaa' }}>Sin eventos este día</div>
@@ -131,30 +122,17 @@ export default function Calendario() {
         {dayBriefs.map(b => {
           const c = getColor(b.estado);
           return (
-            <div key={b.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, background:'#f9f9f7', border:'1px solid #eee', marginBottom:6 }}>
+            <div key={b.id} onClick={()=>setExpedienteId(b.id)} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, background:'#f9f9f7', border:'1px solid #eee', marginBottom:6, cursor:'pointer' }}>
               <div style={{ width:3, height:36, borderRadius:2, background:c.border, flexShrink:0 }}/>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:14, fontWeight:500 }}>📋 {b.nombre}</div>
                 {b.cliente_nombre && <div style={{ fontSize:12, color:'#888', marginTop:1 }}>🏢 {b.cliente_nombre}</div>}
               </div>
               <span style={{ fontSize:11, padding:'2px 8px', borderRadius:999, background:c.bg, color:c.text, fontWeight:500 }}>Entrega</span>
+              <span style={{ fontSize:11, color:'#7c3aed' }}>📁</span>
             </div>
           );
-        })}
-        {dayPropuestas.map(p => {
-          const c = getColor(p.estado);
-          return (
-            <div key={p.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, background:'#f9f9f7', border:'1px solid #eee', marginBottom:6 }}>
-              <div style={{ width:3, height:36, borderRadius:2, background:'#7c3aed', flexShrink:0 }}/>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:14, fontWeight:500 }}>🎨 {p.titulo}</div>
-                {p.cliente_nombre && <div style={{ fontSize:12, color:'#888', marginTop:1 }}>🏢 {p.cliente_nombre}</div>}
-              </div>
-              <span style={{ fontSize:11, padding:'2px 8px', borderRadius:999, background:c.bg, color:c.text, fontWeight:500 }}>{ESTADOS_PROPUESTA_LABELS_MAP[p.estado]||p.estado}</span>
-            </div>
-          );
-        })}
-      </div>
+        })}      </div>
     );
   }
 
@@ -211,7 +189,7 @@ export default function Calendario() {
             const isSelected = dateStr===selected;
             const dayBriefs = briefsForDay(dateStr);
             const dayImpls  = implsForDay(dateStr);
-            const dayProps  = propuestasForDay(dateStr);
+            const dayProps  = [];
             return (
               <div key={dateStr} onClick={()=>setSelected(s=>s===dateStr?null:dateStr)} style={{ minHeight:120, padding:8, borderRadius:10, cursor:'pointer', overflow:'hidden', border:isSelected?'2px solid #1a1a1a':isToday?'2px solid #3b82f6':'1px solid #e8e8e8', background:isSelected?'#f9f9f7':isToday?'#eff6ff':'#fff' }}>
                 <div style={{ textAlign:'center', marginBottom:6 }}>
@@ -220,9 +198,7 @@ export default function Calendario() {
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
                   {dayImpls.map(i=><div key={'i'+i.id} style={{ fontSize:11, padding:'3px 6px', borderRadius:5, background:'#ede9fe', color:'#5b21b6', borderLeft:'2px solid #7c3aed', lineHeight:1.3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{implLabel(i,dateStr)}</div>)}
-                  {dayBriefs.map(b=>{ const c=getColor(b.estado); return <div key={'b'+b.id} style={{ fontSize:11, padding:'3px 6px', borderRadius:5, background:c.bg, color:c.text, borderLeft:`2px solid ${c.border}`, lineHeight:1.3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>📋 {b.nombre}</div>; })}
-                  {dayProps.map(p=>{ const c=getColor(p.estado); return <div key={'p'+p.id} style={{ fontSize:11, padding:'3px 6px', borderRadius:5, background:c.bg, color:c.text, borderLeft:`2px solid ${c.border}`, lineHeight:1.3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>🎨 {p.titulo}</div>; })}
-                </div>
+                  {dayBriefs.map(b=>{ const c=getColor(b.estado); return <div key={'b'+b.id} style={{ fontSize:11, padding:'3px 6px', borderRadius:5, background:c.bg, color:c.text, borderLeft:`2px solid ${c.border}`, lineHeight:1.3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>📋 {b.nombre}</div>; })}                </div>
               </div>
             );
           })}
@@ -250,9 +226,7 @@ export default function Calendario() {
         {/* Leyenda */}
         <div style={{ marginLeft:'auto', display:'flex', gap:12, flexWrap:'wrap', alignItems:'center' }}>
           {[
-            { label:'Entrega brief', bg:'#dcfce7', border:'#22c55e' },
-            { label:'Propuesta', bg:'#dbeafe', border:'#3b82f6' },
-            { label:'Implementación', bg:'#ede9fe', border:'#7c3aed' },
+            { label:'Entrega brief', bg:'#dcfce7', border:'#22c55e' },            { label:'Implementación', bg:'#ede9fe', border:'#7c3aed' },
           ].map(l=>(
             <div key={l.label} style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, color:'#555' }}>
               <div style={{ width:10, height:10, borderRadius:3, background:l.bg, border:`2px solid ${l.border}` }}/>
@@ -262,6 +236,7 @@ export default function Calendario() {
         </div>
       </div>
       {view==='month' ? <MonthView/> : <WeekView/>}
+      {expedienteId && <ExpedientePanel briefId={expedienteId} onClose={()=>setExpedienteId(null)}/>}
     </div>
   );
 }

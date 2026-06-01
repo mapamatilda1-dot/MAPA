@@ -53,7 +53,7 @@ export default function App() {
     if (!session) { setActiveTab(null); return; }
     const role = session.user?.user_metadata?.role || 'produccion';
     const tabs = getNavTabs(role);
-    setActiveTab(tabs[0] || 'briefs');
+    setActiveTab(role === 'admin' ? 'calendario' : (tabs[0] || 'briefs'));
   }, [session?.user?.id]);
 
   if (loading) return (

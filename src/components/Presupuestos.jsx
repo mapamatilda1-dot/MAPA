@@ -23,6 +23,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
   const [toast, setToast]         = useState('');
   const [popupPpto, setPopupPpto] = useState(null);
   const [expedienteId, setExpedienteId] = useState(null);
+  const [vincularPpto, setVincularPpto] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [exportPeriod, setExportPeriod] = useState({ type:'mes', mes:new Date().getMonth()+1, anio:new Date().getFullYear() });
 
@@ -152,7 +153,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
         ppto={editing === 'new' ? null : editing}
         cfg={cfg} categorias={categorias} clientes={clientes}
         ejecutivos={ejecutivos} logoUrl={logoUrl} userRole={userRole}
-        briefs={briefs}
+        briefs={briefs.map(b => ({ ...b, _usado: pptos.some(p => p.brief_id === b.id && p.id !== (editing?.id)) }))}
         onSave={() => { setEditing(null); fetchAll(); showToast('Presupuesto guardado ✓'); }}
         onCancel={() => setEditing(null)}
       />
@@ -179,7 +180,10 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
               {p.fecha_evento && <span>📅 {p.fecha_evento}</span>}
               {p.ciudad && <span>📍 {p.ciudad}</span>}
               <span>📦 {(p.items||[]).filter(it=>!it._type).length} ítems</span>
-              {p.brief_id && <span style={{ color:'#7c3aed', cursor:'pointer', fontWeight:500 }} onClick={e=>{ e.stopPropagation(); setExpedienteId(p.brief_id); }}>📁 Ver expediente</span>}
+              {p.brief_id 
+                ? <span style={{ color:'#7c3aed', cursor:'pointer', fontWeight:500 }} onClick={e=>{ e.stopPropagation(); setExpedienteId(p.brief_id); }}>📁 Ver expediente</span>
+                : <span style={{ color:'#aaa', cursor:'pointer', fontSize:11 }} onClick={e=>{ e.stopPropagation(); setVincularPpto(p); }}>🔗 Vincular proyecto</span>
+              }
             </div>
           </div>
           <div style={{ textAlign:'right' }} onClick={() => setPopupPpto(p)}>
@@ -322,6 +326,34 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
       )}
 
       <Toast msg={toast}/>
+
+      {/* Modal vincular proyecto */}
+      {vincularPpto && (
+        <div onClick={()=>setVincularPpto(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.45)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:14, width:'100%', maxWidth:460, padding:24, boxShadow:'0 4px 24px rgba(0,0,0,.15)' }}>
+            <div style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:4 }}>Vincular a proyecto</div>
+            <div style={{ fontSize:12, color:'#8aa0b8', marginBottom:16 }}>{vincularPpto.nombre || vincularPpto.cliente}</div>
+            <select
+              style={{ width:'100%', padding:'9px 12px', border:'1px solid #ddd', borderRadius:9, fontSize:13, fontFamily:'inherit', marginBottom:16 }}
+              defaultValue=""
+              onChange={async e => {
+                if (!e.target.value) return;
+                await supabase.from('presupuestos').update({ brief_id: e.target.value }).eq('id', vincularPpto.id);
+                setVincularPpto(null);
+                showToast('Proyecto vinculado ✓');
+                fetchAll();
+              }}
+            >
+              <option value="">Seleccioná un proyecto…</option>
+              {briefs.filter(b => !pptos.some(p => p.brief_id === b.id && p.id !== vincularPpto.id)).map(b => (
+                <option key={b.id} value={b.id}>{b.nombre}{b.cliente_nombre ? ' — ' + b.cliente_nombre : ''}</option>
+              ))}
+            </select>
+            <button onClick={()=>setVincularPpto(null)} style={{ width:'100%', padding:9, background:'#f0f4f8', border:'1px solid #dde6ef', borderRadius:8, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
       {expedienteId && <ExpedientePanel briefId={expedienteId} onClose={()=>setExpedienteId(null)}/>}
     </div>
   );

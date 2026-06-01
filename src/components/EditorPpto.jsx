@@ -360,7 +360,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
               <Label>Vincular a proyecto</Label>
               <select style={S.select} value={p.brief_id||''} onChange={e=>selectBrief(e.target.value)} disabled={bloqueado}>
                 <option value="">Sin vincular</option>
-                {briefs.map(b=><option key={b.id} value={b.id}>{b.nombre}{b.cliente_nombre?' — '+b.cliente_nombre:''}</option>)}
+                {briefs.filter(b => !b._usado || b.id === p.brief_id).map(b=><option key={b.id} value={b.id}>{b.nombre}{b.cliente_nombre?' — '+b.cliente_nombre:''}</option>)}
               </select>
               {p.brief_id && (
                 <div style={{fontSize:11,color:'#2e8b4e',marginTop:4}}>
