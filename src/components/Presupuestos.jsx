@@ -27,12 +27,18 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
   const [vincularPpto, setVincularPpto] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [exportPeriod, setExportPeriod] = useState({ type:'mes', mes:new Date().getMonth()+1, anio:new Date().getFullYear() });
+  // Filtro por usuario — Producción ve solo los suyos por defecto, Admin ve todos
+  const [soloMios, setSoloMios]   = useState(userRole === 'produccion');
+  const [loading, setLoading]     = useState(false);
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); }, [soloMios]);
 
   async function fetchAll() {
+    setLoading(true);
+    let query = supabase.from('presupuestos').select('*').order('created_at', { ascending: false });
+    if (soloMios) query = query.eq('created_by', userEmail);
     const [ppR, catR, cliR, cfgR, ejecR, brR] = await Promise.all([
-      supabase.from('presupuestos').select('*').order('created_at', { ascending: false }),
+      query,
       supabase.from('categorias').select('*').order('nombre'),
       supabase.from('clientes').select('*').order('nombre'),
       supabase.from('config').select('*').single(),
@@ -45,6 +51,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
     if (cfgR.data)  setCfg(cfgR.data);
     if (ejecR.data) setEjecs(ejecR.data);
     if (brR.data)   setBriefs(brR.data);
+    setLoading(false);
   }
 
   function showToast(m) { setToast(m); setTimeout(() => setToast(''), 3000); }
@@ -225,6 +232,19 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, flexWrap:'wrap', gap:10 }}>
         <h2 style={{ fontSize:20, fontWeight:700, color:'#0d3b5e' }}>📊 Presupuestos {anioActual}</h2>
         <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+          {/* Toggle mis presupuestos / todos */}
+          <button
+            onClick={() => setSoloMios(v => !v)}
+            style={{
+              padding:'7px 14px', borderRadius:8, fontSize:12, fontWeight:500,
+              cursor:'pointer', fontFamily:'inherit', border:'1px solid',
+              background: soloMios ? '#0d3b5e' : '#fff',
+              color:      soloMios ? '#fff'    : '#0d3b5e',
+              borderColor: '#0d3b5e',
+            }}
+          >
+            {soloMios ? '👤 Mis presupuestos' : '👥 Todos'}
+          </button>
           <select style={{ ...S.select, width:'auto' }} value={exportPeriod.type} onChange={e => setExportPeriod(p => ({...p, type:e.target.value}))}>
             <option value="mes">Por mes</option><option value="anio">Por año</option>
           </select>
