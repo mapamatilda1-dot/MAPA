@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { S, Label, Badge, Toast } from '../styles.jsx';
 import { calcItem, calcPpto, genNomenclatura, fmt, fmtPct } from '../calc';
 import { generatePdfClienteHTML, generatePdfFinancieroHTML, generateExcelFinancieroData } from './PdfCliente';
+import AlcanceTab from './AlcanceTab';
 import {
   ESTADOS_PPTO, ESTADOS_PPTO_LABELS, ESTADOS_PPTO_COLORS,
   canChangeEstadoPpto, canEditPpto, canApproveCostoReal, canEditBcoReal,
@@ -165,6 +166,23 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     if(!p)return;
     const html=generatePdfClienteHTML(p,logoUrl);
     const w=window.open('','_blank');w.document.write(html);w.document.close();
+  }
+
+  async function saveVersion(ppto, estado) {
+    try {
+      const html = generatePdfClienteHTML(ppto, logoUrl);
+      const blob = new Blob([html], { type:'text/html' });
+      const fileName = `${(ppto.nomenclatura||ppto.id).replace(/[^a-zA-Z0-9-_]/g,'_')}_v${Date.now()}.html`;
+      await supabase.storage.from('versiones-pdf').upload(fileName, blob, { contentType:'text/html' });
+      const { data:urlData } = supabase.storage.from('versiones-pdf').getPublicUrl(fileName);
+      const { count } = await supabase.from('versiones_ppto').select('*',{count:'exact',head:true}).eq('presupuesto_id',ppto.id);
+      await supabase.from('versiones_ppto').insert({
+        presupuesto_id: ppto.id, estado,
+        version_num: (count||0)+1,
+        pdf_url: urlData?.publicUrl||'',
+        created_by: ppto.ejecutivo_email||ppto.created_by||'',
+      });
+    } catch(e) { console.warn('No se pudo guardar versión:', e); }
   }
 
   function openPdfFinanciero(){
@@ -344,7 +362,12 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
           onChange={e=>{
             if(!canChangeEstadoPpto(userRole,e.target.value)){showToast('⚠️ Sin permiso para este estado');return;}
             if(!canEditPpto(userRole,p.estado)){showToast('⚠️ Presupuesto bloqueado');return;}
-            setField('estado',e.target.value);
+            const nuevoEstado = e.target.value;
+            setField('estado', nuevoEstado);
+            if (p.id) {
+              await supabase.from('presupuestos').update({ estado: nuevoEstado }).eq('id', p.id);
+              await saveVersion({ ...p, estado: nuevoEstado }, nuevoEstado);
+            }
           }}>
           {ESTADOS_PPTO.map(e=><option key={e} value={e} disabled={!canChangeEstadoPpto(userRole,e)&&p.estado!==e}>{ESTADOS_PPTO_LABELS[e]}</option>)}
         </select>
@@ -356,7 +379,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
 
       {/* Tabs */}
       <div style={{display:'flex',gap:4,marginBottom:16,borderBottom:'2px solid #dde6ef',paddingBottom:0}}>
-        {[['info','📋 Info'],['items','📦 Ítems'],['totales','💰 Totales'],['vista','👁 Vista previa']].map(([k,l])=>(
+        {[['info','📋 Info'],['items','📦 Ítems'],['totales','💰 Totales'],['alcance','➕ Alcance'],['vista','👁 Vista previa']].map(([k,l])=>(
           <button key={k} onClick={()=>setTab(k)} style={{
             padding:'8px 16px',border:'none',cursor:'pointer',fontSize:13,background:'none',
             borderBottom:tab===k?'2px solid #c8264a':'2px solid transparent',
@@ -438,6 +461,12 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
               {p.items.length} ítems · Precio total: <strong style={{color:'#0d3b5e'}}>{fmt(totales.subtotalPrecio)}</strong>
             </span>
             <div style={{display:'flex',gap:8}}>
+              {p.estado==='enviado_cliente' && p.id && (
+                <button style={{...S.btnPrimary,background:'#7c3aed'}} onClick={async()=>{
+                  await saveVersion(p, p.estado);
+                  showToast('📄 Versión guardada en el expediente ✓');
+                }}>📄 Nueva versión</button>
+              )}
               <button style={{...S.btnPrimary,background:'#0d3b5e'}} onClick={()=>{
                 const nombre=window.prompt('Nombre de la subcategoría:');
                 if(!nombre||!nombre.trim())return;
@@ -887,6 +916,17 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
         </div>
       )}
 
+      {/* ══ ALCANCE ══ */}
+      {tab==='alcance'&&(
+        <AlcanceTab
+          presupuestoId={p.id}
+          presupuesto={p}
+          cfg={cfg}
+          logoUrl={logoUrl}
+          userRole={userRole}
+        />
+      )}
+
       {/* ══ VISTA PREVIA ══ */}
       {tab==='vista'&&(
         <div>
@@ -905,6 +945,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                   if (!canChangeEstadoPpto(userRole, nextEstado)) { showToast('⚠️ Sin permiso'); return; }
                   setField('estado', nextEstado);
                   await supabase.from('presupuestos').update({ estado: nextEstado }).eq('id', p.id);
+                  await saveVersion({ ...p, estado: nextEstado }, nextEstado);
                   showToast(`Estado actualizado: ${ESTADOS_PPTO_LABELS[nextEstado]}`);
                 }}
               >
