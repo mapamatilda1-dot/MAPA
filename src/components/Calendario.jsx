@@ -257,7 +257,8 @@ export default function Calendario() {
   if (loading) return <div style={{ padding:'2rem', textAlign:'center', color:'#888' }}>Cargando calendario…</div>;
 
   return (
-    <div style={{ width:'100%', overflowX:'hidden' }}>
+    <div style={{ width:'100%', overflowX:'auto' }}>
+      <div style={{ minWidth:700 }}>
       <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:'1.25rem', flexWrap:'wrap' }}>
         <div style={{ display:'flex', gap:4 }}>
           {['month','week'].map(v=>(
@@ -285,6 +286,7 @@ export default function Calendario() {
       </div>
       {view==='month' ? <MonthView/> : <WeekView/>}
       {expedienteId && <ExpedientePanel briefId={expedienteId} onClose={()=>setExpedienteId(null)}/>}
+      </div>
     </div>
   );
 }
