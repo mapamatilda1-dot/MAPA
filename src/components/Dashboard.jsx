@@ -53,8 +53,17 @@ export default function Dashboard() {
   // Filtrar por año
   const pptosAnio = pptos.filter(p => p.fecha_evento?.startsWith(String(anio)));
 
-  // Con cálculos
-  const withCalc = pptosAnio.map(p => ({ ...p, _t: calcPpto(p) }));
+  // Con cálculos - agregar margen sin fee y margen incl fee
+  const withCalc = pptosAnio.map(p => {
+    const t = calcPpto(p);
+    const margenSinFee     = t.subtotalPrecio - t.subtotalCosto;
+    const margenSinFeePct  = t.subtotalPrecio > 0 ? margenSinFee / t.subtotalPrecio * 100 : 0;
+    const margenRealSinFee = t.subtotalPrecio - t.subtotalCostoReal;
+    const margenRealSinFeePct = t.subtotalPrecio > 0 ? margenRealSinFee / t.subtotalPrecio * 100 : 0;
+    const margenInclFee    = t.totalSinIva - t.subtotalCosto - (p.apply_rebate ? t.rebate : 0);
+    const margenInclFeePct = t.totalSinIva > 0 ? margenInclFee / t.totalSinIva * 100 : 0;
+    return { ...p, _t: { ...t, margenSinFee, margenSinFeePct, margenRealSinFee, margenRealSinFeePct, margenInclFee, margenInclFeePct } };
+  });
 
   // Por estado
   const facturados      = withCalc.filter(p => p.estado === 'facturado');
@@ -65,24 +74,25 @@ export default function Dashboard() {
   // Totales globales
   const totalFacturado  = facturados.reduce((a,p)=>a+p._t.totalSinIva,0);
   const costoFacturado  = facturados.reduce((a,p)=>a+p._t.subtotalCosto,0);
-  const margenFacturado = facturados.reduce((a,p)=>a+p._t.margenTotal,0);
+  const margenFacturado = facturados.reduce((a,p)=>a+p._t.margenSinFee,0);
   const totalEjecutado  = ejecutados.reduce((a,p)=>a+p._t.totalSinIva,0);
   const costoRealEjec   = ejecutados.reduce((a,p)=>a+p._t.subtotalCostoReal,0);
-  const margenRealEjec  = ejecutados.reduce((a,p)=>a+p._t.margenRealTotal,0);
+  const margenRealEjec  = ejecutados.reduce((a,p)=>a+p._t.margenRealSinFee,0);
   const totalPipeline   = withCalc.filter(p=>!['cancelado','facturado'].includes(p.estado)).reduce((a,p)=>a+p._t.totalSinIva,0);
 
   // Por cliente
   const porCliente = {};
   withCalc.forEach(p => {
     const cl = p.cliente || 'Sin cliente';
-    if (!porCliente[cl]) porCliente[cl] = { nombre:cl, pptos:[], totalPrecio:0, totalCosto:0, totalCostoReal:0, margen:0, margenReal:0, facturado:0, ejecutado:0 };
+    if (!porCliente[cl]) porCliente[cl] = { nombre:cl, pptos:[], totalPrecio:0, totalCosto:0, totalCostoReal:0, margen:0, margenReal:0, margenInclFee:0, facturado:0, ejecutado:0 };
     const g = porCliente[cl];
     g.pptos.push(p);
     g.totalPrecio   += p._t.totalSinIva;
     g.totalCosto    += p._t.subtotalCosto;
     g.totalCostoReal+= p._t.subtotalCostoReal;
-    g.margen        += p._t.margenTotal;
-    g.margenReal    += p._t.margenRealTotal;
+    g.margen        += p._t.margenSinFee;
+    g.margenReal    += p._t.margenRealSinFee;
+    g.margenInclFee += p._t.margenInclFee;
     if (p.estado === 'facturado')  g.facturado += p._t.totalSinIva;
     if (p.ejecutado)               g.ejecutado += p._t.totalSinIva;
   });
@@ -101,7 +111,7 @@ export default function Dashboard() {
     porMes[m].precio   += p._t.totalSinIva;
     porMes[m].costo    += p._t.subtotalCosto;
     porMes[m].costoReal+= p._t.subtotalCostoReal;
-    porMes[m].margen   += p._t.margenTotal;
+    porMes[m].margen   += p._t.margenSinFee;
     porMes[m].count    ++;
     if (p.estado==='facturado') porMes[m].facturado += p._t.totalSinIva;
   });
@@ -204,11 +214,12 @@ export default function Dashboard() {
                 {[
                   ['Total precio', fmt(c.totalPrecio), '#0d3b5e'],
                   ['Costo cotizado', fmt(c.totalCosto), '#555'],
-                  ['Margen cotizado', fmt(c.margen)+` (${pct(c.margen,c.totalPrecio)})`, c.margen>=0?'#2e8b4e':'#dc2626'],
+                  ['Margen cotizado (sin fee)', fmt(c.margen)+` (${pct(c.margen,c.totalPrecio)})`, c.margen>=0?'#2e8b4e':'#dc2626'],
+                  ['Margen incl. fee', fmt(c.margenInclFee)+` (${pct(c.margenInclFee,c.totalPrecio)})`, c.margenInclFee>=0?'#0d3b5e':'#dc2626'],
                   ['Facturado', fmt(c.facturado), '#2e8b4e'],
                   ['Ejecutado', fmt(c.ejecutado), '#7c3aed'],
                   ['Costo real', fmt(c.totalCostoReal), '#d97706'],
-                  ['Margen real', fmt(c.margenReal)+` (${pct(c.margenReal,c.ejecutado)})`, c.margenReal>=0?'#2e8b4e':'#dc2626'],
+                  ['Margen real (sin fee)', fmt(c.margenReal)+` (${pct(c.margenReal,c.ejecutado)})`, c.margenReal>=0?'#2e8b4e':'#dc2626'],
                 ].map(([l,v,col])=>(
                   <div key={l} style={{ background:'#f8fafc', borderRadius:8, padding:'10px 12px' }}>
                     <div style={{ fontSize:10, color:'#888', marginBottom:3 }}>{l}</div>
@@ -237,8 +248,8 @@ export default function Dashboard() {
                           </td>
                           <td style={{ padding:'6px 10px', textAlign:'right', fontWeight:600 }}>{fmt(p._t.totalSinIva)}</td>
                           <td style={{ padding:'6px 10px', textAlign:'right' }}>{fmt(p._t.subtotalCosto)}</td>
-                          <td style={{ padding:'6px 10px', textAlign:'right', color:p._t.margenTotal>=0?'#2e8b4e':'#dc2626', fontWeight:600 }}>{fmt(p._t.margenTotal)}</td>
-                          <td style={{ padding:'6px 10px', textAlign:'right', color:p._t.margenPct>=20?'#2e8b4e':'#dc2626' }}>{p._t.margenPct.toFixed(1)}%</td>
+                          <td style={{ padding:'6px 10px', textAlign:'right', color:p._t.margenSinFee>=0?'#2e8b4e':'#dc2626', fontWeight:600 }}>{fmt(p._t.margenSinFee)}</td>
+                          <td style={{ padding:'6px 10px', textAlign:'right', color:p._t.margenSinFeePct>=20?'#2e8b4e':'#dc2626' }}>{p._t.margenSinFeePct.toFixed(1)}%</td>
                         </tr>
                       ))}
                     </tbody>
@@ -266,7 +277,7 @@ export default function Dashboard() {
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                 <thead>
                   <tr style={{ background:'#0d3b5e' }}>
-                    {['Código','Nombre','Cliente','Fecha','Estado','Ejec.','Total s/IVA','Costo','Margen','%','Costo real','Margen real'].map(h=>(
+                    {['Código','Nombre','Cliente','Fecha','Estado','Ejec.','Total s/IVA','Costo','Margen s/fee','%','Margen incl.fee','Costo real','Margen real s/fee'].map(h=>(
                       <th key={h} style={{ padding:'10px 12px', textAlign:'left', fontSize:11, color:'rgba(255,255,255,.8)', fontWeight:700, whiteSpace:'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -284,10 +295,10 @@ export default function Dashboard() {
                       <td style={{ padding:'8px 12px', textAlign:'center' }}>{p.ejecutado?'✅':'—'}</td>
                       <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:600 }}>{fmt(p._t.totalSinIva)}</td>
                       <td style={{ padding:'8px 12px', textAlign:'right', color:'#555' }}>{fmt(p._t.subtotalCosto)}</td>
-                      <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:600, color:p._t.margenTotal>=0?'#2e8b4e':'#dc2626' }}>{fmt(p._t.margenTotal)}</td>
-                      <td style={{ padding:'8px 12px', textAlign:'right', color:p._t.margenPct>=20?'#2e8b4e':'#dc2626' }}>{p._t.margenPct.toFixed(1)}%</td>
+                      <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:600, color:p._t.margenSinFee>=0?'#2e8b4e':'#dc2626' }}>{fmt(p._t.margenSinFee)}</td>
+                      <td style={{ padding:'8px 12px', textAlign:'right', color:p._t.margenSinFeePct>=20?'#2e8b4e':'#dc2626' }}>{p._t.margenSinFeePct.toFixed(1)}%</td>
                       <td style={{ padding:'8px 12px', textAlign:'right', color:'#7c3aed' }}>{p._t.subtotalCostoReal>0?fmt(p._t.subtotalCostoReal):'—'}</td>
-                      <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:600, color:p._t.margenRealTotal>=0?'#2e8b4e':'#dc2626' }}>{p._t.subtotalCostoReal>0?fmt(p._t.margenRealTotal):'—'}</td>
+                      <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:600, color:p._t.margenRealSinFee>=0?'#2e8b4e':'#dc2626' }}>{p._t.subtotalCostoReal>0?fmt(p._t.margenRealSinFee):'—'}</td>
                     </tr>
                   ))}
                   {pptosTabla.length === 0 && (
@@ -300,12 +311,12 @@ export default function Dashboard() {
                       <td colSpan={6} style={{ padding:'10px 12px', color:'rgba(255,255,255,.8)', fontSize:12 }}>TOTALES ({pptosTabla.length})</td>
                       <td style={{ padding:'10px 12px', textAlign:'right', color:'#fff' }}>{fmt(pptosTabla.reduce((a,p)=>a+p._t.totalSinIva,0))}</td>
                       <td style={{ padding:'10px 12px', textAlign:'right', color:'rgba(255,255,255,.7)' }}>{fmt(pptosTabla.reduce((a,p)=>a+p._t.subtotalCosto,0))}</td>
-                      <td style={{ padding:'10px 12px', textAlign:'right', color:'#3dbfb8' }}>{fmt(pptosTabla.reduce((a,p)=>a+p._t.margenTotal,0))}</td>
+                      <td style={{ padding:'10px 12px', textAlign:'right', color:'#3dbfb8' }}>{fmt(pptosTabla.reduce((a,p)=>a+p._t.margenSinFee,0))}</td>
                       <td style={{ padding:'10px 12px', textAlign:'right', color:'#3dbfb8' }}>
-                        {pct(pptosTabla.reduce((a,p)=>a+p._t.margenTotal,0), pptosTabla.reduce((a,p)=>a+p._t.totalSinIva,0))}
+                        {pct(pptosTabla.reduce((a,p)=>a+p._t.margenSinFee,0), pptosTabla.reduce((a,p)=>a+p._t.subtotalPrecio,0))}
                       </td>
                       <td style={{ padding:'10px 12px', textAlign:'right', color:'#c084fc' }}>{fmt(pptosTabla.reduce((a,p)=>a+p._t.subtotalCostoReal,0))}</td>
-                      <td style={{ padding:'10px 12px', textAlign:'right', color:'#3dbfb8' }}>{fmt(pptosTabla.reduce((a,p)=>a+p._t.margenRealTotal,0))}</td>
+                      <td style={{ padding:'10px 12px', textAlign:'right', color:'#3dbfb8' }}>{fmt(pptosTabla.reduce((a,p)=>a+p._t.margenRealSinFee,0))}</td>
                     </tr>
                   </tfoot>
                 )}
@@ -363,8 +374,8 @@ export default function Dashboard() {
                     <td style={{ padding:'10px 14px', color:'rgba(255,255,255,.7)' }}>{withCalc.length}</td>
                     <td style={{ padding:'10px 14px', textAlign:'right', color:'#fff' }}>{fmt(withCalc.reduce((a,p)=>a+p._t.totalSinIva,0))}</td>
                     <td style={{ padding:'10px 14px', textAlign:'right', color:'rgba(255,255,255,.7)' }}>{fmt(withCalc.reduce((a,p)=>a+p._t.subtotalCosto,0))}</td>
-                    <td style={{ padding:'10px 14px', textAlign:'right', color:'#3dbfb8' }}>{fmt(withCalc.reduce((a,p)=>a+p._t.margenTotal,0))}</td>
-                    <td style={{ padding:'10px 14px', textAlign:'right', color:'#3dbfb8' }}>{pct(withCalc.reduce((a,p)=>a+p._t.margenTotal,0),withCalc.reduce((a,p)=>a+p._t.totalSinIva,0))}</td>
+                    <td style={{ padding:'10px 14px', textAlign:'right', color:'#3dbfb8' }}>{fmt(withCalc.reduce((a,p)=>a+p._t.margenSinFee,0))}</td>
+                    <td style={{ padding:'10px 14px', textAlign:'right', color:'#3dbfb8' }}>{pct(withCalc.reduce((a,p)=>a+p._t.margenSinFee,0),withCalc.reduce((a,p)=>a+p._t.subtotalPrecio,0))}</td>
                     <td style={{ padding:'10px 14px', textAlign:'right', color:'#5dc98a' }}>{fmt(facturados.reduce((a,p)=>a+p._t.totalSinIva,0))}</td>
                   </tr>
                 </tfoot>

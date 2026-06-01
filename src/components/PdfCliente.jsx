@@ -310,14 +310,14 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
         <!-- 3 TIPOS DE MARGEN -->
         <tr style="background:#eef4fb;">
           <td colspan="6" style="padding:8px 10px;font-size:11px;color:#0d3b5e;font-weight:600;">Margen cotizado (sin fee)</td>
-          <td colspan="8" style="padding:8px 10px;text-align:right;font-weight:700;color:${t.margenTotal>=0?'#1a6e3e':'#8b1a1a'};">
-            ${fmt(t.margenTotal)} (${t.margenPct.toFixed(1)}%)
+          <td colspan="8" style="padding:8px 10px;text-align:right;font-weight:700;color:${(t.subtotalPrecio-t.subtotalCosto)>=0?'#1a6e3e':'#8b1a1a'};">
+            ${fmt(t.subtotalPrecio - t.subtotalCosto)} (${t.subtotalPrecio>0?(((t.subtotalPrecio-t.subtotalCosto)/t.subtotalPrecio)*100).toFixed(1):'0.0'}%)
           </td>
         </tr>
         <tr style="background:#e8f5ee;">
           <td colspan="6" style="padding:8px 10px;font-size:11px;color:#1a6e3e;font-weight:600;">Margen real (sin fee)</td>
-          <td colspan="8" style="padding:8px 10px;text-align:right;font-weight:700;color:${t.margenRealTotal>=0?'#1a6e3e':'#8b1a1a'};">
-            ${t.subtotalCostoReal > 0 ? fmt(t.margenRealTotal)+' ('+t.margenRealPct.toFixed(1)+'%)' : '— (sin costo real ingresado)'}
+          <td colspan="8" style="padding:8px 10px;text-align:right;font-weight:700;color:${t.subtotalCostoReal>0?((t.subtotalPrecio-t.subtotalCostoReal)>=0?'#1a6e3e':'#8b1a1a'):'#bbb'};">
+            ${t.subtotalCostoReal > 0 ? fmt(t.subtotalPrecio - t.subtotalCostoReal)+' ('+(((t.subtotalPrecio-t.subtotalCostoReal)/t.subtotalPrecio)*100).toFixed(1)+'%)' : '— (sin costo real ingresado)'}
           </td>
         </tr>
         <tr style="background:#0d3b5e;">
