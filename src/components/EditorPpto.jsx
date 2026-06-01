@@ -651,6 +651,91 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                               <div><Label># Factura proveedor</Label><input style={S.input} value={it.num_factura_prov||''} onChange={e=>updItem(it.id,'num_factura_prov',e.target.value)} placeholder="Ej: 001-001-000123456"/></div>
                               <div><Label>Info general</Label><input style={S.input} value={it.info||''} onChange={e=>updItem(it.id,'info',e.target.value)}/></div>
 
+                              {/* CONDICIÓN DE PAGO */}
+                              <div style={{gridColumn:'1/-1',background:'#fdf8ee',borderRadius:8,padding:'10px 12px',border:'1px solid #e8d8a0'}}>
+                                <div style={{fontSize:12,fontWeight:700,color:'#7a5500',marginBottom:8}}>💳 Condición de pago</div>
+                                <div style={{display:'flex',gap:8,marginBottom:10}}>
+                                  {['Contado','Crédito','Abono'].map(op => (
+                                    <button key={op} onClick={()=>updItem(it.id,'condicion_pago',op)}
+                                      style={{padding:'5px 14px',borderRadius:7,border:'1px solid',fontSize:12,cursor:'pointer',fontFamily:'inherit',fontWeight:500,
+                                        background: it.condicion_pago===op?'#7a5500':'#fff',
+                                        color:      it.condicion_pago===op?'#fff':'#7a5500',
+                                        borderColor:'#c8a840',
+                                      }}>{op}</button>
+                                  ))}
+                                </div>
+                                {it.condicion_pago==='Crédito' && (
+                                  <div style={{display:'grid',gridTemplateColumns:'1fr',gap:8}}>
+                                    <div><Label>Días de crédito</Label>
+                                      <input type="number" min="0" style={S.input} value={it.dias_credito||''} placeholder="Ej: 30" onChange={e=>updItem(it.id,'dias_credito',e.target.value)}/>
+                                    </div>
+                                  </div>
+                                )}
+                                {it.condicion_pago==='Abono' && (()=>{
+                                  const pct = Number(it.abono_pct||50);
+                                  const totalItem = Number(it.costo_unit||0)*Number(it.cantidad||1)*Number(it.dias||1);
+                                  const valorAbono = totalItem * (pct/100);
+                                  const saldo = totalItem - valorAbono;
+                                  return (
+                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                                      <div><Label>% de abono</Label>
+                                        <input type="number" min="0" max="100" style={S.input} value={it.abono_pct||50} onChange={e=>updItem(it.id,'abono_pct',Number(e.target.value))}/>
+                                      </div>
+                                      <div><Label>Valor abono</Label>
+                                        <input style={S.inputRO} readOnly value={fmt(valorAbono)}/>
+                                      </div>
+                                      <div><Label>Días crédito del saldo</Label>
+                                        <input type="number" min="0" style={S.input} value={it.dias_credito_saldo||''} placeholder="Ej: 30" onChange={e=>updItem(it.id,'dias_credito_saldo',e.target.value)}/>
+                                      </div>
+                                      <div style={{gridColumn:'1/-1',fontSize:12,color:'#7a5500',background:'#fff8e6',borderRadius:6,padding:'6px 10px'}}>
+                                        Saldo a recibir en {it.dias_credito_saldo||'—'} días: <strong>{fmt(saldo)}</strong>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+
+                              {/* MULTI-PROVEEDOR */}
+                              <div style={{gridColumn:'1/-1',background:'#f8fafc',borderRadius:8,padding:'10px 12px',border:'1px solid #dde6ef'}}>
+                                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                                  <div style={{fontSize:12,fontWeight:700,color:'#5a7a9a'}}>🏭 Proveedores adicionales</div>
+                                  <button onClick={()=>{
+                                    const provs = [...(it.proveedores_adicionales||[]), {id:crypto.randomUUID(),razon_social:'',factura:'',costo:0}];
+                                    updItem(it.id,'proveedores_adicionales',provs);
+                                  }} style={{fontSize:11,padding:'3px 10px',borderRadius:6,border:'1px solid #0d3b5e',background:'transparent',color:'#0d3b5e',cursor:'pointer',fontFamily:'inherit'}}>
+                                    + Agregar proveedor
+                                  </button>
+                                </div>
+                                {(it.proveedores_adicionales||[]).length === 0 && (
+                                  <div style={{fontSize:12,color:'#aaa',fontStyle:'italic'}}>Sin proveedores adicionales — el precio al cliente es uno solo</div>
+                                )}
+                                {(it.proveedores_adicionales||[]).map((prov,pi) => (
+                                  <div key={prov.id} style={{display:'grid',gridTemplateColumns:'1fr 1fr auto auto',gap:8,marginBottom:8,padding:'8px',background:'#fff',borderRadius:6,border:'1px solid #eee'}}>
+                                    <div><Label>Razón social</Label>
+                                      <input style={S.input} value={prov.razon_social||''} placeholder="Nombre del proveedor"
+                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],razon_social:e.target.value};updItem(it.id,'proveedores_adicionales',ps);}}/>
+                                    </div>
+                                    <div><Label># Factura</Label>
+                                      <input style={S.input} value={prov.factura||''} placeholder="001-001-000123"
+                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],factura:e.target.value};updItem(it.id,'proveedores_adicionales',ps);}}/>
+                                    </div>
+                                    <div><Label>Costo ($)</Label>
+                                      <input type="number" step="0.01" style={S.input} value={prov.costo||0}
+                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],costo:Number(e.target.value)};updItem(it.id,'proveedores_adicionales',ps);}}/>
+                                    </div>
+                                    <div style={{display:'flex',alignItems:'flex-end',paddingBottom:2}}>
+                                      <button onClick={()=>{const ps=(it.proveedores_adicionales||[]).filter((_,i)=>i!==pi);updItem(it.id,'proveedores_adicionales',ps);}}
+                                        style={{background:'#fee2e2',border:'none',borderRadius:6,color:'#dc2626',cursor:'pointer',padding:'7px 10px',fontSize:13}}>✕</button>
+                                    </div>
+                                  </div>
+                                ))}
+                                {(it.proveedores_adicionales||[]).length > 0 && (
+                                  <div style={{fontSize:12,color:'#5a7a9a',marginTop:4,padding:'6px 10px',background:'#eef4fb',borderRadius:6}}>
+                                    Costo adicional total: <strong>{fmt((it.proveedores_adicionales||[]).reduce((a,p)=>a+Number(p.costo||0),0))}</strong> — el precio al cliente no cambia
+                                  </div>
+                                )}
+                              </div>
+
                               {/* Foto de referencia */}
                               <div style={{gridColumn:'1/-1',background:'#f8fafc',borderRadius:8,padding:'10px 12px',border:'1px dashed #c8d8e8'}}>
                                 <Label>📸 Foto de referencia (aparece en PDF y vista cliente)</Label>
