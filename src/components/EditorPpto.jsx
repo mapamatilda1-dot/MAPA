@@ -160,7 +160,6 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     showToast('Guardado ✓');
     // Nos quedamos en la página para seguir editando
   }
-  }
 
   function openPdfCliente(){
     if(!p)return;
