@@ -10,6 +10,7 @@ import Presupuestos from './components/Presupuestos';
 import LiquidacionesTab from './components/LiquidacionesTab';
 import Implementaciones from './components/Implementaciones';
 import AdminPanel from './components/AdminPanel';
+import Proformas from './components/Proformas';
 
 // Placeholders — se reemplazarán en las fases siguientes
 const Placeholder = ({ nombre }) => (
@@ -25,6 +26,7 @@ const TAB_CONFIG = {
   crm:              { label: 'CRM',            icon: '◎' },
   briefs:           { label: 'Proyectos',       icon: '◇' },
   propuestas:       { label: 'Propuestas',      icon: '◈' },
+  proformas:        { label: 'Proformas',       icon: '📋' },
   presupuestos:     { label: 'Presupuestos',    icon: '💰' },
   liquidaciones:    { label: 'Liquidaciones',   icon: '🧾' },
   calendario:       { label: 'Calendario',      icon: '📅' },
@@ -78,6 +80,7 @@ export default function App() {
       case 'crm':              return <CRM userRole={role} />;
       case 'briefs':           return <Briefs userRole={role} userEmail={email} />;
       case 'propuestas':       return <Propuestas userRole={role} userEmail={email} />;
+      case 'proformas':        return <Proformas userRole={role} userEmail={email} />;
       case 'presupuestos':     return <Presupuestos userRole={role} userEmail={email} logoUrl={null} />;
       case 'liquidaciones':    return <LiquidacionesTab userRole={role} />;
       case 'calendario':       return <Calendario />;

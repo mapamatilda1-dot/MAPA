@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import ExpedientePanel from './ExpedientePanel';
 
 function fmtDate(s) { if (!s) return '—'; const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; }
 function fmtRange(inicio, fin) {
@@ -31,6 +32,7 @@ export default function Implementaciones({ userRole }) {
   const [saving, setSaving]   = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm]   = useState({});
+  const [expedienteId, setExpedienteId] = useState(null);
   const [form, setForm] = useState({ nombre:'', ciudad:'', cliente_id:'', brief_id:'', fecha_evento:'', fecha_evento_fin:'', fecha_montaje:'' });
 
   const canEdit = ['admin','produccion'].includes(userRole);
@@ -197,6 +199,7 @@ export default function Implementaciones({ userRole }) {
                     {impl.ciudad && <span style={{ fontSize:12, color:'#777' }}>📍 {impl.ciudad}</span>}
                     {impl.fecha_montaje && <span style={{ fontSize:12, color:'#777' }}>🔧 Montaje: {fmtDate(impl.fecha_montaje)}</span>}
                     <span style={{ fontSize:12, color:'#777' }}>🎯 Evento: {fmtRange(impl.fecha_evento, impl.fecha_evento_fin)}</span>
+                    {impl.brief_id && <span style={{ fontSize:12, color:'#7c3aed', cursor:'pointer', fontWeight:500 }} onClick={()=>setExpedienteId(impl.brief_id)}>📁 Ver expediente</span>}
                   </div>
                 </div>
                 {canEdit && (
@@ -210,6 +213,7 @@ export default function Implementaciones({ userRole }) {
           );
         })}
       </div>
+      {expedienteId && <ExpedientePanel briefId={expedienteId} onClose={()=>setExpedienteId(null)}/>}
     </div>
   );
 }

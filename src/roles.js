@@ -24,6 +24,7 @@ export function getNavTabs(role) {
     crm:             ['admin', 'ventas'],
     briefs:          ['admin', 'ventas', 'creativo', 'produccion', 'financiero'],
     propuestas:      ['admin', 'ventas', 'creativo', 'produccion'],
+    proformas:       ['admin', 'produccion'],
     presupuestos:    ['admin', 'produccion', 'financiero'],
     liquidaciones:   ['admin', 'produccion', 'financiero'],
     calendario:      ['admin', 'ventas', 'creativo', 'produccion', 'financiero'],
