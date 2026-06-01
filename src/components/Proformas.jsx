@@ -248,7 +248,7 @@ export default function Proformas({ userRole, userEmail }) {
       supabase.from('proformas').select('*').order('created_at', { ascending:false }),
       supabase.from('clientes').select('*').eq('activo',true).order('nombre'),
       supabase.from('ejecutivos').select('*').order('nombre'),
-      supabase.from('briefs').select('id, nombre, cliente_id, cliente_nombre, fecha_evento, ciudad, lugar, personas, dias_evento').order('nombre'),
+      supabase.from('briefs').select('id, nombre, cliente_id, cliente_nombre, fecha_evento, ciudad, lugar, pax, dias_evento').order('nombre'),
       supabase.from('config').select('*').single(),
     ]);
     setProformas(pfR.data || []);
@@ -434,7 +434,7 @@ function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, onSave, on
           if (!next.fecha_evento) next.fecha_evento = br.fecha_evento || '';
           if (!next.lugar)        next.lugar        = br.lugar || '';
           if (!next.ciudad || next.ciudad === 'Guayaquil') next.ciudad = br.ciudad || 'Guayaquil';
-          if (!next.personas)     next.personas     = br.pax || 0;
+          if (!next.personas) next.personas = br.pax || 0;
           if (!next.dias_evento || next.dias_evento === 1) next.dias_evento = br.dias_evento || 1;
         }
       }
