@@ -100,30 +100,33 @@ export default function Calendario() {
 
     return (
       <div onClick={onClick} style={{
-        minHeight:72, padding:4, borderRadius:8, cursor:'pointer',
+        minHeight:'clamp(52px, 10vw, 90px)', padding:'2px 3px', borderRadius:6, cursor:'pointer',
         border: isSelected?'2px solid #1a1a1a': isToday?'2px solid #3b82f6':'1px solid #e8e8e8',
         background: isSelected?'#f9f9f7':'#fff', transition:'border-color .1s',
+        overflow:'hidden',
       }}>
-        <div style={{ fontSize:12, fontWeight:isToday?600:400, color:isToday?'#2563eb':'#333', marginBottom:3 }}>{day}</div>
-        <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-          {dayImpls.slice(0,2).map(i => (
-            <div key={'i'+i.id} style={{ fontSize:10, padding:'1px 5px', borderRadius:4, background:'#ede9fe', color:'#5b21b6', borderLeft:'2px solid #7c3aed', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-              {implLabel(i, dateStr)}
+        <div style={{ fontSize:'clamp(10px,2vw,13px)', fontWeight:isToday?600:400, color:isToday?'#2563eb':'#333', marginBottom:2 }}>{day}</div>
+        <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
+          {dayImpls.slice(0,1).map(i => (
+            <div key={'i'+i.id} style={{ fontSize:'clamp(8px,1.5vw,10px)', padding:'1px 3px', borderRadius:3, background:'#ede9fe', color:'#5b21b6', borderLeft:'2px solid #7c3aed', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              🎯 {i.nombre}
             </div>
           ))}
-          {dayGcal.slice(0,2).map(e => (
-            <div key={'g'+e.id} style={{ fontSize:10, padding:'1px 5px', borderRadius:4, background:'#fce8f3', color:'#9d174d', borderLeft:'2px solid #db2777', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+          {dayGcal.slice(0,1).map(e => (
+            <div key={'g'+e.id} style={{ fontSize:'clamp(8px,1.5vw,10px)', padding:'1px 3px', borderRadius:3, background:'#fce8f3', color:'#9d174d', borderLeft:'2px solid #db2777', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
               📅 {e.title}
             </div>
           ))}
-          {dayBriefs.slice(0,2).map(b => {
+          {dayBriefs.slice(0,1).map(b => {
             const c = getColor(b.estado);
-            return <div key={'b'+b.id} style={{ fontSize:10, padding:'1px 5px', borderRadius:4, background:c.bg, color:c.text, borderLeft:`2px solid ${c.border}`, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>📋 {b.nombre}</div>;
-          })}          {total > 3 && <div style={{ fontSize:10, color:'#888' }}>+{total-3} más</div>}
+            return <div key={'b'+b.id} style={{ fontSize:'clamp(8px,1.5vw,10px)', padding:'1px 3px', borderRadius:3, background:c.bg, color:c.text, borderLeft:`2px solid ${c.border}`, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>📋 {b.nombre}</div>;
+          })}
+          {total > 1 && <div style={{ fontSize:'clamp(7px,1.2vw,9px)', color:'#888' }}>+{total-1} más</div>}
         </div>
       </div>
     );
   }
+
 
   function DayDetail({ dateStr }) {
     const dayBriefs    = briefsForDay(dateStr);
@@ -199,7 +202,7 @@ export default function Calendario() {
           <button onClick={()=>{ setCurrent(new Date(year,month+1,1)); setSelected(null); }} style={navBtnStyle}>›</button>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2, marginBottom:2 }}>
-          {DAYS.map(d=><div key={d} style={{ textAlign:'center', fontSize:11, color:'#888', fontWeight:500, padding:'4px 0', textTransform:'uppercase', letterSpacing:'.04em' }}>{d}</div>)}
+          {DAYS.map(d=><div key={d} style={{ textAlign:'center', fontSize:'clamp(9px,1.5vw,11px)', color:'#888', fontWeight:500, padding:'4px 0', textTransform:'uppercase', letterSpacing:'.04em' }}>{d}</div>)}
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
           {cells.map((day,i) => {
@@ -257,8 +260,8 @@ export default function Calendario() {
   if (loading) return <div style={{ padding:'2rem', textAlign:'center', color:'#888' }}>Cargando calendario…</div>;
 
   return (
-    <div style={{ width:'100%', overflowX:'auto' }}>
-      <div style={{ minWidth:700 }}>
+    <div style={{ width:'100%', overflowX:'hidden' }}>
+      <div style={{ width:'100%' }}>
       <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:'1.25rem', flexWrap:'wrap' }}>
         <div style={{ display:'flex', gap:4 }}>
           {['month','week'].map(v=>(
