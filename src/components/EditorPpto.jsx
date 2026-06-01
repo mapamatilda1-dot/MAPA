@@ -83,15 +83,16 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
   function setField(k,v){setP(prev=>({...prev,[k]:v}));}
   function setNum(k,v){setP(prev=>({...prev,[k]:v===''?0:parseFloat(v)??0}));}
   function setCliente(n) {
-    const feeData = getFeeForCliente(n);
+    // Buscar el cliente en la lista para obtener su fee y BCO configurados
+    const clienteObj = clientes.find(c => c.nombre === n);
+    const feeData = clienteObj
+      ? { fee: clienteObj.fee_agencia || 0, bco: !!clienteObj.bco_aplica }
+      : getFeeForCliente(n); // fallback a tabla hardcoded
     setP(prev => ({
       ...prev,
       cliente: n,
-      apply_rebate: n.toUpperCase().includes('TESALIA'),
-      ...(feeData ? {
-        fee_agencia: feeData.fee,
-        apply_rebate: feeData.bco,
-      } : {}),
+      apply_rebate: feeData?.bco ?? n.toUpperCase().includes('TESALIA'),
+      ...(feeData?.fee !== undefined ? { fee_agencia: feeData.fee } : {}),
     }));
   }
 

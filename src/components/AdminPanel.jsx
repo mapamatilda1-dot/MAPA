@@ -16,7 +16,7 @@ export default function AdminPanel() {
 
   // Forms
   const [newCat,  setNewCat]  = useState('');
-  const [newCli,  setNewCli]  = useState({ nombre:'', ruc:'', contacto:'', telefono:'', email:'', notas:'' });
+  const [newCli,  setNewCli]  = useState({ nombre:'', ruc:'', contacto:'', telefono:'', email:'', notas:'', fee_agencia:0, bco_aplica:false });
   const [editCli, setEditCli] = useState(null);
   const [newEjec,  setNewEjec]  = useState({ nombre:'', email:'', cargo:'' });
   const [editEjec, setEditEjec] = useState(null);
@@ -321,6 +321,14 @@ export default function AdminPanel() {
               <div><Label>Contacto</Label><input style={S.input} value={newCli.contacto} onChange={e=>setNewCli(p=>({...p,contacto:e.target.value}))}/></div>
               <div><Label>Teléfono</Label><input style={S.input} value={newCli.telefono} onChange={e=>setNewCli(p=>({...p,telefono:e.target.value}))}/></div>
               <div style={{ gridColumn:'1/-1' }}><Label>Email</Label><input style={S.input} type="email" value={newCli.email} onChange={e=>setNewCli(p=>({...p,email:e.target.value}))}/></div>
+              <div>
+                <Label>Fee agencia (%)</Label>
+                <input type="number" step="0.1" min="0" style={S.input} value={newCli.fee_agencia||0} onChange={e=>setNewCli(p=>({...p,fee_agencia:parseFloat(e.target.value)||0}))}/>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:10, paddingTop:20 }}>
+                <input type="checkbox" id="bco_new" checked={!!newCli.bco_aplica} onChange={e=>setNewCli(p=>({...p,bco_aplica:e.target.checked}))} style={{ width:16, height:16, cursor:'pointer' }}/>
+                <label htmlFor="bco_new" style={{ fontSize:13, cursor:'pointer', color:'#333' }}>Aplica BCO</label>
+              </div>
               <div style={{ gridColumn:'1/-1' }}><Label>Notas</Label><textarea style={{ ...S.input, minHeight:60, resize:'vertical' }} value={newCli.notas} onChange={e=>setNewCli(p=>({...p,notas:e.target.value}))}/></div>
             </div>
             <button style={{ ...S.btnPrimary, marginTop:12 }} onClick={saveCli}>+ Agregar cliente</button>
@@ -328,7 +336,7 @@ export default function AdminPanel() {
           <div style={S.card}>
             <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Clientes ({clientes.length})</h3>
             <table style={S.table}>
-              <thead><tr>{['Nombre','RUC','Contacto','Email',''].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Nombre','RUC','Contacto','Email','Fee %','BCO',''].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
               <tbody>
                 {clientes.map(c=>(
                   <tr key={c.id}>
@@ -336,6 +344,8 @@ export default function AdminPanel() {
                     <td style={S.td}>{c.ruc}</td>
                     <td style={S.td}>{c.contacto}</td>
                     <td style={S.td}>{c.email}</td>
+                    <td style={S.td}>{c.fee_agencia > 0 ? `${c.fee_agencia}%` : '—'}</td>
+                    <td style={S.td}>{c.bco_aplica ? '✅' : '—'}</td>
                     <td style={S.td}>
                       <div style={{ display:'flex', gap:4 }}>
                         <button style={S.btnSm} onClick={()=>setEditCli({...c})}>✏️</button>
@@ -344,7 +354,7 @@ export default function AdminPanel() {
                     </td>
                   </tr>
                 ))}
-                {clientes.length===0 && <tr><td colSpan={5} style={{ ...S.td, textAlign:'center', color:'#8aa0b8' }}>Sin clientes</td></tr>}
+                {clientes.length===0 && <tr><td colSpan={7} style={{ ...S.td, textAlign:'center', color:'#8aa0b8' }}>Sin clientes</td></tr>}
               </tbody>
             </table>
           </div>
@@ -447,6 +457,14 @@ export default function AdminPanel() {
             <div><Label>Contacto</Label><input style={S.input} value={editCli.contacto||''} onChange={e=>setEditCli(p=>({...p,contacto:e.target.value}))}/></div>
             <div><Label>Teléfono</Label><input style={S.input} value={editCli.telefono||''} onChange={e=>setEditCli(p=>({...p,telefono:e.target.value}))}/></div>
             <div><Label>Email</Label><input style={S.input} value={editCli.email||''} onChange={e=>setEditCli(p=>({...p,email:e.target.value}))}/></div>
+            <div>
+              <Label>Fee agencia (%)</Label>
+              <input type="number" step="0.1" min="0" style={S.input} value={editCli.fee_agencia||0} onChange={e=>setEditCli(p=>({...p,fee_agencia:parseFloat(e.target.value)||0}))}/>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:10, paddingTop:8 }}>
+              <input type="checkbox" id="bco_edit" checked={!!editCli.bco_aplica} onChange={e=>setEditCli(p=>({...p,bco_aplica:e.target.checked}))} style={{ width:16, height:16, cursor:'pointer' }}/>
+              <label htmlFor="bco_edit" style={{ fontSize:13, cursor:'pointer', color:'#333' }}>Aplica BCO</label>
+            </div>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:8 }}>
               <button style={S.btnSecondary} onClick={()=>setEditCli(null)}>Cancelar</button>
               <button style={S.btnPrimary} onClick={updateCli}>Guardar</button>
