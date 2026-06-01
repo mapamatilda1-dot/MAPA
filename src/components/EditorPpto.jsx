@@ -29,6 +29,157 @@ function emptyItem(p) {
   };
 }
 
+// ── Componente de opciones adicionales ───────────────────────
+function OpcionesAdicionales({ p, setP, bloqueado, fmt, fmtPct, calcItem, S, Label }) {
+  const [openOp, setOpenOp] = useState(null);
+  const opciones = p.opciones_adicionales || [];
+
+  function addOpcion() {
+    const nombre = window.prompt('Nombre de la opción (ej: Opción A - Centro de mesa alternativo):');
+    if (!nombre?.trim()) return;
+    const nueva = { id: crypto.randomUUID(), nombre: nombre.trim(), items: [] };
+    setP(prev => ({ ...prev, opciones_adicionales: [...(prev.opciones_adicionales||[]), nueva] }));
+    setOpenOp(nueva.id);
+  }
+
+  function updateOpcion(opId, changes) {
+    setP(prev => ({
+      ...prev,
+      opciones_adicionales: (prev.opciones_adicionales||[]).map(o => o.id===opId ? {...o,...changes} : o)
+    }));
+  }
+
+  function deleteOpcion(opId) {
+    setP(prev => ({ ...prev, opciones_adicionales: (prev.opciones_adicionales||[]).filter(o=>o.id!==opId) }));
+    if (openOp===opId) setOpenOp(null);
+  }
+
+  function addItemToOp(opId) {
+    const items = (opciones.find(o=>o.id===opId)?.items||[]).concat({
+      id:crypto.randomUUID(), item:'', detalle:'', cantidad:1, dias:1,
+      precio_unit:0, costo_unit:0, oh_pct:Number(p.oh_pct||15), bco_pct:Number(p.bco_pct||5.5),
+      subcategoria:'', categoria:'',
+    });
+    updateOpcion(opId, { items });
+  }
+
+  function updItemOp(opId, itemId, field, value) {
+    const nums = ['costo_unit','precio_unit','cantidad','dias','oh_pct','bco_pct'];
+    const items = (opciones.find(o=>o.id===opId)?.items||[]).map(it =>
+      it.id===itemId ? {...it,[field]:nums.includes(field)?Number(value):value} : it
+    );
+    updateOpcion(opId, { items });
+  }
+
+  function promoverAItems(opId) {
+    const op = opciones.find(o=>o.id===opId);
+    if (!op) return;
+    if (!window.confirm(`¿Agregar los ítems de "${op.nombre}" al presupuesto principal?`)) return;
+    // Agregar como nueva subcategoría en el presupuesto principal
+    const subcat = { id:crypto.randomUUID(), _type:'subcat', subcategoria:op.nombre, item:'', detalle:'', cantidad:0, dias:0, costo_unit:0, precio_unit:0, oh_pct:0, bco_pct:0, categoria:'', es_liquidacion:false };
+    const itemsNuevos = op.items.map(it => ({ ...it, id:crypto.randomUUID(), subcategoria:op.nombre }));
+    setP(prev => ({
+      ...prev,
+      items: [...prev.items, subcat, ...itemsNuevos],
+      opciones_adicionales: (prev.opciones_adicionales||[]).filter(o=>o.id!==opId),
+    }));
+  }
+
+  return (
+    <div style={{ marginTop:24, borderTop:'2px dashed #dde6ef', paddingTop:16 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+        <div>
+          <div style={{ fontSize:14, fontWeight:700, color:'#7c3aed' }}>✦ Opciones adicionales</div>
+          <div style={{ fontSize:11, color:'#aaa' }}>Aparecen en el PDF cliente después de los totales — no entran en los cálculos</div>
+        </div>
+        {!bloqueado && <button style={{...S.btnPrimary,background:'#7c3aed'}} onClick={addOpcion}>+ Agregar opción</button>}
+      </div>
+
+      {opciones.length===0 && (
+        <div style={{ textAlign:'center', padding:'1.5rem', color:'#ccc', fontSize:13, border:'1px dashed #e8e8e8', borderRadius:10 }}>
+          Sin opciones adicionales
+        </div>
+      )}
+
+      {opciones.map(op => {
+        const totalOp = (op.items||[]).reduce((a,it) => a + calcItem(it).precio, 0);
+        const isOpen  = openOp===op.id;
+        return (
+          <div key={op.id} style={{ border:`1px solid ${isOpen?'#7c3aed':'#e8e8e8'}`, borderRadius:10, marginBottom:10, overflow:'hidden' }}>
+            {/* Header opción */}
+            <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:isOpen?'#f5f3ff':'#fafafa', cursor:'pointer' }}
+              onClick={()=>setOpenOp(isOpen?null:op.id)}>
+              <span style={{ fontSize:13, fontWeight:600, color:'#7c3aed', flex:1 }}>{op.nombre}</span>
+              <span style={{ fontSize:12, color:'#888' }}>{(op.items||[]).length} ítems · {fmt(totalOp)}</span>
+              {!bloqueado && <>
+                <button onClick={e=>{e.stopPropagation();promoverAItems(op.id);}}
+                  style={{...S.btnSm,background:'#2e8b4e',color:'#fff',border:'none',fontSize:11}}>→ Promover a principal</button>
+                <button onClick={e=>{e.stopPropagation();deleteOpcion(op.id);}}
+                  style={{...S.btnRed,fontSize:11}}>✕</button>
+              </>}
+            </div>
+
+            {/* Ítems de la opción */}
+            {isOpen && (
+              <div style={{ padding:'12px 14px', borderTop:'1px solid #e8e8e8' }}>
+                <div style={{ overflowX:'auto' }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                    <thead>
+                      <tr style={{ background:'#f0f4f8' }}>
+                        {['Ítem','Detalle','Cant.','Días','P.Unit','Total',''].map(h=>(
+                          <th key={h} style={{ padding:'6px 8px', textAlign:['Cant.','Días','P.Unit','Total'].includes(h)?'right':'left', fontSize:11, color:'#666', fontWeight:700 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(op.items||[]).map(it => {
+                        const c = calcItem(it);
+                        return (
+                          <tr key={it.id} style={{ borderBottom:'1px solid #f0f0f0' }}>
+                            <td style={{ padding:'5px 8px' }}>
+                              <input value={it.item||''} onChange={e=>updItemOp(op.id,it.id,'item',e.target.value)}
+                                style={{...S.input,padding:'3px 6px',fontSize:12}} placeholder="Nombre del ítem"/>
+                            </td>
+                            <td style={{ padding:'5px 8px' }}>
+                              <input value={it.detalle||''} onChange={e=>updItemOp(op.id,it.id,'detalle',e.target.value)}
+                                style={{...S.input,padding:'3px 6px',fontSize:12}} placeholder="Detalle"/>
+                            </td>
+                            <td style={{ padding:'5px 4px', width:60 }}>
+                              <input type="number" value={it.cantidad} onChange={e=>updItemOp(op.id,it.id,'cantidad',e.target.value)}
+                                style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right'}}/>
+                            </td>
+                            <td style={{ padding:'5px 4px', width:55 }}>
+                              <input type="number" value={it.dias} onChange={e=>updItemOp(op.id,it.id,'dias',e.target.value)}
+                                style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right'}}/>
+                            </td>
+                            <td style={{ padding:'5px 4px', width:90 }}>
+                              <input type="number" step="0.01" value={it.precio_unit} onChange={e=>updItemOp(op.id,it.id,'precio_unit',e.target.value)}
+                                style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right'}}/>
+                            </td>
+                            <td style={{ padding:'5px 8px', textAlign:'right', fontWeight:600, color:'#7c3aed' }}>{fmt(c.precio)}</td>
+                            <td style={{ padding:'5px 4px', width:30 }}>
+                              <button onClick={()=>updateOpcion(op.id,{items:(op.items||[]).filter(x=>x.id!==it.id)})}
+                                style={{background:'none',border:'none',color:'#dc2626',cursor:'pointer',fontSize:14}}>✕</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8 }}>
+                  <button onClick={()=>addItemToOp(op.id)} style={{...S.btnSm,background:'#7c3aed',color:'#fff',border:'none',fontSize:12}}>+ Ítem</button>
+                  <span style={{ fontSize:13, fontWeight:600, color:'#7c3aed' }}>Total: {fmt(totalOp)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, clientes, ejecutivos, logoUrl, userRole='produccion', briefs=[] }) {
   const [p, setP]               = useState(null);
   const [tab, setTab]           = useState('info');
@@ -359,7 +510,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
         <Badge estado={p.estado}/>
         <select style={{...S.select,width:'auto'}} value={p.estado}
           disabled={!canEditPpto(userRole,p.estado)&&userRole!=='admin'}
-          onChange={e=>{
+          onChange={async e=>{
             if(!canChangeEstadoPpto(userRole,e.target.value)){showToast('⚠️ Sin permiso para este estado');return;}
             if(!canEditPpto(userRole,p.estado)){showToast('⚠️ Presupuesto bloqueado');return;}
             const nuevoEstado = e.target.value;
@@ -568,7 +719,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                           <span style={{flex:1,fontWeight:600,fontSize:14,color:c.hasWarning?'#c8264a':'#1a1a2e'}}>{it.item||<span style={{color:'#bbb'}}>Sin nombre</span>}</span>
                           {c.hasWarning&&<span style={{fontSize:11,color:'#c8264a',fontWeight:700}}>⚠️ Costo &gt; Precio</span>}
                           {it.costo_aprobado&&<span style={{fontSize:10,background:'#edf7ed',color:'#2e8b4e',padding:'2px 6px',borderRadius:4,fontWeight:700,border:'1px solid #2e8b4e44'}}>✅ Aprobado</span>}
-                          {it.es_liquidacion&&<span style={{fontSize:10,background:'#e0f7f6',color:'#3dbfb8',padding:'2px 7px',borderRadius:4,fontWeight:700,border:'1px solid #3dbfb8'}}>LIQ</span>}
+                          
                           {it.categoria&&<span style={{fontSize:11,background:'#e8f0f8',color:'#0d3b5e',padding:'2px 7px',borderRadius:4,fontWeight:600}}>{it.categoria}</span>}
                           {tieneReal&&<span style={{fontSize:11,background:'#edf7ed',color:'#2e8b4e',padding:'2px 7px',borderRadius:4,fontWeight:600,border:'1px solid #2e8b4e44'}}>Ahorro: {fmt(c.ahorro)}</span>}
                           <span style={{fontSize:12,color:'#8aa0b8'}}>Costo: <strong>{fmt(c.costoTotal)}</strong></span>
@@ -784,10 +935,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                                 )}
                               </div>
 
-                              <div style={{gridColumn:'1/-1',display:'flex',alignItems:'center',gap:10,padding:'8px 12px',background:it.es_liquidacion?'#e0f7f6':'#f8fafc',borderRadius:6,border:`1px solid ${it.es_liquidacion?'#3dbfb8':'#dde6ef'}`}}>
-                                <input type="checkbox" id={`liq-${it.id}`} checked={!!it.es_liquidacion} onChange={e=>updItem(it.id,'es_liquidacion',e.target.checked)} style={{width:16,height:16,cursor:'pointer',accentColor:'#3dbfb8'}}/>
-                                <label htmlFor={`liq-${it.id}`} style={{fontSize:13,cursor:'pointer',fontWeight:600,color:it.es_liquidacion?'#3dbfb8':'#5a7a9a'}}>Ítem de liquidación</label>
-                              </div>
+
                             </div>
                           </div>
                         )}
@@ -806,6 +954,9 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             const subcat={id:crypto.randomUUID(),_type:'subcat',subcategoria:nombre.trim(),item:'',detalle:'',cantidad:0,dias:0,costo_unit:0,precio_unit:0,oh_pct:0,bco_pct:0,categoria:'',es_liquidacion:false};
             setP(prev=>({...prev,items:[...prev.items,subcat]}));
           }}>+ Nueva subcategoría</button>}
+
+          {/* ── Opciones adicionales ── */}
+          <OpcionesAdicionales p={p} setP={setP} bloqueado={bloqueado} fmt={fmt} fmtPct={fmtPct} calcItem={calcItem} S={S} Label={Label} />
         </div>
       )}
 
