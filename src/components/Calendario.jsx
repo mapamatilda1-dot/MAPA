@@ -95,7 +95,8 @@ export default function Calendario() {
     const dayBriefs    = briefsForDay(dateStr);
     const dayPropuestas = [];
     const dayImpls     = implsForDay(dateStr);
-    const total = dayBriefs.length + dayImpls.length;
+    const dayGcal      = gcalForDay(dateStr);
+    const total = dayBriefs.length + dayImpls.length + dayGcal.length;
 
     return (
       <div onClick={onClick} style={{
