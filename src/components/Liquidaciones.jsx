@@ -4,11 +4,14 @@ import { S, Label, Toast, Modal } from '../styles.jsx';
 import { fmt } from '../calc';
 import { CATS_LIQUIDACION, canEditLiq, canChangeLiqToLiquidado } from '../roles';
 
+const r2 = n => Math.round((Number(n)||0) * 100) / 100;
+const IVA_OPCIONES = [0, 5, 8, 15];
+
 function emptyGasto() {
   return {
     id: crypto.randomUUID(),
     concepto: '', categoria: CATS_LIQUIDACION[0],
-    subtotal15: 0, subtotal0: 0, iva: 0, total: 0,
+    subtotal15: 0, subtotal0: 0, iva_pct: 15, iva: 0, total: 0,
     ruc_proveedor: '', nombre_proveedor: '', num_factura: '', num_autorizacion: '', fecha_factura: '',
     valor_asignado: 0, valor_justificado: 0, notas: '',
   };
@@ -69,9 +72,10 @@ export default function Liquidaciones({ presupuestos, userRole }) {
         if(g.id!==gid)return g;
         const nums=['subtotal15','subtotal0','valor_asignado','valor_justificado'];
         const upd={...g,[k]:nums.includes(k)?(parseFloat(v)||0):v};
-        if(['subtotal15','subtotal0'].includes(k)){
-          upd.iva=upd.subtotal15*0.15;
-          upd.total=upd.subtotal15+upd.subtotal0+upd.iva;
+        if(['subtotal15','subtotal0','iva_pct'].includes(k)){
+          const pct = (k==='iva_pct' ? Number(v) : Number(upd.iva_pct||15)) / 100;
+          upd.iva=r2(upd.subtotal15 * pct);
+          upd.total=r2(upd.subtotal15+upd.subtotal0+upd.iva);
           upd.valor_justificado=upd.total;
         }
         return upd;
@@ -142,6 +146,7 @@ export default function Liquidaciones({ presupuestos, userRole }) {
           <td style="padding:5px 10px;">${g.concepto}</td>
           <td style="padding:5px 6px;text-align:right;">${fmt(g.subtotal0)}</td>
           <td style="padding:5px 6px;text-align:right;">${fmt(g.subtotal15)}</td>
+          <td style="padding:5px 6px;text-align:right;font-size:9px;color:#666;">${g.iva_pct??15}%</td>
           <td style="padding:5px 6px;text-align:right;">${fmt(g.iva)}</td>
           <td style="padding:5px 6px;text-align:right;font-weight:700;">${fmt(g.total)}</td>
           <td style="padding:5px 6px;font-size:9px;">${g.ruc_proveedor||''}</td>
@@ -189,7 +194,8 @@ export default function Liquidaciones({ presupuestos, userRole }) {
           <th style="padding:6px 10px;text-align:left;">Concepto</th>
           <th style="padding:6px 6px;text-align:right;">Fecha Fact.</th>
           <th style="padding:6px 6px;text-align:right;">Sub 0%</th>
-          <th style="padding:6px 6px;text-align:right;">Sub 15%</th>
+          <th style="padding:6px 6px;text-align:right;">Sub c/IVA</th>
+          <th style="padding:6px 6px;text-align:right;">IVA%</th>
           <th style="padding:6px 6px;text-align:right;">IVA</th>
           <th style="padding:6px 6px;text-align:right;">Total</th>
           <th style="padding:6px 6px;text-align:left;">RUC</th>
@@ -362,7 +368,16 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8,marginBottom:8}}>
                   <div><Label>Subtotal 0%</Label><input type="number" style={S.input} value={g.subtotal0} onChange={e=>updGasto(g.id,'subtotal0',e.target.value)}/></div>
-                  <div><Label>Subtotal 15%</Label><input type="number" style={S.input} value={g.subtotal15} onChange={e=>updGasto(g.id,'subtotal15',e.target.value)}/></div>
+                  <div>
+                    <Label>Subtotal con IVA</Label>
+                    <input type="number" style={S.input} value={g.subtotal15} onChange={e=>updGasto(g.id,'subtotal15',e.target.value)}/>
+                  </div>
+                  <div>
+                    <Label>IVA %</Label>
+                    <select style={S.select} value={g.iva_pct??15} onChange={e=>updGasto(g.id,'iva_pct',Number(e.target.value))}>
+                      {IVA_OPCIONES.map(p=><option key={p} value={p}>{p}%{p===15?' (estándar)':p===8?' (turismo)':p===5?' (construcción)':' (exento)'}</option>)}
+                    </select>
+                  </div>
                   <div><Label>IVA (auto)</Label><input style={S.inputRO} readOnly value={fmt(g.iva)}/></div>
                   <div><Label>Total (auto)</Label><input style={{...S.inputRO,fontWeight:700}} readOnly value={fmt(g.total)}/></div>
                 </div>
