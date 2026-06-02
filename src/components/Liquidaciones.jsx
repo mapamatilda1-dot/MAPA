@@ -4,12 +4,15 @@ import { S, Label, Toast, Modal } from '../styles.jsx';
 import { fmt } from '../calc';
 import { CATS_LIQUIDACION, canEditLiq, canChangeLiqToLiquidado } from '../roles';
 
+const r2 = n => Math.round((Number(n)||0) * 100) / 100;
+const IVA_OPCIONES = [0, 5, 8, 15];
+
 function emptyGasto() {
   return {
     id: crypto.randomUUID(),
     concepto: '', categoria: CATS_LIQUIDACION[0],
-    subtotal15: 0, subtotal0: 0, iva: 0, total: 0,
-    ruc_proveedor: '', nombre_proveedor: '', num_factura: '', num_autorizacion: '',
+    subtotal15: 0, subtotal0: 0, iva_pct: 15, iva: 0, total: 0,
+    ruc_proveedor: '', nombre_proveedor: '', num_factura: '', num_autorizacion: '', fecha_factura: '',
     valor_asignado: 0, valor_justificado: 0, notas: '',
   };
 }
@@ -24,7 +27,9 @@ export default function Liquidaciones({ presupuestos, userRole }) {
 
   const emptyLiq = () => ({
     presupuesto_id:'', presupuesto_nombre:'', evento:'',
-    responsable:'', estado:'abierta', notas:'', gastos:[],
+    cliente_nombre:'', lugar:'', fecha_evento:'', dias_evento:1,
+    responsable:'', solicitante:'', estado:'abierta', notas:'',
+    gastos:[], solicitud_id:'', valor_recibido:0,
   });
 
   useEffect(()=>{fetchAll();},[]);
@@ -45,10 +50,14 @@ export default function Liquidaciones({ presupuestos, userRole }) {
     }));
     setEditing(prev=>({
       ...prev,
-      presupuesto_id:id,
-      presupuesto_nombre:pp?(pp.nomenclatura||pp.nombre||pp.cliente):'',
-      evento:pp?.nombre||'',
-      gastos:gastosPpto.length>0?gastosPpto:(prev.gastos||[]),
+      presupuesto_id:     id,
+      presupuesto_nombre: pp?(pp.nomenclatura||pp.nombre||pp.cliente):'',
+      evento:             pp?.nombre||'',
+      cliente_nombre:     pp?.cliente||'',
+      lugar:              pp?.lugar||'',
+      fecha_evento:       pp?.fecha_evento||'',
+      dias_evento:        pp?.dias_evento||1,
+      gastos:             gastosPpto.length>0?gastosPpto:(prev.gastos||[]),
     }));
   }
 
@@ -63,9 +72,10 @@ export default function Liquidaciones({ presupuestos, userRole }) {
         if(g.id!==gid)return g;
         const nums=['subtotal15','subtotal0','valor_asignado','valor_justificado'];
         const upd={...g,[k]:nums.includes(k)?(parseFloat(v)||0):v};
-        if(['subtotal15','subtotal0'].includes(k)){
-          upd.iva=upd.subtotal15*0.15;
-          upd.total=upd.subtotal15+upd.subtotal0+upd.iva;
+        if(['subtotal15','subtotal0','iva_pct'].includes(k)){
+          const pct = (k==='iva_pct' ? Number(v) : Number(upd.iva_pct||15)) / 100;
+          upd.iva=r2(upd.subtotal15 * pct);
+          upd.total=r2(upd.subtotal15+upd.subtotal0+upd.iva);
           upd.valor_justificado=upd.total;
         }
         return upd;
@@ -84,10 +94,13 @@ export default function Liquidaciones({ presupuestos, userRole }) {
     setSaving(true);
     let error;
     if(editing.id){({error}=await supabase.from('liquidaciones').update(editing).eq('id',editing.id));}
-    else{({error}=await supabase.from('liquidaciones').insert(editing));}
+    else{let data2;({data:data2,error}=await supabase.from('liquidaciones').insert(editing).select().single());if(data2)setEditing(prev=>({...prev,id:data2.id}));}
     setSaving(false);
     if(error){showToast('Error: '+error.message);return;}
-    showToast('Guardado ✓');setEditing(null);fetchAll();
+    showToast('Guardado ✓');
+    // Quedarse en la página para seguir editando
+    if (!editing.id && data?.id) setEditing(prev => ({ ...prev, id: data.id }));
+    fetchAll();
   }
 
   async function deleteLiq(id){
@@ -98,9 +111,15 @@ export default function Liquidaciones({ presupuestos, userRole }) {
 
   function totalesLiq(liq){
     const gastos=liq.gastos||[];
-    const asignado=gastos.reduce((a,g)=>a+(g.valor_asignado||0),0);
-    const justificado=gastos.reduce((a,g)=>a+(g.valor_justificado||0),0);
-    return{asignado,justificado,saldo:asignado-justificado};
+    const asignado    = gastos.reduce((a,g)=>a+(g.valor_asignado||0),0);
+    const justificado = gastos.reduce((a,g)=>a+(g.total||0),0);
+    const noDeducible = gastos.filter(g=>g.categoria==='No deducible').reduce((a,g)=>a+(g.total||0),0);
+    const sub0  = gastos.reduce((a,g)=>a+(Number(g.subtotal0)||0),0);
+    const sub15 = gastos.reduce((a,g)=>a+(Number(g.subtotal15)||0),0);
+    const iva   = gastos.reduce((a,g)=>a+(Number(g.iva)||0),0);
+    const valorRecibido = Number(liq.valor_recibido||0);
+    const diferencia = valorRecibido - justificado;
+    return { asignado, justificado, noDeducible, sub0, sub15, iva, valorRecibido, diferencia };
   }
 
   // Agrupar gastos por categoría para PDF/Excel
@@ -127,6 +146,7 @@ export default function Liquidaciones({ presupuestos, userRole }) {
           <td style="padding:5px 10px;">${g.concepto}</td>
           <td style="padding:5px 6px;text-align:right;">${fmt(g.subtotal0)}</td>
           <td style="padding:5px 6px;text-align:right;">${fmt(g.subtotal15)}</td>
+          <td style="padding:5px 6px;text-align:right;font-size:9px;color:#666;">${g.iva_pct??15}%</td>
           <td style="padding:5px 6px;text-align:right;">${fmt(g.iva)}</td>
           <td style="padding:5px 6px;text-align:right;font-weight:700;">${fmt(g.total)}</td>
           <td style="padding:5px 6px;font-size:9px;">${g.ruc_proveedor||''}</td>
@@ -155,16 +175,27 @@ export default function Liquidaciones({ presupuestos, userRole }) {
       <div style="text-align:right;"><div style="color:#3dbfb8;font-size:9px;letter-spacing:2px;text-transform:uppercase;">Liquidación de Gastos</div></div>
     </div>
     <div style="background:#c8264a;height:3px;"></div>
-    <div style="padding:12px 28px;background:#f8fafc;border-bottom:1px solid #dde6ef;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-      ${[['Evento',liq.evento],['Responsable',liq.responsable],['Presupuesto',liq.presupuesto_nombre]].map(([l,v])=>`
+    <div style="padding:14px 28px;background:#f8fafc;border-bottom:1px solid #dde6ef;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+      ${[
+        ['Cliente',       liq.cliente_nombre],
+        ['Proyecto',      liq.evento],
+        ['Presupuesto',   liq.presupuesto_nombre],
+        ['Lugar evento',  liq.lugar],
+        ['Fecha evento',  liq.fecha_evento],
+        ['Días',          liq.dias_evento?`${liq.dias_evento} día(s)`:''],
+        ['Responsable',   liq.responsable],
+        ['Solicitante',   liq.solicitante && liq.solicitante!==liq.responsable ? liq.solicitante : ''],
+      ].filter(([,v])=>v).map(([l,v])=>`
         <div><div style="font-size:8px;color:#3dbfb8;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;">${l}</div><div style="font-weight:700;color:#0d3b5e;font-size:12px;">${v||'—'}</div></div>`).join('')}
     </div>
     <div style="padding:12px 28px;">
       <table style="width:100%;border-collapse:collapse;">
         <thead><tr style="background:#0d3b5e;color:#fff;font-size:9px;text-transform:uppercase;">
           <th style="padding:6px 10px;text-align:left;">Concepto</th>
+          <th style="padding:6px 6px;text-align:right;">Fecha Fact.</th>
           <th style="padding:6px 6px;text-align:right;">Sub 0%</th>
-          <th style="padding:6px 6px;text-align:right;">Sub 15%</th>
+          <th style="padding:6px 6px;text-align:right;">Sub c/IVA</th>
+          <th style="padding:6px 6px;text-align:right;">IVA%</th>
           <th style="padding:6px 6px;text-align:right;">IVA</th>
           <th style="padding:6px 6px;text-align:right;">Total</th>
           <th style="padding:6px 6px;text-align:left;">RUC</th>
@@ -176,20 +207,39 @@ export default function Liquidaciones({ presupuestos, userRole }) {
           ${catRows}
           <tr style="background:#0d3b5e;color:#fff;font-weight:700;font-size:11px;">
             <td style="padding:8px 10px;">TOTAL GENERAL</td>
-            <td colspan="3"></td>
+            <td colspan="2" style="padding:8px 6px;text-align:right;">Sub 0%: ${fmt(t.sub0)}</td>
+            <td colspan="2" style="padding:8px 6px;text-align:right;">Sub 15%: ${fmt(t.sub15)}</td>
             <td style="padding:8px 6px;text-align:right;color:#3dbfb8;">${fmt(t.justificado)}</td>
             <td colspan="4"></td>
           </tr>
+          ${t.noDeducible > 0 ? `
+          <tr style="background:#fff8e6;">
+            <td colspan="5" style="padding:6px 10px;font-size:11px;color:#7a5500;font-weight:600;">No Deducible</td>
+            <td style="padding:6px 6px;text-align:right;font-weight:700;color:#7a5500;">${fmt(t.noDeducible)}</td>
+            <td colspan="4"></td>
+          </tr>` : ''}
         </tbody>
       </table>
     </div>
     <div style="margin:0 28px 16px;border:1px solid #dde6ef;border-radius:6px;overflow:hidden;">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;">
-        ${[['Monto asignado',fmt(t.asignado),'#0d3b5e'],['Total justificado',fmt(t.justificado),'#0d3b5e'],['Saldo',fmt(t.saldo),t.saldo>=0?'#2e8b4e':'#c8264a']].map(([l,v,col])=>`
+        ${[
+          ['Total justificado', fmt(t.justificado), '#0d3b5e'],
+          ['Valor recibido',    fmt(t.valorRecibido), '#2e8b4e'],
+          ['Diferencia',        fmt(Math.abs(t.diferencia)), t.diferencia>=0?'#2e8b4e':'#c8264a'],
+        ].map(([l,v,col])=>`
           <div style="padding:10px 16px;border-right:1px solid #dde6ef;">
             <div style="font-size:10px;color:#888;margin-bottom:3px;">${l}</div>
             <div style="font-size:15px;font-weight:700;color:${col};">${v}</div>
           </div>`).join('')}
+      </div>
+      <div style="padding:12px 16px;background:${t.diferencia>=0?'#e8f5ee':'#fde8ec'};border-top:1px solid #dde6ef;">
+        <div style="font-size:12px;font-weight:700;color:${t.diferencia>=0?'#1a5c3a':'#7a1a1a'};">
+          ${t.diferencia >= 0
+            ? `Usted debe depositar a la cuenta de Matilda el valor de ${fmt(t.diferencia)}`
+            : `Matilda debe acreditar a su cuenta el valor de ${fmt(Math.abs(t.diferencia))}`
+          }
+        </div>
       </div>
     </div>
     ${liq.comprobante_url?`<div style="margin:0 28px 16px;"><div style="font-size:10px;color:#888;margin-bottom:4px;">Comprobante de depósito:</div><img src="${liq.comprobante_url}" style="max-height:120px;border:1px solid #dde6ef;border-radius:4px;"/></div>`:''}
@@ -280,6 +330,8 @@ export default function Liquidaciones({ presupuestos, userRole }) {
               </div>
               <div><Label>Nombre del evento</Label><input style={S.input} value={editing.evento||''} onChange={e=>setEditing(p=>({...p,evento:e.target.value}))}/></div>
               <div><Label>Responsable / Supervisor *</Label><input style={S.input} value={editing.responsable||''} onChange={e=>setEditing(p=>({...p,responsable:e.target.value}))}/></div>
+              <div><Label>Solicitante (si difiere del responsable)</Label><input style={S.input} value={editing.solicitante||''} onChange={e=>setEditing(p=>({...p,solicitante:e.target.value}))} placeholder="Nombre del solicitante"/></div>
+              <div><Label>Valor recibido ($)</Label><input type="number" step="0.01" style={S.input} value={editing.valor_recibido||0} onChange={e=>setEditing(p=>({...p,valor_recibido:Number(e.target.value)}))}/></div>
               <div>
                 <Label>Estado</Label>
                 <select style={S.select} value={editing.estado||'abierta'} onChange={e=>{
@@ -316,11 +368,21 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8,marginBottom:8}}>
                   <div><Label>Subtotal 0%</Label><input type="number" style={S.input} value={g.subtotal0} onChange={e=>updGasto(g.id,'subtotal0',e.target.value)}/></div>
-                  <div><Label>Subtotal 15%</Label><input type="number" style={S.input} value={g.subtotal15} onChange={e=>updGasto(g.id,'subtotal15',e.target.value)}/></div>
+                  <div>
+                    <Label>Subtotal con IVA</Label>
+                    <input type="number" style={S.input} value={g.subtotal15} onChange={e=>updGasto(g.id,'subtotal15',e.target.value)}/>
+                  </div>
+                  <div>
+                    <Label>IVA %</Label>
+                    <select style={S.select} value={g.iva_pct??15} onChange={e=>updGasto(g.id,'iva_pct',Number(e.target.value))}>
+                      {IVA_OPCIONES.map(p=><option key={p} value={p}>{p}%{p===15?' (estándar)':p===8?' (turismo)':p===5?' (construcción)':' (exento)'}</option>)}
+                    </select>
+                  </div>
                   <div><Label>IVA (auto)</Label><input style={S.inputRO} readOnly value={fmt(g.iva)}/></div>
                   <div><Label>Total (auto)</Label><input style={{...S.inputRO,fontWeight:700}} readOnly value={fmt(g.total)}/></div>
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8}}>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr',gap:8}}>
+                  <div><Label>Fecha factura</Label><input type="date" style={S.input} value={g.fecha_factura||''} onChange={e=>updGasto(g.id,'fecha_factura',e.target.value)}/></div>
                   <div><Label>RUC proveedor</Label><input style={S.input} value={g.ruc_proveedor||''} onChange={e=>updGasto(g.id,'ruc_proveedor',e.target.value)}/></div>
                   <div><Label>Nombre proveedor</Label><input style={S.input} value={g.nombre_proveedor||''} onChange={e=>updGasto(g.id,'nombre_proveedor',e.target.value)}/></div>
                   <div><Label># Factura</Label><input style={S.input} value={g.num_factura||''} onChange={e=>updGasto(g.id,'num_factura',e.target.value)}/></div>
@@ -332,10 +394,22 @@ export default function Liquidaciones({ presupuestos, userRole }) {
             {(editing.gastos||[]).length>0&&(()=>{
               const t=totalesLiq(editing);
               return(
-                <div style={{display:'flex',gap:16,background:'#f0f4f8',borderRadius:8,padding:'10px 14px'}}>
-                  <span style={{fontSize:13}}>Asignado: <strong>{fmt(t.asignado)}</strong></span>
-                  <span style={{fontSize:13}}>Justificado: <strong>{fmt(t.justificado)}</strong></span>
-                  <span style={{fontSize:13,color:t.saldo>=0?'#2e8b4e':'#c8264a'}}>Saldo: <strong>{fmt(t.saldo)}</strong></span>
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  <div style={{display:'flex',gap:16,background:'#f0f4f8',borderRadius:8,padding:'10px 14px',flexWrap:'wrap'}}>
+                    <span style={{fontSize:13}}>Justificado: <strong>{fmt(t.justificado)}</strong></span>
+                    <span style={{fontSize:13}}>Recibido: <strong style={{color:'#2e8b4e'}}>{fmt(t.valorRecibido)}</strong></span>
+                    {t.noDeducible>0&&<span style={{fontSize:13}}>No Deducible: <strong style={{color:'#7a5500'}}>{fmt(t.noDeducible)}</strong></span>}
+                  </div>
+                  {(t.valorRecibido>0||t.justificado>0)&&(
+                    <div style={{padding:'10px 14px',borderRadius:8,background:t.diferencia>=0?'#e8f5ee':'#fde8ec',border:`1px solid ${t.diferencia>=0?'#2e8b4e':'#c8264a'}`}}>
+                      <div style={{fontSize:13,fontWeight:700,color:t.diferencia>=0?'#1a5c3a':'#7a1a1a'}}>
+                        {t.diferencia>=0
+                          ? `Usted debe depositar a la cuenta de Matilda el valor de ${fmt(t.diferencia)}`
+                          : `Matilda debe acreditar a su cuenta el valor de ${fmt(Math.abs(t.diferencia))}`
+                        }
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -381,9 +455,11 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                   </div>
                 </div>
                 <div style={{textAlign:'right',marginRight:12}}>
-                  <div style={{fontSize:11,color:'#aaa'}}>Asignado / Justificado</div>
-                  <div style={{fontSize:15,fontWeight:700}}>{fmt(t.asignado)} / {fmt(t.justificado)}</div>
-                  <div style={{fontSize:12,fontWeight:700,color:t.saldo>=0?'#2e8b4e':'#c8264a'}}>Saldo: {fmt(t.saldo)}</div>
+                  <div style={{fontSize:11,color:'#aaa'}}>Justificado / Recibido</div>
+                  <div style={{fontSize:15,fontWeight:700}}>{fmt(t.justificado)} / {fmt(t.valorRecibido)}</div>
+                  <div style={{fontSize:12,fontWeight:700,color:t.diferencia>=0?'#2e8b4e':'#c8264a'}}>
+                    {t.diferencia>=0?'A depositar':'A acreditar'}: {fmt(Math.abs(t.diferencia))}
+                  </div>
                 </div>
                 <div style={{display:'flex',flexDirection:'column',gap:4}}>
                   {!bloqueado&&<button style={S.btnSm} onClick={()=>setEditing({...liq})}>✏️ Editar</button>}

@@ -147,7 +147,57 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride) {
     <div style="font-size:9px;color:#3dbfb8;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">Nota</div>
     <div style="font-size:12px;color:#1a1a2e;line-height:1.6;">${ppto.notas}</div>
   </div>` : ''}
-  <!-- FOOTER — solo frase, sin contacto -->
+
+  ${(ppto.opciones_adicionales||[]).length > 0 ? `
+  <div style="margin:0 36px 20px;">
+    <div style="background:#5b21b6;color:#fff;padding:10px 16px;border-radius:8px 8px 0 0;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">
+      ✦ Opciones adicionales
+    </div>
+    <div style="border:1px solid #dde6ef;border-top:none;border-radius:0 0 8px 8px;padding:16px;">
+      ${(ppto.opciones_adicionales||[]).map(op => {
+        const totalOp = (op.items||[]).reduce((a,it) => {
+          const qty = Number(it.cantidad||0); const dias = Number(it.dias||1); const pu = Number(it.precio_unit||0);
+          return a + qty*dias*pu;
+        }, 0);
+        const itemRows = (op.items||[]).map((it,i) => {
+          const qty = Number(it.cantidad||0); const dias = Number(it.dias||1); const pu = Number(it.precio_unit||0);
+          const total = qty*dias*pu;
+          return `<tr style="background:${i%2?'#f8fafc':'#fff'};border-bottom:1px solid #f0f0f0;">
+            <td style="padding:7px 10px;font-size:12px;font-weight:500;">${it.item||''}</td>
+            <td style="padding:7px 10px;font-size:11px;color:#666;">${it.detalle||''}</td>
+            <td style="padding:7px 8px;text-align:center;font-size:12px;">${qty}</td>
+            <td style="padding:7px 8px;text-align:center;font-size:12px;">${dias}</td>
+            <td style="padding:7px 8px;text-align:right;font-size:12px;">$${pu.toFixed(2)}</td>
+            <td style="padding:7px 8px;text-align:right;font-size:12px;font-weight:600;color:#5b21b6;">$${total.toFixed(2)}</td>
+          </tr>`;
+        }).join('');
+        return `
+        <div style="margin-bottom:16px;">
+          <div style="background:#f5f3ff;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:700;color:#5b21b6;margin-bottom:6px;">${op.nombre}</div>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr style="background:#ede9fe;">
+              <th style="padding:6px 10px;text-align:left;font-size:10px;color:#5b21b6;">Ítem</th>
+              <th style="padding:6px 10px;text-align:left;font-size:10px;color:#5b21b6;">Detalle</th>
+              <th style="padding:6px 8px;text-align:center;font-size:10px;color:#5b21b6;">Cant.</th>
+              <th style="padding:6px 8px;text-align:center;font-size:10px;color:#5b21b6;">Días</th>
+              <th style="padding:6px 8px;text-align:right;font-size:10px;color:#5b21b6;">P.Unit</th>
+              <th style="padding:6px 8px;text-align:right;font-size:10px;color:#5b21b6;">Total</th>
+            </tr></thead>
+            <tbody>${itemRows}</tbody>
+          </table>
+          <div style="text-align:right;padding:6px 8px;font-size:13px;font-weight:700;color:#5b21b6;">Total opción: $${totalOp.toFixed(2)}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>` : ''}
+
+  <div style="margin:0 36px 16px;background:#fdf8ee;border:1px solid #e8d8a0;border-radius:6px;padding:12px 16px;">
+    <div style="font-size:10px;color:#7a5500;line-height:1.7;">
+      <strong>NOTA:</strong> LA PRESENTE COTIZACIÓN TIENE UNA VIGENCIA DE 30 DÍAS CALENDARIO A PARTIR DE LA FECHA DE EMISIÓN.<br>
+      VENCIDO ESTE PLAZO, LOS VALORES PODRÁN SER AJUSTADOS SEGÚN LAS CONDICIONES DEL MERCADO.
+    </div>
+  </div>
+  <!-- FOOTER -->
   <div style="background:#0d3b5e;padding:12px 36px;display:flex;justify-content:center;align-items:center;margin-top:8px;">
     <div style="font-size:10px;color:#3dbfb8;letter-spacing:1px;font-style:italic;">"Donde la estrategia se convierte en experiencia."</div>
   </div>
@@ -177,26 +227,27 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
       <div style="font-size:12px;font-weight:700;color:#0d3b5e;">${v}</div>
     </div>`).join('');
 
-  // Columnas: Ítem | Cant | Días | Costo Unit | Costo Total | OH+BCO | Total Costo | Precio Unit | Precio Total | Costo Real Unit | Costo Real Total | Ahorro | Margen | Proveedor
+  // Columnas: Ítem | Detalle | Cant | Días | C.Unit | C.Total | P.Unit | P.Total | Margen Cot. | Proveedor | #Fact | C.Real Unit | C.Real Total | Ahorro | Margen Real
   const tableHeader = `
     <tr style="background:#0d3b5e;color:#fff;">
-      <th style="padding:6px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:1px;width:22%;">Ítem / Detalle</th>
+      <th style="padding:6px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:1px;width:18%;">Ítem / Detalle</th>
       <th style="padding:6px 5px;text-align:center;font-size:9px;text-transform:uppercase;">Cant</th>
       <th style="padding:6px 5px;text-align:center;font-size:9px;text-transform:uppercase;">Días</th>
       <th style="padding:6px 5px;text-align:right;font-size:9px;text-transform:uppercase;color:#ffcccc;">C.Unit</th>
       <th style="padding:6px 5px;text-align:right;font-size:9px;text-transform:uppercase;color:#ffcccc;">C.Total</th>
       <th style="padding:6px 5px;text-align:right;font-size:9px;text-transform:uppercase;color:#aaddff;">P.Unit</th>
-      <th style="padding:6px 5px;text-align:right;font-size:9px;text-transform:uppercase;color:#aaddff;">Total</th>
+      <th style="padding:6px 5px;text-align:right;font-size:9px;text-transform:uppercase;color:#aaddff;">P.Total</th>
+      <th style="padding:6px 5px;text-align:right;font-size:9px;text-transform:uppercase;color:#ffffaa;">Margen Cot.</th>
       <th style="padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase;">Proveedor</th>
       <th style="padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase;"># Fact.</th>
       <th style="padding:6px 5px;text-align:right;font-size:9px;text-transform:uppercase;color:#aaffcc;">C.Real Unit</th>
       <th style="padding:6px 5px;text-align:right;font-size:9px;text-transform:uppercase;color:#aaffcc;">C.Real Total</th>
       <th style="padding:6px 5px;text-align:right;font-size:9px;text-transform:uppercase;color:#aaffcc;">Ahorro</th>
-      <th style="padding:6px 5px;text-align:right;font-size:9px;text-transform:uppercase;color:#ffffaa;">Margen</th>
+      <th style="padding:6px 5px;text-align:right;font-size:9px;text-transform:uppercase;color:#88ffaa;">Margen Real</th>
     </tr>`;
 
   const itemRows = groups.map(({ subcat, items }) => {
-    const subcatRow = `<tr><td colspan="13" style="background:#1a5078;color:#fff;padding:5px 10px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">${subcat}</td></tr>`;
+    const subcatRow = `<tr><td colspan="14" style="background:#1a5078;color:#fff;padding:5px 10px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">${subcat}</td></tr>`;
     const rows = items.map((it, i) => {
       const c = calcItem(it);
       const tieneReal = it.costo_real_unit !== null && it.costo_real_unit !== undefined;
@@ -212,12 +263,13 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
         <td style="padding:6px 5px;text-align:right;color:#8b1a1a;font-weight:600;">${fmt(c.costoTotal)}</td>
         <td style="padding:6px 5px;text-align:right;color:#0d3b5e;">${fmt(c.precioU)}</td>
         <td style="padding:6px 5px;text-align:right;color:#0d3b5e;font-weight:600;">${fmt(c.precio)}</td>
+        <td style="padding:6px 5px;text-align:right;font-weight:600;color:${c.margen>=0?'#1a6e3e':'#8b1a1a'};">${fmt(c.margen)}<div style="font-size:8px;">(${c.margenPct.toFixed(1)}%)</div></td>
         <td style="padding:6px 8px;font-size:9px;color:#5a7a9a;">${it.proveedor || ''}</td>
         <td style="padding:6px 8px;font-size:9px;color:#5a7a9a;">${it.num_factura_prov || ''}</td>
         <td style="padding:6px 5px;text-align:right;color:${tieneReal ? '#1a6e3e' : '#bbb'};">${tieneReal ? fmt(c.costoRealUnit) : '—'}</td>
         <td style="padding:6px 5px;text-align:right;color:${tieneReal ? '#1a6e3e' : '#bbb'};">${tieneReal ? fmt(c.costoRealTotal) : '—'}</td>
         <td style="padding:6px 5px;text-align:right;font-weight:${tieneReal?'700':'400'};color:${tieneReal?(c.ahorro>=0?'#1a6e3e':'#8b1a1a'):'#bbb'};">${tieneReal ? fmt(c.ahorro) : '—'}</td>
-        <td style="padding:6px 5px;text-align:right;font-weight:600;color:${c.margen>=0?'#1a6e3e':'#8b1a1a'};">${fmt(c.margen)}<div style="font-size:8px;">(${c.margenPct.toFixed(1)}%)</div></td>
+        <td style="padding:6px 5px;text-align:right;font-weight:600;color:${tieneReal?(c.margenReal>=0?'#1a6e3e':'#8b1a1a'):'#bbb'};">${tieneReal ? fmt(c.margenReal)+'<div style="font-size:8px;">('+c.margenRealPct.toFixed(1)+'%)</div>' : '—'}</td>
       </tr>`;
     }).join('');
     return subcatRow + rows;
@@ -292,13 +344,32 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
           <td style="padding:8px 5px;text-align:right;font-weight:700;color:#8b1a1a;">${fmt(t.subtotalCosto)}</td>
           <td style="padding:8px 5px;"></td>
           <td style="padding:8px 5px;text-align:right;font-weight:700;color:#0d3b5e;">${fmt(t.subtotalPrecio)}</td>
+          <td style="padding:8px 5px;text-align:right;font-weight:700;color:${t.margenTotal>=0?'#1a6e3e':'#8b1a1a'};">${fmt(t.margenTotal)}</td>
           <td colspan="2" style="padding:8px 5px;"></td>
-          <td style="padding:8px 5px;"></td>
           <td style="padding:8px 5px;text-align:right;font-weight:700;color:#1a6e3e;">${t.subtotalCostoReal > 0 ? fmt(t.subtotalCostoReal) : '—'}</td>
           <td style="padding:8px 5px;text-align:right;font-weight:700;color:${t.subtotalAhorro>=0?'#1a6e3e':'#8b1a1a'};">${t.subtotalAhorro > 0 ? fmt(t.subtotalAhorro) : '—'}</td>
-          <td style="padding:8px 5px;text-align:right;font-weight:700;color:${t.margenTotal>=0?'#1a6e3e':'#8b1a1a'};">${fmt(t.margenTotal)}<div style="font-size:8px;">(${t.margenPct.toFixed(1)}%)</div></td>
+          <td style="padding:8px 5px;text-align:right;font-weight:700;color:${t.margenRealTotal>=0?'#1a6e3e':'#8b1a1a'};">${t.subtotalCostoReal > 0 ? fmt(t.margenRealTotal) : '—'}</td>
         </tr>
         ${rebateRow}
+        <!-- 3 TIPOS DE MARGEN -->
+        <tr style="background:#eef4fb;">
+          <td colspan="6" style="padding:8px 10px;font-size:11px;color:#0d3b5e;font-weight:600;">Margen cotizado (sin fee)</td>
+          <td colspan="8" style="padding:8px 10px;text-align:right;font-weight:700;color:${(t.subtotalPrecio-t.subtotalCosto)>=0?'#1a6e3e':'#8b1a1a'};">
+            ${fmt(t.subtotalPrecio - t.subtotalCosto)} (${t.subtotalPrecio>0?(((t.subtotalPrecio-t.subtotalCosto)/t.subtotalPrecio)*100).toFixed(1):'0.0'}%)
+          </td>
+        </tr>
+        <tr style="background:#e8f5ee;">
+          <td colspan="6" style="padding:8px 10px;font-size:11px;color:#1a6e3e;font-weight:600;">Margen real (sin fee)</td>
+          <td colspan="8" style="padding:8px 10px;text-align:right;font-weight:700;color:${t.subtotalCostoReal>0?((t.subtotalPrecio-t.subtotalCostoReal)>=0?'#1a6e3e':'#8b1a1a'):'#bbb'};">
+            ${t.subtotalCostoReal > 0 ? fmt(t.subtotalPrecio - t.subtotalCostoReal)+' ('+(((t.subtotalPrecio-t.subtotalCostoReal)/t.subtotalPrecio)*100).toFixed(1)+'%)' : '— (sin costo real ingresado)'}
+          </td>
+        </tr>
+        <tr style="background:#0d3b5e;">
+          <td colspan="6" style="padding:8px 10px;font-size:11px;color:#3dbfb8;font-weight:700;">Margen incl. fee${ppto.apply_rebate?` menos Rebate ${ppto.rebate_pct??0}%`:''}</td>
+          <td colspan="8" style="padding:8px 10px;text-align:right;font-weight:700;color:#3dbfb8;font-size:13px;">
+            ${fmt(t.totalSinIva - t.subtotalCosto - (ppto.apply_rebate ? t.rebate : 0))} (${((t.totalSinIva - t.subtotalCosto - (ppto.apply_rebate ? t.rebate : 0)) / (t.totalSinIva||1) * 100).toFixed(1)}%)
+          </td>
+        </tr>
       </tbody>
     </table>
   </div>

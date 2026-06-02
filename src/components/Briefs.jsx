@@ -204,6 +204,8 @@ export default function Briefs({ userRole, userEmail }) {
   const [editBrief, setEditBrief]   = useState(null);
   const [detalle, setDetalle]       = useState(null);
   const [expedienteId, setExpedienteId] = useState(null);
+  const [modalCambios, setModalCambios] = useState(null); // { brief, nuevoEstado }
+  const [notasCambio, setNotasCambio] = useState('');
   const [filter, setFilter]         = useState('todos');
   const [clientFilter, setClientFilter] = useState('');
   const [search, setSearch]         = useState('');
@@ -230,17 +232,41 @@ export default function Briefs({ userRole, userEmail }) {
   async function saveBrief(data) {
     if (editBrief) {
       await supabase.from('briefs').update(data).eq('id', editBrief.id);
+      setEditBrief(prev => ({ ...prev, ...data }));
     } else {
-      await supabase.from('briefs').insert({ ...data, created_by: userEmail });
+      const { data: newBrief } = await supabase.from('briefs').insert({ ...data, created_by: userEmail }).select().single();
+      if (newBrief) setEditBrief(newBrief);
     }
-    setView('list');
-    setEditBrief(null);
+    // Nos quedamos en el formulario para seguir editando
     loadAll();
   }
 
-  async function updateEstado(id, estado) {
+  async function updateEstado(id, estado, estadoAnterior) {
+    if (estado === 'con_cambios' && estadoAnterior === 'entregado') {
+      const brief = briefs.find(b => b.id === id);
+      setModalCambios({ brief, nuevoEstado: estado });
+      setNotasCambio('');
+      return;
+    }
     await supabase.from('briefs').update({ estado }).eq('id', id);
     setBriefs(prev => prev.map(b => b.id === id ? { ...b, estado } : b));
+  }
+
+  async function confirmarCambios() {
+    if (!modalCambios) return;
+    const { brief, nuevoEstado } = modalCambios;
+    await supabase.from('briefs').update({ estado: nuevoEstado }).eq('id', brief.id);
+    // Guardar registro del cambio
+    await supabase.from('cambios_brief').insert({
+      brief_id: brief.id,
+      estado_anterior: brief.estado,
+      estado_nuevo: nuevoEstado,
+      notas_cambio: notasCambio,
+      created_by: userEmail,
+    });
+    setBriefs(prev => prev.map(b => b.id === brief.id ? { ...b, estado: nuevoEstado } : b));
+    setModalCambios(null);
+    setNotasCambio('');
   }
 
   async function deleteBrief(id) {
@@ -367,7 +393,7 @@ export default function Briefs({ userRole, userEmail }) {
                 <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
                   {canEdit ? (
                     <>
-                      <select value={b.estado} onChange={e=>updateEstado(b.id,e.target.value)} style={{ fontSize:12, padding:'4px 8px', border:'1px solid #ddd', borderRadius:7, background:'#fff', color:'#1a1a1a', width:'auto', fontFamily:'inherit' }}>
+                      <select value={b.estado} onChange={e=>updateEstado(b.id,e.target.value,b.estado)} style={{ fontSize:12, padding:'4px 8px', border:'1px solid #ddd', borderRadius:7, background:'#fff', color:'#1a1a1a', width:'auto', fontFamily:'inherit' }}>
                         {ESTADOS_BRIEF.map(e=><option key={e} value={e}>{ESTADOS_BRIEF_LABELS[e]}</option>)}
                       </select>
                       <button onClick={()=>{ setEditBrief(b); setView('form'); }} style={{ padding:'4px 10px', fontSize:12, borderRadius:7, border:'1px solid #ddd', background:'transparent', color:'#555', cursor:'pointer', fontFamily:'inherit' }}>Editar</button>
@@ -422,6 +448,29 @@ export default function Briefs({ userRole, userEmail }) {
       </Modal>
 
       {expedienteId && <ExpedientePanel briefId={expedienteId} onClose={()=>setExpedienteId(null)}/>}
+
+      {/* Modal cambios solicitados */}
+      {modalCambios && (
+        <div onClick={()=>setModalCambios(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.45)', zIndex:400, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:14, width:'100%', maxWidth:480, padding:24, boxShadow:'0 4px 24px rgba(0,0,0,.15)' }}>
+            <div style={{ fontSize:15, fontWeight:700, color:'#c8264a', marginBottom:4 }}>📝 Cambios solicitados</div>
+            <div style={{ fontSize:13, color:'#666', marginBottom:16 }}>
+              El proyecto <strong>{modalCambios.brief?.nombre}</strong> pasará de "Entregado" a "Con cambios". Anotá qué cambios se solicitaron:
+            </div>
+            <textarea
+              value={notasCambio}
+              onChange={e=>setNotasCambio(e.target.value)}
+              placeholder="Describí los cambios solicitados por el cliente..."
+              style={{ width:'100%', minHeight:100, padding:'10px 12px', border:'1px solid #ddd', borderRadius:9, fontSize:13, fontFamily:'inherit', resize:'vertical', outline:'none', boxSizing:'border-box' }}
+              autoFocus
+            />
+            <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:14 }}>
+              <Btn variant="secondary" onClick={()=>setModalCambios(null)}>Cancelar</Btn>
+              <Btn onClick={confirmarCambios}>Confirmar cambios</Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

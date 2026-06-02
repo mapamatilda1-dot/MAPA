@@ -65,79 +65,87 @@ function Modal({ open, onClose, title, children, footer, wide }) {
 }
 
 // ── Editor de ítem ────────────────────────────────────────────
-function ItemRow({ item, onChange, onDelete, oh_pct }) {
+function ItemCardProforma({ item, onChange, onDelete, oh_pct, isOpen, onToggle }) {
   const [uploading, setUploading] = useState(false);
-  const total = calcItem(item);
-  const costoTotal = Number(item.cantidad||0) * Number(item.dias||1) * Number(item.costo_unit||0) * (1 + Number(item.bco_pct_item||0)/100);
-  const ohItem = costoTotal * (oh_pct/100);
+  const qty  = Number(item.cantidad||0);
+  const dias = Number(item.dias||1);
+  const pu   = Number(item.precio_unit||0);
+  const cu   = Number(item.costo_unit||0);
+  const bco  = Number(item.bco_pct_item||0)/100;
+  const oh   = Number(oh_pct||15)/100;
+  const precioTotal = qty*dias*pu;
+  const costoTotal  = qty*dias*cu*(1+bco)*(1+oh);
+  const margen = precioTotal - costoTotal;
+  const margenPct = precioTotal>0 ? margen/precioTotal*100 : 0;
 
   async function handleImg(e) {
     const file = e.target.files[0]; if (!file) return;
     setUploading(true);
-    const name = `${Date.now()}-${file.name}`;
+    const name = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g,'_')}`;
     await supabase.storage.from('proforma-images').upload(name, file);
     const { data } = supabase.storage.from('proforma-images').getPublicUrl(name);
     onChange('imagen_url', data.publicUrl);
     setUploading(false);
   }
 
-  const cellStyle = { padding:'0 4px', verticalAlign:'middle' };
-  const numInp = { ...inp, width:'100%', fontSize:12, padding:'5px 7px', textAlign:'right' };
-
   return (
-    <tr style={{ borderBottom:'1px solid #f0f0f0' }}>
-      {/* Imagen */}
-      <td style={{ ...cellStyle, width:52 }}>
-        <label style={{ cursor:'pointer', display:'block', width:44, height:44, borderRadius:6, border:'1px dashed #ddd', overflow:'hidden', background:'#fafafa', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <input type="file" accept="image/*" onChange={handleImg} style={{ display:'none' }} disabled={uploading}/>
-          {item.imagen_url
-            ? <img src={item.imagen_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
-            : <span style={{ fontSize:18, color:'#ccc' }}>{uploading?'⏳':'📷'}</span>
-          }
-        </label>
-      </td>
-      {/* Subcategoría */}
-      <td style={{ ...cellStyle, width:110 }}>
-        <input value={item.subcategoria||''} onChange={e=>onChange('subcategoria',e.target.value)} style={{...inp,width:'100%',fontSize:12,padding:'5px 7px'}} placeholder="Subcategoría"/>
-      </td>
-      {/* Ítem */}
-      <td style={{ ...cellStyle, minWidth:140 }}>
-        <input value={item.nombre||''} onChange={e=>onChange('nombre',e.target.value)} style={{...inp,width:'100%',fontSize:12,padding:'5px 7px'}} placeholder="Descripción del ítem"/>
-      </td>
-      {/* Cantidad */}
-      <td style={{ ...cellStyle, width:60 }}>
-        <input type="number" value={item.cantidad||''} onChange={e=>onChange('cantidad',e.target.value)} style={numInp} min="0" placeholder="0"/>
-      </td>
-      {/* Días */}
-      <td style={{ ...cellStyle, width:55 }}>
-        <input type="number" value={item.dias||''} onChange={e=>onChange('dias',e.target.value)} style={numInp} min="1" placeholder="1"/>
-      </td>
-      {/* Precio unit */}
-      <td style={{ ...cellStyle, width:90 }}>
-        <input type="number" value={item.precio_unit||''} onChange={e=>onChange('precio_unit',e.target.value)} style={numInp} min="0" placeholder="0.00"/>
-      </td>
-      {/* Costo unit */}
-      <td style={{ ...cellStyle, width:90, background:'#fafafa' }}>
-        <input type="number" value={item.costo_unit||''} onChange={e=>onChange('costo_unit',e.target.value)} style={{...numInp,background:'#fafafa'}} min="0" placeholder="0.00"/>
-      </td>
-      {/* BCO % */}
-      <td style={{ ...cellStyle, width:65, background:'#fafafa' }}>
-        <input type="number" value={item.bco_pct_item||''} onChange={e=>onChange('bco_pct_item',e.target.value)} style={{...numInp,background:'#fafafa'}} min="0" placeholder="0"/>
-      </td>
-      {/* Precio total */}
-      <td style={{ ...cellStyle, width:90, textAlign:'right', fontSize:12, fontWeight:600, color:'#0d3b5e' }}>
-        {fmt(total)}
-      </td>
-      {/* Eliminar */}
-      <td style={{ ...cellStyle, width:32, textAlign:'center' }}>
-        <button onClick={onDelete} style={{ background:'none', border:'none', cursor:'pointer', color:'#dc2626', fontSize:16 }}>✕</button>
-      </td>
-    </tr>
+    <div style={{ border:'1px solid #dde6ef', borderRadius:9, marginBottom:6, overflow:'hidden' }}>
+      {/* Resumen clickeable */}
+      <div onClick={onToggle} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', cursor:'pointer', background:isOpen?'#eef4fb':'#fff', userSelect:'none' }}>
+        {item.imagen_url
+          ? <img src={item.imagen_url} alt="" style={{ width:36, height:36, objectFit:'cover', borderRadius:5, flexShrink:0 }}/>
+          : <div style={{ width:36, height:36, borderRadius:5, background:'#f0f4f8', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:16, color:'#ccc' }}>📷</div>
+        }
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:13, fontWeight:500, color:'#0d3b5e', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.nombre||<span style={{color:'#aaa',fontStyle:'italic'}}>Sin nombre</span>}</div>
+          <div style={{ fontSize:11, color:'#8aa0b8' }}>{item.subcategoria||''} {item.subcategoria&&item.detalle?'·':''} {item.detalle||''}</div>
+        </div>
+        <div style={{ fontSize:12, color:'#8aa0b8', flexShrink:0, textAlign:'right' }}>
+          {qty}×{dias} · P:{fmt(precioTotal)}
+        </div>
+        <div style={{ fontSize:12, fontWeight:600, color:margen>=0?'#2e8b4e':'#c8264a', flexShrink:0 }}>{fmt(margen)}</div>
+        <button onClick={e=>{e.stopPropagation();onDelete();}} style={{ background:'none', border:'none', color:'#c8264a', cursor:'pointer', fontSize:16, flexShrink:0 }}>✕</button>
+      </div>
+      {/* Campos expandibles */}
+      {isOpen && (
+        <div style={{ padding:'12px 14px', background:'#fafcfe', borderTop:'1px solid #dde6ef', display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+          <div style={{gridColumn:'1/-1'}}><label style={lbl}>Subcategoría</label><input style={inp} value={item.subcategoria||''} onChange={e=>onChange('subcategoria',e.target.value)} placeholder="Ej: DECORACIÓN"/></div>
+          <div style={{gridColumn:'1/-1'}}><label style={lbl}>Nombre del ítem *</label><input style={inp} value={item.nombre||''} onChange={e=>onChange('nombre',e.target.value)} placeholder="Descripción del ítem"/></div>
+          <div style={{gridColumn:'1/-1'}}><label style={lbl}>Detalle</label><textarea style={{...inp,minHeight:52,resize:'vertical'}} value={item.detalle||''} onChange={e=>onChange('detalle',e.target.value)} placeholder="Descripción detallada..."/></div>
+          <div><label style={lbl}>Cantidad</label><input type="number" style={inp} value={item.cantidad} onChange={e=>onChange('cantidad',Number(e.target.value))} min="0"/></div>
+          <div><label style={lbl}>Días</label><input type="number" style={inp} value={item.dias} onChange={e=>onChange('dias',Number(e.target.value))} min="1"/></div>
+          <div><label style={lbl}>Costo unitario ($)</label><input type="number" step="0.01" style={{...inp,background:'#fafafa'}} value={item.costo_unit||''} onChange={e=>onChange('costo_unit',Number(e.target.value))}/></div>
+          <div><label style={lbl}>Costo total (auto)</label><input readOnly style={{...inp,background:'#f0f0f0',color:'#555'}} value={fmt(qty*dias*cu*(1+bco))}/></div>
+          <div><label style={lbl}>OH %</label><input type="number" step="0.1" style={{...inp,background:'#fafafa'}} value={oh_pct||15} readOnly/></div>
+          <div><label style={lbl}>BCO %</label><input type="number" step="0.1" style={{...inp,background:'#fafafa'}} value={item.bco_pct_item||''} onChange={e=>onChange('bco_pct_item',Number(e.target.value))} placeholder="0"/></div>
+          <div><label style={lbl}>Precio unitario ($)</label><input type="number" step="0.01" style={inp} value={item.precio_unit||''} onChange={e=>onChange('precio_unit',Number(e.target.value))}/></div>
+          <div><label style={lbl}>Precio total (auto)</label><input readOnly style={{...inp,background:'#f0f0f0',fontWeight:600,color:'#0d3b5e'}} value={fmt(precioTotal)}/></div>
+          <div><label style={lbl}>Razón social proveedor</label><input style={inp} value={item.proveedor||''} onChange={e=>onChange('proveedor',e.target.value)}/></div>
+          <div><label style={lbl}>Info general</label><input style={inp} value={item.info||''} onChange={e=>onChange('info',e.target.value)}/></div>
+          <div style={{gridColumn:'1/-1'}}>
+            <label style={lbl}>Imagen de referencia</label>
+            <label style={{ display:'inline-flex', alignItems:'center', gap:8, cursor:'pointer', padding:'7px 12px', border:'1px solid #ddd', borderRadius:8, background:'#fafafa', fontSize:12 }}>
+              <input type="file" accept="image/*" onChange={handleImg} style={{ display:'none' }} disabled={uploading}/>
+              {uploading ? '⏳ Subiendo...' : '📷 Seleccionar imagen'}
+            </label>
+            {item.imagen_url && <img src={item.imagen_url} alt="" style={{ marginLeft:12, width:60, height:60, objectFit:'cover', borderRadius:6, border:'1px solid #ddd', verticalAlign:'middle' }}/>}
+          </div>
+          <div style={{gridColumn:'1/-1', background:'#eef4fb', borderRadius:8, padding:'8px 12px', display:'flex', gap:20}}>
+            <span style={{fontSize:13}}>Precio total: <strong style={{color:'#0d3b5e'}}>{fmt(precioTotal)}</strong></span>
+            <span style={{fontSize:13}}>Costo total: <strong>{fmt(costoTotal)}</strong></span>
+            <span style={{fontSize:13,color:margen>=0?'#2e8b4e':'#c8264a'}}>Margen: <strong>{fmt(margen)} ({margenPct.toFixed(1)}%)</strong></span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
   );
 }
 
 // ── Editor de opción ──────────────────────────────────────────
 function OpcionEditor({ opcion, onChange, onDelete, oh_pct, fee_agencia, aprobada, onAprobar, index }) {
+  const [openItem, setOpenItem] = useState(null);
   const t = calcOpcion(opcion, oh_pct, fee_agencia);
 
   function updateItem(itemId, field, value) {
@@ -145,14 +153,79 @@ function OpcionEditor({ opcion, onChange, onDelete, oh_pct, fee_agencia, aprobad
     onChange({ ...opcion, items });
   }
   function addItem() {
-    const items = [...(opcion.items||[]), { id:uid(), subcategoria:'', nombre:'', imagen_url:'', cantidad:1, dias:1, precio_unit:0, costo_unit:0, bco_pct_item:0 }];
+    const items = [...(opcion.items||[]), { id:uid(), subcategoria:'', nombre:'', detalle:'', imagen_url:'', cantidad:1, dias:1, precio_unit:0, costo_unit:0, bco_pct_item:0, proveedor:'', info:'' }];
     onChange({ ...opcion, items });
+    setOpenItem(items[items.length-1].id);
   }
   function deleteItem(itemId) {
     onChange({ ...opcion, items: opcion.items.filter(it => it.id !== itemId) });
+    if (openItem === itemId) setOpenItem(null);
   }
 
   const borderColor = aprobada ? '#2e8b4e' : '#e8e8e8';
+
+  return (
+    <div style={{ border:`2px solid ${borderColor}`, borderRadius:12, marginBottom:16, overflow:'hidden' }}>
+      {/* Header opción */}
+      <div style={{ background: aprobada ? '#e8f5ee' : '#f8fafc', padding:'12px 16px', display:'flex', alignItems:'center', gap:10 }}>
+        <div style={{ fontSize:14, fontWeight:700, color: aprobada ? '#2e8b4e' : '#0d3b5e', flex:1 }}>
+          {aprobada && '✅ '}
+          <input
+            value={opcion.nombre||''}
+            onChange={e=>onChange({...opcion, nombre:e.target.value})}
+            placeholder={`Nombre de ítem / opción ${index+1}`}
+            style={{...inp, fontSize:14, fontWeight:600, padding:'4px 8px', width:300, color:aprobada?'#2e8b4e':'#0d3b5e'}}
+          />
+        </div>
+        {!aprobada && <Btn size="xs" variant="green" onClick={onAprobar}>✓ Aprobar</Btn>}
+        {aprobada && <span style={{ fontSize:12, color:'#2e8b4e', fontWeight:600 }}>Aprobado</span>}
+        <Btn size="xs" variant="danger" onClick={onDelete}>✕</Btn>
+      </div>
+
+      {/* Ítems al estilo presupuesto */}
+      <div style={{ padding:'12px 14px' }}>
+        {(opcion.items||[]).map(it => (
+          <ItemCardProforma key={it.id} item={it} oh_pct={oh_pct}
+            isOpen={openItem===it.id}
+            onToggle={()=>setOpenItem(openItem===it.id?null:it.id)}
+            onChange={(field, val) => updateItem(it.id, field, val)}
+            onDelete={() => deleteItem(it.id)}
+          />
+        ))}
+        {(opcion.items||[]).length === 0 && (
+          <div style={{ textAlign:'center', padding:'1.5rem', color:'#ccc', fontSize:13, border:'1px dashed #e8e8e8', borderRadius:8 }}>
+            Sin ítems — hacé clic en "+ Ítem" para agregar
+          </div>
+        )}
+        <div style={{ marginTop:8 }}>
+          <Btn size="xs" variant="secondary" onClick={addItem}>+ Ítem</Btn>
+        </div>
+      </div>
+
+      {/* Totales de la opción */}
+      <div style={{ background:'#f8fafc', borderTop:'1px solid #e8e8e8', padding:'12px 16px', display:'flex', gap:16, flexWrap:'wrap', justifyContent:'flex-end' }}>
+        {[
+          ['Subtotal precio', fmt(t.subtotalPrecio)],
+          ['Fee', fmt(t.fee)],
+          ['Subtotal s/IVA', fmt(t.sinIva)],
+          ['IVA 15%', fmt(t.iva)],
+          ['Total', fmt(t.total)],
+        ].map(([l, v]) => (
+          <div key={l} style={{ textAlign:'right' }}>
+            <div style={{ fontSize:10, color:'#888', marginBottom:2 }}>{l}</div>
+            <div style={{ fontSize:13, fontWeight:700, color:'#0d3b5e' }}>{v}</div>
+          </div>
+        ))}
+        <div style={{ textAlign:'right', borderLeft:'1px solid #ddd', paddingLeft:16 }}>
+          <div style={{ fontSize:10, color:'#888', marginBottom:2 }}>Margen</div>
+          <div style={{ fontSize:13, fontWeight:700, color: t.margenPct >= 20 ? '#2e8b4e' : '#dc2626' }}>
+            {t.margenPct.toFixed(1)}%
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
   return (
     <div style={{ border:`2px solid ${borderColor}`, borderRadius:12, marginBottom:16, overflow:'hidden' }}>

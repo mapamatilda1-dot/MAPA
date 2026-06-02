@@ -42,6 +42,8 @@ export default function ExpedientePanel({ briefId, onClose }) {
   const [presupuestos, setPresupuestos] = useState([]);
   const [liquidaciones, setLiquidaciones] = useState([]);
   const [implementaciones, setImplementaciones] = useState([]);
+  const [versiones, setVersiones]   = useState([]);
+  const [cambiosBrief, setCambiosBrief] = useState([]);
   const [loading, setLoading]       = useState(true);
 
   useEffect(() => {
@@ -51,24 +53,31 @@ export default function ExpedientePanel({ briefId, onClose }) {
 
   async function loadAll() {
     setLoading(true);
-    const [brR, prR, ppR, implR] = await Promise.all([
+    const [brR, prR, ppR, implR, cambR] = await Promise.all([
       supabase.from('briefs').select('*').eq('id', briefId).single(),
       supabase.from('propuestas').select('*').eq('brief_id', briefId).order('created_at', { ascending: false }),
       supabase.from('presupuestos').select('*').eq('brief_id', briefId).order('created_at', { ascending: false }),
       supabase.from('implementaciones').select('*').eq('brief_id', briefId).order('fecha_evento'),
+      supabase.from('cambios_brief').select('*').eq('brief_id', briefId).order('created_at', { ascending: true }),
     ]);
     if (brR.data)   setBrief(brR.data);
     if (prR.data)   setPropuestas(prR.data);
     if (ppR.data)   setPresupuestos(ppR.data);
     if (implR.data) setImplementaciones(implR.data);
+    if (cambR.data) setCambiosBrief(cambR.data);
 
-    // Liquidaciones vinculadas a los presupuestos de este proyecto
+    // Versiones de presupuestos vinculados
     if (ppR.data?.length) {
       const ppIds = ppR.data.map(p => p.id);
-      const { data: liqData } = await supabase.from('liquidaciones').select('*').in('presupuesto_id', ppIds);
+      const [{ data: liqData }, { data: verData }] = await Promise.all([
+        supabase.from('liquidaciones').select('*').in('presupuesto_id', ppIds),
+        supabase.from('versiones_ppto').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: true }),
+      ]);
       setLiquidaciones(liqData || []);
+      setVersiones(verData || []);
     } else {
       setLiquidaciones([]);
+      setVersiones([]);
     }
     setLoading(false);
   }
@@ -257,6 +266,63 @@ export default function ExpedientePanel({ briefId, onClose }) {
                   })
                 }
               </Section>
+
+              {/* Historial de cambios del proyecto */}
+              {cambiosBrief.length > 0 && (
+                <Section icon="📝" title="Historial de cambios" count={cambiosBrief.length}>
+                  <div style={{ position:'relative', paddingLeft:16 }}>
+                    <div style={{ position:'absolute', left:6, top:0, bottom:0, width:2, background:'#e8e8e8', borderRadius:2 }}/>
+                    {cambiosBrief.map((c, i) => (
+                      <div key={c.id} style={{ position:'relative', marginBottom:12, paddingLeft:12 }}>
+                        <div style={{ position:'absolute', left:-10, top:4, width:10, height:10, borderRadius:'50%', background:'#c8264a', border:'2px solid #fff' }}/>
+                        <div style={{ fontSize:11, color:'#888', marginBottom:3 }}>
+                          {fmtDate(c.created_at?.slice(0,10))} · {c.created_by}
+                        </div>
+                        <div style={{ fontSize:12, color:'#555' }}>
+                          <span style={{ background:'#e8f5ee', color:'#2e8b4e', padding:'1px 6px', borderRadius:4, fontSize:11 }}>{c.estado_anterior}</span>
+                          {' → '}
+                          <span style={{ background:'#fde8ec', color:'#c8264a', padding:'1px 6px', borderRadius:4, fontSize:11 }}>{c.estado_nuevo}</span>
+                        </div>
+                        {c.notas_cambio && (
+                          <div style={{ marginTop:5, background:'#fdf8ee', border:'1px solid #e8d8a0', borderRadius:6, padding:'7px 10px', fontSize:12, color:'#7a5500', lineHeight:1.5 }}>
+                            {c.notas_cambio}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {/* Versiones de presupuestos */}
+              {versiones.length > 0 && (
+                <Section icon="🗂️" title="Versiones de presupuestos" count={versiones.length}>
+                  <div style={{ position:'relative', paddingLeft:16 }}>
+                    <div style={{ position:'absolute', left:6, top:0, bottom:0, width:2, background:'#e8e8e8', borderRadius:2 }}/>
+                    {versiones.map((v, i) => {
+                      const ppto = presupuestos.find(p => p.id === v.presupuesto_id);
+                      return (
+                        <div key={v.id} style={{ position:'relative', marginBottom:12, paddingLeft:12 }}>
+                          <div style={{ position:'absolute', left:-10, top:4, width:10, height:10, borderRadius:'50%', background:'#0d3b5e', border:'2px solid #fff' }}/>
+                          <div style={{ fontSize:11, color:'#888', marginBottom:3 }}>
+                            v{v.version_num} · {fmtDate(v.created_at?.slice(0,10))} · {v.created_by}
+                          </div>
+                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <span style={{ fontSize:12, color:'#555' }}>{ppto?.nomenclatura || 'Presupuesto'}</span>
+                            <span style={{ background:'#eef4fb', color:'#0d3b5e', padding:'1px 6px', borderRadius:4, fontSize:11 }}>{v.estado}</span>
+                            {v.pdf_url && (
+                              <a href={v.pdf_url} target="_blank" rel="noreferrer"
+                                style={{ fontSize:11, color:'#c8264a', fontWeight:500, textDecoration:'none' }}>
+                                📄 Ver PDF →
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
             </>
           )}
         </div>
