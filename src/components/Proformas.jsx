@@ -140,8 +140,6 @@ function ItemCardProforma({ item, onChange, onDelete, oh_pct, isOpen, onToggle }
     </div>
   );
 }
-  );
-}
 
 // ── Editor de opción ──────────────────────────────────────────
 function OpcionEditor({ opcion, onChange, onDelete, oh_pct, fee_agencia, aprobada, onAprobar, index }) {
