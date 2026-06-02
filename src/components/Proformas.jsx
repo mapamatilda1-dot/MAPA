@@ -109,7 +109,6 @@ function ItemCardProforma({ item, onChange, onDelete, oh_pct, isOpen, onToggle }
       {/* Campos expandibles */}
       {isOpen && (
         <div style={{ padding:'12px 14px', background:'#fafcfe', borderTop:'1px solid #dde6ef', display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-          <div style={{gridColumn:'1/-1'}}><label style={lbl}>Subcategoría</label><input style={inp} value={item.subcategoria||''} onChange={e=>onChange('subcategoria',e.target.value)} placeholder="Ej: DECORACIÓN"/></div>
           <div style={{gridColumn:'1/-1'}}><label style={lbl}>Nombre del ítem *</label><input style={inp} value={item.nombre||''} onChange={e=>onChange('nombre',e.target.value)} placeholder="Descripción del ítem"/></div>
           <div style={{gridColumn:'1/-1'}}><label style={lbl}>Detalle</label><textarea style={{...inp,minHeight:52,resize:'vertical'}} value={item.detalle||''} onChange={e=>onChange('detalle',e.target.value)} placeholder="Descripción detallada..."/></div>
           <div><label style={lbl}>Cantidad</label><input type="number" style={inp} value={item.cantidad} onChange={e=>onChange('cantidad',Number(e.target.value))} min="0"/></div>
@@ -243,6 +242,20 @@ export default function Proformas({ userRole, userEmail }) {
 
   function showToast(m) { setToast(m); setTimeout(()=>setToast(''), 3000); }
 
+  async function deletePf(id) {
+    if (!window.confirm('¿Eliminar esta proforma?')) return;
+    await supabase.from('proformas').delete().eq('id', id);
+    loadAll();
+    showToast('Proforma eliminada');
+  }
+
+  function generatePDFForPf(pf) {
+    const html = buildPDFHtml(pf);
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+  }
+
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
@@ -321,12 +334,11 @@ export default function Proformas({ userRole, userEmail }) {
       showToast('Proforma guardada ✓');
       loadAll();
     } else {
-      const count = (await supabase.from('proformas').select('*',{count:'exact',head:true})).count || 0;
-      const nom = `PF-${String(count+1).padStart(3,'0')}-${pf.cliente_nombre?.slice(0,10).toUpperCase()}-${new Date().getFullYear()}`;
+      const { count } = await supabase.from('proformas').select('*', { count:'exact', head:true });
+      const nom = `PF-${String((count||0)+1).padStart(3,'0')}-${pf.cliente_nombre?.slice(0,10).toUpperCase()}-${new Date().getFullYear()}`;
       const { data: newPf } = await supabase.from('proformas').insert({ ...pfClean, nomenclatura: nom, created_by: userEmail }).select().single();
       showToast('Proforma guardada ✓');
       loadAll();
-      // Quedarse en el editor con el id asignado
       if (newPf) setEditing(newPf);
     }
   }
@@ -382,7 +394,9 @@ export default function Proformas({ userRole, userEmail }) {
                   {(pf.items||[]).some(it=>it.aprobado) && (
                     <Btn size="xs" variant="green" onClick={()=>setConverting(pf)}>→ Crear presupuesto</Btn>
                   )}
+                  <Btn size="xs" onClick={()=>generatePDFForPf(pf)}>📄 PDF</Btn>
                   <Btn size="xs" variant="secondary" onClick={()=>setEditing(pf)}>Editar</Btn>
+                  {userRole==='admin' && <Btn size="xs" variant="danger" onClick={()=>deletePf(pf.id)}>🗑</Btn>}
                 </div>
               </div>
             </div>
@@ -456,7 +470,6 @@ function ProformaItemCard({ item, onChange, onDelete, onAprobar, oh_pct }) {
       </div>
       {open && (
         <div style={{ padding:'12px 14px', background:'#fafcfe', borderTop:'1px solid #dde6ef', display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-          <div style={{gridColumn:'1/-1'}}><label style={lbl}>Subcategoría</label><input style={inp} value={item.subcategoria||''} onChange={e=>onChange('subcategoria',e.target.value)} placeholder="Ej: DECORACIÓN"/></div>
           <div style={{gridColumn:'1/-1'}}><label style={lbl}>Nombre del ítem *</label><input style={inp} value={item.nombre||''} onChange={e=>onChange('nombre',e.target.value)}/></div>
           <div style={{gridColumn:'1/-1'}}><label style={lbl}>Detalle</label><textarea style={{...inp,minHeight:52,resize:'vertical'}} value={item.detalle||''} onChange={e=>onChange('detalle',e.target.value)}/></div>
           <div><label style={lbl}>Cantidad</label><input type="number" style={inp} value={item.cantidad} onChange={e=>onChange('cantidad',Number(e.target.value))} min="0"/></div>
@@ -805,13 +818,7 @@ function buildPDFHtml(pf) {
         <tbody>${itemsHtml}</tbody>
       </table>
     </div>
-    <div style="padding:12px 16px;background:#f8fafc;border-top:1px solid #eee;display:flex;justify-content:flex-end;gap:20px;flex-wrap:wrap;">
-      ${[['Subtotal',fmtN(subtotalPrecio),'#555'],['Fee',fmtN(fee),'#888'],['Subtotal s/IVA',fmtN(sinIva),'#0d3b5e'],['IVA 15%',fmtN(iva),'#555'],['TOTAL',fmtN(total),'#0d3b5e']].map(([l,v,col])=>`
-        <div style="text-align:right;">
-          <div style="font-size:9px;color:#aaa;margin-bottom:2px;text-transform:uppercase;">${l}</div>
-          <div style="font-size:14px;font-weight:700;color:${col};">${v}</div>
-        </div>`).join('')}
-    </div>` : '<div style="padding:2rem;text-align:center;color:#aaa;">Sin ítems</div>';
+` : '<div style="padding:2rem;text-align:center;color:#aaa;">Sin ítems</div>';
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>Proforma — ${pf.nombre}</title>
