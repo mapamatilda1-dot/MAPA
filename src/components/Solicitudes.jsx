@@ -120,6 +120,16 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
   });
   const [ppto, setPpto] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [justModal, setJustModal] = useState(false);
+  const [justificacion, setJustificacion] = useState('');
+
+  // Detectar ítems que superan el presupuesto
+  function itemsConExceso() {
+    return seleccionados.filter(it => {
+      const disponible = saldoDisponible(it.id, it.costo_presupuestado);
+      return Number(it.valor_solicitado||0) > disponible;
+    });
+  }
 
   // Auto-cargar presupuesto inicial
   useEffect(() => {
@@ -136,14 +146,31 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
     const { data } = await supabase.from('presupuestos').select('*').eq('id', id).single();
     if (!data) return;
     setPpto(data);
-    const items = (data.items||[]).filter(it=>!it._type).map(it=>({
-      id: it.id, item:it.item||'', subcategoria:it.subcategoria||'', categoria:it.categoria||'',
-      costo_presupuestado: Number(it.costo_unit||0)*Number(it.cantidad||0)*Number(it.dias||1),
-      valor_solicitado:0, notas:'', seleccionado:false,
-    }));
-    setForm(f=>({...f, presupuesto_id:data.id, presupuesto_nombre:data.nombre||data.cliente,
+
+    // Cargar solicitudes anteriores de este presupuesto
+    const { data: solsData } = await supabase.from('solicitudes')
+      .select('*').eq('presupuesto_id', id).order('created_at', { ascending: true });
+    const solsPrevias = (solsData||[]).filter(s=>s.id!==solicitud?.id);
+
+    const items = (data.items||[]).filter(it=>!it._type).map(it=>{
+      const costoPpto = Number(it.costo_unit||0)*Number(it.cantidad||0)*Number(it.dias||1);
+      // Calcular saldo disponible descontando enviadas y pagadas
+      const yaUsado = solsPrevias.filter(s=>['enviada','pagado'].includes(s.estado))
+        .flatMap(s=>s.items||[]).filter(si=>si.id===it.id)
+        .reduce((a,si)=>a+Number(si.valor_solicitado||0),0);
+      return {
+        id: it.id, item:it.item||'', subcategoria:it.subcategoria||'', categoria:it.categoria||'',
+        costo_presupuestado: costoPpto,
+        valor_solicitado: 0, notas:'', seleccionado:false,
+        _saldo_inicial: costoPpto - yaUsado,
+      };
+    });
+
+    setForm(f=>({
+      ...f, presupuesto_id:data.id, presupuesto_nombre:data.nombre||data.cliente,
       cliente_nombre:data.cliente, fecha_evento:data.fecha_evento,
       lugar:data.lugar||'', dias_evento:data.dias_evento||1, items,
+      _sols_previas: solsPrevias,
     }));
   }
 
@@ -160,7 +187,7 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
   const saldoTotal = totalPresupuestado - totalSolicitado;
 
   // Solicitudes anteriores del mismo presupuesto (no la actual)
-  const solsAnt = (solicitudesAnteriores||[]).filter(s=>s.id!==solicitud?.id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  const solsAnt = (form._sols_previas || solicitudesAnteriores||[]).filter(s=>s.id!==solicitud?.id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
   const solsAntHeaders = solsAnt.map(s=>({ id:s.id, fecha:fmtDate(s.created_at?.slice(0,10)), estado:s.estado, label:`Sol. ${fmtDate(s.created_at?.slice(0,10))}` }));
 
   // Calcular saldo disponible por ítem (solo enviadas y pagadas restan)
@@ -189,7 +216,11 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
   async function handleSave() {
     if (!form.presupuesto_id) { alert('Seleccioná un presupuesto'); return; }
     setSaving(true);
-    const data = { ...form, items: form.items.filter(it=>it.seleccionado) };
+    const exceso = itemsConExceso();
+    if (exceso.length > 0) {
+      alert(`⚠️ Advertencia: Los ítems "${exceso.map(it=>it.item).join(', ')}" superan el costo presupuestado. Se guardará el borrador de todas formas.`);
+    }
+    const data = { ...form, items: form.items.filter(it=>it.seleccionado), _sols_previas: undefined };
     await onSave(data);
     setSaving(false);
   }
@@ -197,9 +228,27 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
   async function handleEnviar() {
     if (!form.presupuesto_id) { alert('Seleccioná un presupuesto'); return; }
     if (seleccionados.length===0) { alert('Seleccioná al menos un ítem'); return; }
+    const exceso = itemsConExceso();
+    if (exceso.length > 0) {
+      setJustModal(true);
+      return;
+    }
+    await confirmarEnvio('');
+  }
+
+  async function confirmarEnvio(justif) {
     if (!window.confirm('¿Enviar la solicitud a Financiero? No podrá modificarse después.')) return;
     setSaving(true);
-    await onEnviar({ ...form, items: form.items.filter(it=>it.seleccionado), estado:'enviada' });
+    const exceso = itemsConExceso();
+    const data = {
+      ...form,
+      items: form.items.filter(it=>it.seleccionado),
+      estado:'enviada',
+      tiene_exceso: exceso.length > 0,
+      justificacion_exceso: justif || '',
+      _sols_previas: undefined,
+    };
+    await onEnviar(data);
     setSaving(false);
   }
 
@@ -343,8 +392,24 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
           style={{...inp,minHeight:70,resize:'vertical'}} placeholder="Observaciones generales, urgencia..."/>
       </div>
 
-      {/* Botones */}
-      {!bloqueado && (
+      {/* Modal justificación exceso */}
+      {justModal && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:500,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+          <div style={{background:'#fff',borderRadius:14,width:'100%',maxWidth:480,padding:24}}>
+            <div style={{fontSize:15,fontWeight:700,color:'#d97706',marginBottom:4}}>⚠️ Monto supera el presupuesto</div>
+            <div style={{fontSize:13,color:'#555',marginBottom:16}}>
+              Los valores solicitados superan el costo presupuestado. Por favor justificá el motivo para poder enviar a Financiero.
+            </div>
+            <label style={lbl}>Justificación *</label>
+            <textarea value={justificacion} onChange={e=>setJustificacion(e.target.value)} autoFocus
+              style={{...inp,minHeight:90,resize:'vertical',marginBottom:14}} placeholder="Explicá por qué se supera el presupuesto..."/>
+            <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+              <Btn variant="secondary" onClick={()=>setJustModal(false)}>Cancelar</Btn>
+              <Btn onClick={()=>{if(!justificacion.trim()){alert('La justificación es obligatoria');return;}setJustModal(false);confirmarEnvio(justificacion);}}>Confirmar y enviar</Btn>
+            </div>
+          </div>
+        </div>
+      )}
         <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
           <Btn variant="secondary" onClick={onCancel}>Cancelar</Btn>
           <Btn variant="secondary" onClick={handleSave} disabled={saving}>💾 Guardar borrador</Btn>
@@ -503,6 +568,7 @@ export default function Solicitudes({ userRole, userEmail, userName, presupuesto
                   <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:4}}>
                     <span style={{fontWeight:600,fontSize:15}}>{sol.presupuesto_nombre||'—'}</span>
                     <EstadoBadge estado={sol.estado}/>
+                    {sol.tiene_exceso && <span title="Los valores superan el costo presupuestado" style={{fontSize:16,cursor:'help'}}>⚠️</span>}
                   </div>
                   <div style={{display:'flex',gap:12,flexWrap:'wrap',fontSize:12,color:'#777',marginBottom:6}}>
                     {sol.cliente_nombre&&<span>🏢 {sol.cliente_nombre}</span>}
