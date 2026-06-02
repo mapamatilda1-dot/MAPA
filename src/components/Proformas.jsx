@@ -309,12 +309,14 @@ export default function Proformas({ userRole, userEmail }) {
   async function saveProforma(pf) {
     if (!pf.nombre.trim()) { alert('El nombre es obligatorio'); return; }
     if (!pf.cliente_id)    { alert('Seleccioná un cliente'); return; }
+    // Limpiar campos UUID
+    const pfClean = { ...pf, brief_id: pf.brief_id || null, cliente_id: pf.cliente_id || null };
     if (pf.id) {
-      await supabase.from('proformas').update(pf).eq('id', pf.id);
+      await supabase.from('proformas').update(pfClean).eq('id', pf.id);
     } else {
       const count = proformas.length + 1;
       const nom = `PF-${String(count).padStart(3,'0')}-${pf.cliente_nombre?.slice(0,10).toUpperCase()}-${new Date().getFullYear()}`;
-      await supabase.from('proformas').insert({ ...pf, nomenclatura: nom, created_by: userEmail });
+      await supabase.from('proformas').insert({ ...pfClean, nomenclatura: nom, created_by: userEmail });
     }
     setEditing(null);
     loadAll();

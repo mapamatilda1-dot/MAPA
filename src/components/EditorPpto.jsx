@@ -303,6 +303,9 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
       nomenclatura=genNomenclatura(p.nombre,p.cliente,(count||0)+1);
     }
     const payload={...p,nomenclatura};
+    // Limpiar campos UUID — string vacío rompe Postgres
+    if (!payload.brief_id)   payload.brief_id   = null;
+    if (!payload.cliente_id) payload.cliente_id  = null;
     let error,data;
     if(p.id){({error}=await supabase.from('presupuestos').update(payload).eq('id',p.id));}
     else{({data,error}=await supabase.from('presupuestos').insert(payload).select().single());if(data)setP(prev=>({...prev,id:data.id,nomenclatura}));}
