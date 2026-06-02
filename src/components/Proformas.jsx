@@ -328,7 +328,8 @@ export default function Proformas({ userRole, userEmail }) {
   async function saveProforma(pf) {
     if (!pf.nombre.trim()) { alert('El nombre es obligatorio'); return; }
     if (!pf.cliente_id)    { alert('Seleccioná un cliente'); return; }
-    const pfClean = { ...pf, brief_id: pf.brief_id || null, cliente_id: pf.cliente_id || null };
+    const { opciones, opcion_aprobada, ...pfRest } = pf;
+    const pfClean = { ...pfRest, brief_id: pf.brief_id || null, cliente_id: pf.cliente_id || null };
     if (pf.id) {
       await supabase.from('proformas').update(pfClean).eq('id', pf.id);
       showToast('Proforma guardada ✓');
@@ -336,7 +337,8 @@ export default function Proformas({ userRole, userEmail }) {
     } else {
       const { count } = await supabase.from('proformas').select('*', { count:'exact', head:true });
       const nom = `PF-${String((count||0)+1).padStart(3,'0')}-${pf.cliente_nombre?.slice(0,10).toUpperCase()}-${new Date().getFullYear()}`;
-      const { data: newPf } = await supabase.from('proformas').insert({ ...pfClean, nomenclatura: nom, created_by: userEmail }).select().single();
+      const { data: newPf, error } = await supabase.from('proformas').insert({ ...pfClean, nomenclatura: nom, created_by: userEmail }).select().single();
+      if (error) { alert('Error al guardar: ' + error.message); return; }
       showToast('Proforma guardada ✓');
       loadAll();
       if (newPf) setEditing(newPf);
