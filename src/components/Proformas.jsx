@@ -479,13 +479,15 @@ export default function Proformas({ userRole, userEmail }) {
     if(!pf.nombre.trim()){alert('El nombre es obligatorio');return;}
     if(!pf.cliente_id){alert('Seleccioná un cliente');return;}
     // Limpiar campos que pueden causar errores
-    const {items,...pfRest}=pf;
+    // Excluir solo campos que no existen en la tabla
     const pfClean={
-      ...pfRest,
+      ...pf,
       brief_id:     pf.brief_id     || null,
       cliente_id:   pf.cliente_id   || null,
       fecha_evento: pf.fecha_evento  || null,
     };
+    // Eliminar campos que pueden no existir en la tabla
+    delete pfClean.items;
     if(pf.id){
       const {error}=await supabase.from('proformas').update(pfClean).eq('id',pf.id);
       if(error){alert('Error: '+error.message);return;}
