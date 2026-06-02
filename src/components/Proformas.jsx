@@ -366,7 +366,7 @@ export default function Proformas({ userRole, userEmail }) {
                   <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
                     <span style={{ fontWeight:600, fontSize:15 }}>{pf.nombre}</span>
                     <span style={{ fontSize:11, padding:'2px 9px', borderRadius:999, background:color+'22', color, fontWeight:500 }}>{ESTADO_LABELS[pf.estado]||pf.estado}</span>
-                    {aprobada && <span style={{ fontSize:11, padding:'2px 9px', borderRadius:999, background:'#e8f5ee', color:'#2e8b4e', fontWeight:500 }}>✅ Opción aprobada</span>}
+                    {(pf.items||[]).some(it=>it.aprobado) && <span style={{ fontSize:11, padding:'2px 9px', borderRadius:999, background:'#e8f5ee', color:'#2e8b4e', fontWeight:500 }}>✅ Ítems aprobados</span>}
                   </div>
                   {pf.nomenclatura && <div style={{ fontSize:10, color:'#8aa0b8', fontFamily:'monospace', marginTop:2 }}>{pf.nomenclatura}</div>}
                   <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginTop:5 }}>
@@ -494,7 +494,7 @@ function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, onSave, on
     nombre:'', cliente_id:'', cliente_nombre:'', ejecutivo_nombre:'', ejecutivo_email:'',
     brief_id:'', fecha_evento:'', ciudad:'Guayaquil', lugar:'', personas:0, dias_evento:1,
     fee_agencia: cfg.fee_agencia || 0, oh_pct: cfg.oh_pct || 15, bco_pct: cfg.bco_pct || 5.5,
-    notas:'', estado:'borrador', opciones:[], opcion_aprobada:'',
+    notas:'', estado:'borrador', items:[], opciones:[], opcion_aprobada:'',
   });
   const [saving, setSaving] = useState(false);
 
