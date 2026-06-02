@@ -159,14 +159,31 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
   const totalPresupuestado = seleccionados.reduce((a,it)=>a+Number(it.costo_presupuestado||0),0);
   const saldoTotal = totalPresupuestado - totalSolicitado;
 
-  // Calcular saldo disponible por ítem considerando solicitudes anteriores
+  // Solicitudes anteriores del mismo presupuesto (no la actual)
+  const solsAnt = (solicitudesAnteriores||[]).filter(s=>s.id!==solicitud?.id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  const solsAntHeaders = solsAnt.map(s=>({ id:s.id, fecha:fmtDate(s.created_at?.slice(0,10)), estado:s.estado, label:`Sol. ${fmtDate(s.created_at?.slice(0,10))}` }));
+
+  // Calcular saldo disponible por ítem (solo enviadas y pagadas restan)
   function saldoDisponible(itemId, costoPresupuestado) {
-    const anteriores = (solicitudesAnteriores||[])
-      .filter(s => s.id !== solicitud?.id && ['enviada','pagado'].includes(s.estado))
-      .flatMap(s => s.items||[])
-      .filter(it => it.id === itemId);
-    const yasolicitado = anteriores.reduce((a,it)=>a+Number(it.valor_solicitado||0),0);
-    return costoPresupuestado - yasolicitado;
+    const pagadas = solsAnt.filter(s=>['enviada','pagado'].includes(s.estado))
+      .flatMap(s=>s.items||[]).filter(it=>it.id===itemId);
+    const yaUsado = pagadas.reduce((a,it)=>a+Number(it.valor_solicitado||0),0);
+    return costoPresupuestado - yaUsado;
+  }
+
+  // Valor rechazado por ítem (informativo)
+  function valorRechazado(itemId) {
+    const rechazadas = solsAnt.filter(s=>s.estado==='rechazada')
+      .flatMap(s=>s.items||[]).filter(it=>it.id===itemId);
+    return rechazadas.reduce((a,it)=>a+Number(it.valor_solicitado||0),0);
+  }
+
+  // Valor de solicitud anterior por ítem
+  function valorEnSol(solId, itemId) {
+    const s = solsAnt.find(s=>s.id===solId);
+    if (!s) return null;
+    const it = (s.items||[]).find(it=>it.id===itemId);
+    return it ? Number(it.valor_solicitado||0) : null;
   }
 
   async function handleSave() {
@@ -240,38 +257,62 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
                       onChange={e=>setForm(f=>({...f,items:f.items.map(it=>({...it,seleccionado:e.target.checked}))}))}
                       disabled={bloqueado} style={{width:15,height:15,cursor:'pointer'}}/>
                   </th>
-                  {['Subcategoría','Ítem','Costo ppto.','Saldo disp.','Valor solicitado','Saldo','Notas'].map(h=>(
-                    <th key={h} style={{padding:'8px 10px',textAlign:'left',fontSize:11,color:'#666',fontWeight:700,whiteSpace:'nowrap'}}>{h}</th>
+                  <th style={{padding:'8px 6px',textAlign:'left',fontSize:11,color:'#666',fontWeight:700}}>Subcategoría</th>
+                  <th style={{padding:'8px 6px',textAlign:'left',fontSize:11,color:'#666',fontWeight:700}}>Ítem</th>
+                  <th style={{padding:'8px 6px',textAlign:'right',fontSize:11,color:'#666',fontWeight:700}}>Costo ppto.</th>
+                  {/* Columnas de solicitudes anteriores */}
+                  {solsAntHeaders.map(s=>(
+                    <th key={s.id} style={{padding:'8px 6px',textAlign:'right',fontSize:10,color:s.estado==='rechazada'?'#991b1b':s.estado==='pagado'?'#166534':'#1e40af',fontWeight:700,whiteSpace:'nowrap',background:s.estado==='rechazada'?'#fff1f1':s.estado==='pagado'?'#f0fdf4':'#eff6ff'}}>
+                      {s.label}<br/><span style={{fontSize:9,fontWeight:400,opacity:.8}}>{ESTADOS[s.estado]?.label}</span>
+                    </th>
                   ))}
+                  {solsAntHeaders.length>0 && <th style={{padding:'8px 6px',textAlign:'right',fontSize:11,color:'#991b1b',fontWeight:700,whiteSpace:'nowrap'}}>Rechazado</th>}
+                  <th style={{padding:'8px 6px',textAlign:'right',fontSize:11,color:'#2e8b4e',fontWeight:700,whiteSpace:'nowrap'}}>Saldo disp.</th>
+                  {!bloqueado && <th style={{padding:'8px 6px',textAlign:'right',fontSize:11,color:'#0d3b5e',fontWeight:700,whiteSpace:'nowrap'}}>A solicitar</th>}
+                  {!bloqueado && <th style={{padding:'8px 6px',textAlign:'left',fontSize:11,color:'#666',fontWeight:700}}>Notas</th>}
                 </tr>
               </thead>
               <tbody>
                 {form.items.map(it=>{
-                  const saldo = Number(it.costo_presupuestado||0)-Number(it.valor_solicitado||0);
                   const disponible = saldoDisponible(it.id, it.costo_presupuestado);
+                  const rechazado = valorRechazado(it.id);
+                  const saldoActual = Number(it.costo_presupuestado||0)-Number(it.valor_solicitado||0);
                   return (
                     <tr key={it.id} style={{borderBottom:'1px solid #f0f0f0',background:it.seleccionado?'#f0f7ff':'#fff'}}>
                       <td style={{padding:'8px 10px',textAlign:'center'}}>
                         <input type="checkbox" checked={!!it.seleccionado} onChange={()=>toggleItem(it.id)} disabled={bloqueado} style={{width:15,height:15,cursor:'pointer',accentColor:'#0d3b5e'}}/>
                       </td>
-                      <td style={{padding:'8px 10px',fontSize:12,color:'#888'}}>{it.subcategoria||'—'}</td>
-                      <td style={{padding:'8px 10px',fontWeight:500}}>{it.item||'—'}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right'}}>{fmt(it.costo_presupuestado)}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',color:disponible>0?'#2e8b4e':'#dc2626',fontWeight:600}}>{fmt(disponible)}</td>
-                      <td style={{padding:'8px 4px',minWidth:130}}>
-                        <input type="number" min="0" step="0.01" value={it.valor_solicitado||''} disabled={!it.seleccionado||bloqueado} placeholder="0.00"
-                          onChange={e=>updItem(it.id,'valor_solicitado',Number(e.target.value))}
+                      <td style={{padding:'8px 6px',fontSize:12,color:'#888'}}>{it.subcategoria||'—'}</td>
+                      <td style={{padding:'8px 6px',fontWeight:500}}>{it.item||'—'}</td>
+                      <td style={{padding:'8px 6px',textAlign:'right'}}>{fmt(it.costo_presupuestado)}</td>
+                      {/* Valores de solicitudes anteriores */}
+                      {solsAntHeaders.map(s=>{
+                        const val = valorEnSol(s.id, it.id);
+                        return (
+                          <td key={s.id} style={{padding:'8px 6px',textAlign:'right',color:s.estado==='rechazada'?'#991b1b':s.estado==='pagado'?'#166534':'#1e40af',fontWeight:val?600:400,background:s.estado==='rechazada'?'#fff8f8':s.estado==='pagado'?'#f8fff8':'#f8fbff'}}>
+                            {val!=null ? fmt(val) : '—'}
+                          </td>
+                        );
+                      })}
+                      {solsAntHeaders.length>0 && <td style={{padding:'8px 6px',textAlign:'right',color:rechazado>0?'#991b1b':'#ccc',fontWeight:rechazado>0?600:400,background:'#fff8f8'}}>{rechazado>0?fmt(rechazado):'—'}</td>}
+                      <td style={{padding:'8px 6px',textAlign:'right',fontWeight:700,color:disponible>0?'#2e8b4e':'#dc2626'}}>{fmt(disponible)}</td>
+                      {!bloqueado && <td style={{padding:'8px 4px',minWidth:120}}>
+                        <input type="number" min="0" max={disponible} step="0.01"
+                          value={it.valor_solicitado||''} disabled={!it.seleccionado||bloqueado}
+                          placeholder="0.00"
+                          onChange={e=>{
+                            const val=Number(e.target.value);
+                            updItem(it.id,'valor_solicitado',val>disponible?disponible:val);
+                          }}
                           onWheel={e=>e.target.blur()}
-                          style={{...inp,padding:'5px 8px',fontSize:12,textAlign:'right',background:it.seleccionado&&!bloqueado?'#fff':'#f8f8f8'}}/>
-                      </td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:saldo>=0?'#2e8b4e':'#dc2626'}}>
-                        {it.seleccionado?fmt(saldo):'—'}
-                      </td>
-                      <td style={{padding:'8px 4px',minWidth:150}}>
-                        <input value={it.notas||''} disabled={!it.seleccionado||bloqueado} placeholder="Observaciones..."
+                          style={{...inp,padding:'5px 8px',fontSize:12,textAlign:'right',background:it.seleccionado?'#fff':'#f8f8f8'}}/>
+                      </td>}
+                      {!bloqueado && <td style={{padding:'8px 4px',minWidth:140}}>
+                        <input value={it.notas||''} disabled={!it.seleccionado||bloqueado}
+                          placeholder="Observaciones..."
                           onChange={e=>updItem(it.id,'notas',e.target.value)}
-                          style={{...inp,padding:'5px 8px',fontSize:12,background:it.seleccionado&&!bloqueado?'#fff':'#f8f8f8'}}/>
-                      </td>
+                          style={{...inp,padding:'5px 8px',fontSize:12,background:it.seleccionado?'#fff':'#f8f8f8'}}/>
+                      </td>}
                     </tr>
                   );
                 })}
