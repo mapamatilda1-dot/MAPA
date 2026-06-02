@@ -264,20 +264,23 @@ export default function Proformas({ userRole, userEmail }) {
 
   // ── Convertir opción aprobada a presupuesto ────────────────
   async function convertirAPresupuesto(proforma) {
-    const opcion = (proforma.opciones||[]).find(o => o.id === proforma.opcion_aprobada);
-    if (!opcion) { showToast('No hay opción aprobada'); return; }
+    const itemsAprobados = (proforma.items||[]).filter(it => !it._type && it.aprobado);
+    if (!itemsAprobados.length) { showToast('No hay ítems aprobados'); return; }
 
-    // Transformar ítems de proforma al formato de presupuesto
-    const items = (opcion.items||[]).map(it => ({
+    const items = itemsAprobados.map(it => ({
       id: uid(),
       categoria: it.subcategoria || 'OTROS',
+      subcategoria: it.subcategoria || '',
       nombre: it.nombre,
+      detalle: it.detalle || '',
       cantidad: Number(it.cantidad||0),
       dias: Number(it.dias||1),
       precio_unit: Number(it.precio_unit||0),
       costo_unit: Number(it.costo_unit||0),
       bco_real_pct: Number(it.bco_pct_item||0),
       foto_referencia: it.imagen_url || null,
+      proveedor: it.proveedor || '',
+      info: it.info || '',
     }));
 
     const { data: newPpto, error } = await supabase.from('presupuestos').insert({
@@ -356,8 +359,6 @@ export default function Proformas({ userRole, userEmail }) {
       <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
         {proformas.map(pf => {
           const color = ESTADO_COLORS[pf.estado] || '#888';
-          const totalOpciones = (pf.opciones||[]).length;
-          const aprobada = pf.opcion_aprobada;
           return (
             <div key={pf.id} style={{ background:'#fff', border:'1px solid #e8e8e8', borderLeft:`4px solid ${color}`, borderRadius:'0 10px 10px 0', padding:'14px 16px' }}>
               <div style={{ display:'flex', alignItems:'flex-start', gap:8, justifyContent:'space-between' }}>
@@ -372,12 +373,13 @@ export default function Proformas({ userRole, userEmail }) {
                     {pf.cliente_nombre && <span style={{ fontSize:12, color:'#777' }}>🏢 {pf.cliente_nombre}</span>}
                     {pf.ejecutivo_nombre && <span style={{ fontSize:12, color:'#777' }}>👤 {pf.ejecutivo_nombre}</span>}
                     {pf.fecha_evento && <span style={{ fontSize:12, color:'#777' }}>📅 {fmtDate(pf.fecha_evento)}</span>}
-                    <span style={{ fontSize:12, color:'#777' }}>📋 {totalOpciones} opción(es)</span>
+                    <span style={{ fontSize:12, color:'#777' }}>📋 {(pf.items||[]).filter(it=>!it._type).length} ítem(s)</span>
+                    {(pf.items||[]).some(it=>it.aprobado) && <span style={{ fontSize:12, color:'#2e8b4e', fontWeight:500 }}>✅ {(pf.items||[]).filter(it=>it.aprobado).length} aprobado(s)</span>}
                     {pf.brief_id && <span style={{ fontSize:12, color:'#7c3aed', cursor:'pointer', fontWeight:500 }} onClick={()=>setExpedienteId(pf.brief_id)}>📁 Ver expediente</span>}
                   </div>
                 </div>
                 <div style={{ display:'flex', gap:6, flexShrink:0, flexWrap:'wrap' }}>
-                  {aprobada && !['borrador'].includes(pf.estado) && (
+                  {(pf.items||[]).some(it=>it.aprobado) && (
                     <Btn size="xs" variant="green" onClick={()=>setConverting(pf)}>→ Crear presupuesto</Btn>
                   )}
                   <Btn size="xs" variant="secondary" onClick={()=>setEditing(pf)}>Editar</Btn>
@@ -392,16 +394,14 @@ export default function Proformas({ userRole, userEmail }) {
       <Modal open={!!converting} onClose={()=>setConverting(null)} title="Convertir a presupuesto"
         footer={<><Btn variant="secondary" onClick={()=>setConverting(null)}>Cancelar</Btn><Btn variant="green" onClick={()=>convertirAPresupuesto(converting)}>✅ Crear presupuesto</Btn></>}>
         {converting && (() => {
-          const op = (converting.opciones||[]).find(o=>o.id===converting.opcion_aprobada);
-          const t  = op ? calcOpcion(op, converting.oh_pct, converting.fee_agencia) : null;
+          const aprobados = (converting.items||[]).filter(it=>!it._type&&it.aprobado);
+          const total = aprobados.reduce((a,it)=>a+Number(it.cantidad||0)*Number(it.dias||1)*Number(it.precio_unit||0),0);
           return (
             <div>
-              <p style={{ fontSize:14, marginBottom:12 }}>Se creará un presupuesto en borrador con los ítems de la opción aprobada:</p>
+              <p style={{ fontSize:14, marginBottom:12 }}>Se creará un presupuesto en borrador con los ítems aprobados:</p>
               <div style={{ background:'#f8fafc', borderRadius:10, padding:'14px 16px', marginBottom:12 }}>
-                <div style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:4 }}>{op?.nombre || 'Opción aprobada'}</div>
-                <div style={{ fontSize:13, color:'#555' }}>
-                  {(op?.items||[]).length} ítems · {t ? fmt(t.sinIva) : '—'} s/IVA
-                </div>
+                <div style={{ fontSize:13, color:'#555' }}>{aprobados.length} ítem(s) aprobado(s) · {fmt(total)} s/fee</div>
+                {aprobados.map(it=><div key={it.id} style={{fontSize:12,color:'#888',marginTop:4}}>• {it.nombre}</div>)}
               </div>
               <p style={{ fontSize:12, color:'#888' }}>Podés editar el presupuesto luego de crearlo.</p>
             </div>
@@ -411,6 +411,77 @@ export default function Proformas({ userRole, userEmail }) {
 
       {expedienteId && <ExpedientePanel briefId={expedienteId} onClose={()=>setExpedienteId(null)}/>}
       {toast && <div style={{ position:'fixed', bottom:24, right:24, background:'#0d3b5e', color:'#fff', padding:'10px 18px', borderRadius:10, fontSize:13, zIndex:999 }}>{toast}</div>}
+    </div>
+  );
+}
+
+// ── Tarjeta de ítem para Proforma (igual que presupuesto) ────
+function ProformaItemCard({ item, onChange, onDelete, onAprobar, oh_pct }) {
+  const [open, setOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const qty = Number(item.cantidad||0), dias = Number(item.dias||1);
+  const pu = Number(item.precio_unit||0), cu = Number(item.costo_unit||0);
+  const bco = Number(item.bco_pct_item||0)/100;
+  const precioTotal = qty*dias*pu;
+  const costoTotal = qty*dias*cu*(1+bco)*(1+(oh_pct||15)/100);
+  const margen = precioTotal - costoTotal;
+
+  async function handleImg(e) {
+    const file = e.target.files[0]; if (!file) return;
+    setUploading(true);
+    const name = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g,'_')}`;
+    await supabase.storage.from('proforma-images').upload(name, file);
+    const { data } = supabase.storage.from('proforma-images').getPublicUrl(name);
+    onChange('imagen_url', data.publicUrl);
+    setUploading(false);
+  }
+
+  return (
+    <div style={{ border:`1px solid ${item.aprobado?'#2e8b4e':'#dde6ef'}`, borderRadius:9, marginBottom:6, overflow:'hidden' }}>
+      <div onClick={()=>setOpen(o=>!o)} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', cursor:'pointer', background:item.aprobado?'#e8f5ee':open?'#eef4fb':'#fff', userSelect:'none' }}>
+        {item.imagen_url
+          ? <img src={item.imagen_url} alt="" style={{ width:36, height:36, objectFit:'cover', borderRadius:5, flexShrink:0 }}/>
+          : <div style={{ width:36, height:36, borderRadius:5, background:'#f0f4f8', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:14, color:'#ccc' }}>📷</div>
+        }
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:13, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.nombre||<span style={{color:'#aaa',fontStyle:'italic'}}>Sin nombre</span>}</div>
+          <div style={{ fontSize:11, color:'#8aa0b8' }}>{item.subcategoria||''}</div>
+        </div>
+        <span style={{ fontSize:12, color:'#8aa0b8', flexShrink:0 }}>{qty}×{dias} · {fmt(precioTotal)}</span>
+        <button onClick={e=>{e.stopPropagation();onAprobar();}} title={item.aprobado?'Quitar aprobación':'Aprobar ítem'}
+          style={{ background:item.aprobado?'#2e8b4e':'#f0f4f8', border:'none', borderRadius:6, color:item.aprobado?'#fff':'#555', cursor:'pointer', padding:'3px 8px', fontSize:11, fontWeight:600, flexShrink:0 }}>
+          {item.aprobado?'✅ Aprobado':'✓ Aprobar'}
+        </button>
+        <button onClick={e=>{e.stopPropagation();onDelete();}} style={{ background:'none', border:'none', color:'#c8264a', cursor:'pointer', fontSize:16, flexShrink:0 }}>✕</button>
+      </div>
+      {open && (
+        <div style={{ padding:'12px 14px', background:'#fafcfe', borderTop:'1px solid #dde6ef', display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+          <div style={{gridColumn:'1/-1'}}><label style={lbl}>Subcategoría</label><input style={inp} value={item.subcategoria||''} onChange={e=>onChange('subcategoria',e.target.value)} placeholder="Ej: DECORACIÓN"/></div>
+          <div style={{gridColumn:'1/-1'}}><label style={lbl}>Nombre del ítem *</label><input style={inp} value={item.nombre||''} onChange={e=>onChange('nombre',e.target.value)}/></div>
+          <div style={{gridColumn:'1/-1'}}><label style={lbl}>Detalle</label><textarea style={{...inp,minHeight:52,resize:'vertical'}} value={item.detalle||''} onChange={e=>onChange('detalle',e.target.value)}/></div>
+          <div><label style={lbl}>Cantidad</label><input type="number" style={inp} value={item.cantidad} onChange={e=>onChange('cantidad',Number(e.target.value))} min="0"/></div>
+          <div><label style={lbl}>Días</label><input type="number" style={inp} value={item.dias} onChange={e=>onChange('dias',Number(e.target.value))} min="1"/></div>
+          <div><label style={lbl}>Costo unitario ($)</label><input type="number" step="0.01" style={{...inp,background:'#fafafa'}} value={item.costo_unit||''} onChange={e=>onChange('costo_unit',Number(e.target.value))}/></div>
+          <div><label style={lbl}>BCO %</label><input type="number" step="0.1" style={{...inp,background:'#fafafa'}} value={item.bco_pct_item||''} onChange={e=>onChange('bco_pct_item',Number(e.target.value))} placeholder="0"/></div>
+          <div><label style={lbl}>Precio unitario ($)</label><input type="number" step="0.01" style={inp} value={item.precio_unit||''} onChange={e=>onChange('precio_unit',Number(e.target.value))}/></div>
+          <div><label style={lbl}>Precio total</label><input readOnly style={{...inp,background:'#f0f0f0',fontWeight:600}} value={fmt(precioTotal)}/></div>
+          <div><label style={lbl}>Razón social proveedor</label><input style={inp} value={item.proveedor||''} onChange={e=>onChange('proveedor',e.target.value)}/></div>
+          <div><label style={lbl}>Info general</label><input style={inp} value={item.info||''} onChange={e=>onChange('info',e.target.value)}/></div>
+          <div style={{gridColumn:'1/-1'}}>
+            <label style={lbl}>Imagen de referencia</label>
+            <label style={{ display:'inline-flex', alignItems:'center', gap:8, cursor:'pointer', padding:'6px 12px', border:'1px solid #ddd', borderRadius:8, background:'#fafafa', fontSize:12 }}>
+              <input type="file" accept="image/*" onChange={handleImg} style={{ display:'none' }} disabled={uploading}/>
+              {uploading ? '⏳ Subiendo...' : '📷 Seleccionar imagen'}
+            </label>
+            {item.imagen_url && <img src={item.imagen_url} alt="" style={{ marginLeft:12, width:60, height:60, objectFit:'cover', borderRadius:6, border:'1px solid #ddd', verticalAlign:'middle' }}/>}
+          </div>
+          <div style={{gridColumn:'1/-1',background:'#eef4fb',borderRadius:8,padding:'8px 12px',display:'flex',gap:20}}>
+            <span style={{fontSize:13}}>Precio: <strong style={{color:'#0d3b5e'}}>{fmt(precioTotal)}</strong></span>
+            <span style={{fontSize:13}}>Costo: <strong>{fmt(costoTotal)}</strong></span>
+            <span style={{fontSize:13,color:margen>=0?'#2e8b4e':'#c8264a'}}>Margen: <strong>{fmt(margen)}</strong></span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -453,18 +524,177 @@ function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, onSave, on
     });
   }
 
-  function addOpcion() {
-    const ops = [...(pf.opciones||[]), { id:uid(), nombre:`Opción ${(pf.opciones||[]).length+1}`, items:[] }];
-    setPf(p => ({ ...p, opciones:ops }));
+  function addSubcat() {
+    const nombre = window.prompt('Nombre de la subcategoría:');
+    if (!nombre?.trim()) return;
+    const subcat = { id:uid(), _type:'subcat', subcategoria:nombre.trim(), nombre:'', detalle:'', cantidad:0, dias:0, costo_unit:0, precio_unit:0, oh_pct:0, bco_pct:0 };
+    setPf(p => ({ ...p, items: [...(p.items||[]), subcat] }));
   }
-  function updateOpcion(id, data) {
-    setPf(p => ({ ...p, opciones: p.opciones.map(o => o.id === id ? data : o) }));
+  function addItem() {
+    const newItem = { id:uid(), subcategoria:'', nombre:'', detalle:'', imagen_url:'', cantidad:1, dias:1, precio_unit:0, costo_unit:0, bco_pct_item:0, proveedor:'', info:'', aprobado:false };
+    setPf(p => ({ ...p, items: [...(p.items||[]), newItem] }));
   }
-  function deleteOpcion(id) {
-    setPf(p => ({ ...p, opciones: p.opciones.filter(o => o.id !== id), opcion_aprobada: p.opcion_aprobada === id ? '' : p.opcion_aprobada }));
+  function updateItem(itemId, field, value) {
+    setPf(p => ({ ...p, items: (p.items||[]).map(it => it.id===itemId ? {...it,[field]:value} : it) }));
   }
-  function aprobarOpcion(id) {
-    setPf(p => ({ ...p, opcion_aprobada: id, estado: 'aprobada' }));
+  function deleteItem(itemId) {
+    setPf(p => ({ ...p, items: (p.items||[]).filter(it => it.id!==itemId) }));
+  }
+  function aprobarItem(itemId) {
+    setPf(p => ({ ...p, items: (p.items||[]).map(it => it.id===itemId ? {...it, aprobado:!it.aprobado} : it) }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    await onSave(pf);
+    setSaving(false);
+  }
+
+  function generatePDF() {
+    const html = buildPDFHtml(pf);
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+  }
+
+  const filteredBriefs = briefs.filter(b => !pf.cliente_id || b.cliente_id === pf.cliente_id);
+  const items = pf.items || [];
+  const aprobados = items.filter(it => !it._type && it.aprobado);
+
+  // Calcular totales
+  const totalSinFee = items.filter(it=>!it._type).reduce((a,it)=>a+Number(it.cantidad||0)*Number(it.dias||1)*Number(it.precio_unit||0),0);
+  const fee = totalSinFee * ((pf.fee_agencia||0)/100);
+  const sinIva = totalSinFee + fee;
+  const iva = sinIva * 0.15;
+  const total = sinIva + iva;
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+        <button onClick={onCancel} style={{ background:'none', border:'1px solid #ddd', borderRadius:8, padding:'6px 12px', cursor:'pointer', fontSize:13, fontFamily:'inherit' }}>← Volver</button>
+        <h2 style={{ fontSize:17, fontWeight:700, color:'#0d3b5e', flex:1 }}>{initial ? 'Editar proforma' : 'Nueva proforma'}</h2>
+        <Btn variant="secondary" onClick={generatePDF}>📄 PDF cliente</Btn>
+        <Btn onClick={handleSave} disabled={saving}>{saving?'Guardando...':'Guardar'}</Btn>
+      </div>
+
+      {/* Datos generales */}
+      <div style={{ background:'#fff', border:'1px solid #e8e8e8', borderRadius:12, padding:'18px 20px', marginBottom:16 }}>
+        <div style={{ fontSize:13, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Datos generales</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <div style={{ gridColumn:'1/-1' }}>
+            <label style={lbl}>Nombre de la proforma *</label>
+            <input value={pf.nombre} onChange={e=>set('nombre',e.target.value)} style={{...inp,width:'100%'}} placeholder="Ej: Propuesta decoración gala anual"/>
+          </div>
+          <div>
+            <label style={lbl}>Cliente *</label>
+            <select value={pf.cliente_id} onChange={e=>set('cliente_id',e.target.value)} style={{...inp,width:'100%'}}>
+              <option value="">Seleccioná...</option>
+              {clientes.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Vincular a proyecto</label>
+            <select value={pf.brief_id||''} onChange={e=>set('brief_id',e.target.value)} style={{...inp,width:'100%'}}>
+              <option value="">Sin vincular</option>
+              {filteredBriefs.map(b=><option key={b.id} value={b.id}>{b.nombre}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Ejecutivo</label>
+            <select value={pf.ejecutivo_nombre||''} onChange={e=>set('ejecutivo_nombre',e.target.value)} style={{...inp,width:'100%'}}>
+              <option value="">Sin asignar</option>
+              {ejecutivos.map(e=><option key={e.id} value={e.nombre}>{e.nombre}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Estado</label>
+            <select value={pf.estado} onChange={e=>set('estado',e.target.value)} style={{...inp,width:'100%'}}>
+              {['borrador','enviada','aprobada','cancelada'].map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Fecha del evento</label>
+            <input type="date" value={pf.fecha_evento||''} onChange={e=>set('fecha_evento',e.target.value||null)} style={{...inp,width:'100%'}}/>
+          </div>
+          <div>
+            <label style={lbl}>Ciudad</label>
+            <input value={pf.ciudad||''} onChange={e=>set('ciudad',e.target.value)} style={{...inp,width:'100%'}}/>
+          </div>
+          <div>
+            <label style={lbl}>Lugar / Venue</label>
+            <input value={pf.lugar||''} onChange={e=>set('lugar',e.target.value)} style={{...inp,width:'100%'}}/>
+          </div>
+          <div>
+            <label style={lbl}>PAX</label>
+            <input type="number" value={pf.personas||''} onChange={e=>set('personas',e.target.value)} style={{...inp,width:'100%'}} min="0"/>
+          </div>
+          <div>
+            <label style={lbl}>OH %</label>
+            <input type="number" value={pf.oh_pct||''} onChange={e=>set('oh_pct',Number(e.target.value))} style={{...inp,width:'100%'}} step="0.1"/>
+          </div>
+          <div>
+            <label style={lbl}>Fee agencia %</label>
+            <input type="number" value={pf.fee_agencia||''} onChange={e=>set('fee_agencia',Number(e.target.value))} style={{...inp,width:'100%'}} step="0.1"/>
+          </div>
+          <div style={{ gridColumn:'1/-1' }}>
+            <label style={lbl}>Notas</label>
+            <textarea value={pf.notas||''} onChange={e=>set('notas',e.target.value)} style={{...inp,width:'100%',minHeight:60,resize:'vertical'}}/>
+          </div>
+        </div>
+      </div>
+
+      {/* Ítems — igual que presupuestos */}
+      <div style={{ background:'#fff', border:'1px solid #e8e8e8', borderRadius:12, padding:'18px 20px', marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:'#0d3b5e' }}>Ítems</div>
+          <div style={{ display:'flex', gap:8 }}>
+            <Btn size="sm" variant="secondary" onClick={addSubcat}>+ Subcategoría</Btn>
+            <Btn size="sm" onClick={addItem}>+ Ítem</Btn>
+          </div>
+        </div>
+
+        {items.length === 0 && (
+          <div style={{ textAlign:'center', padding:'2rem', color:'#aaa', fontSize:13, border:'1px dashed #e8e8e8', borderRadius:10 }}>
+            Sin ítems. Agregá una subcategoría y luego ítems.
+          </div>
+        )}
+
+        {items.map(it => {
+          if (it._type === 'subcat') return (
+            <div key={it.id} style={{ background:'#0d3b5e', color:'#fff', padding:'7px 14px', borderRadius:8, fontSize:12, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span>{it.subcategoria}</span>
+              <button onClick={()=>deleteItem(it.id)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:16 }}>✕</button>
+            </div>
+          );
+          return (
+            <ProformaItemCard key={it.id} item={it} oh_pct={pf.oh_pct}
+              onChange={(field,val)=>updateItem(it.id,field,val)}
+              onDelete={()=>deleteItem(it.id)}
+              onAprobar={()=>aprobarItem(it.id)}
+            />
+          );
+        })}
+
+        {/* Totales */}
+        {items.filter(it=>!it._type).length > 0 && (
+          <div style={{ background:'#0d3b5e', borderRadius:10, padding:'14px 18px', marginTop:12 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:10 }}>
+              {[['Subtotal',totalSinFee],['Fee',fee],['Subtotal s/IVA',sinIva],['IVA 15%',iva],['Total c/IVA',total]].map(([l,v])=>(
+                <div key={l} style={{textAlign:'center'}}>
+                  <div style={{fontSize:10,color:'rgba(255,255,255,.6)',marginBottom:3}}>{l}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:'#fff'}}>{fmt(v)}</div>
+                </div>
+              ))}
+            </div>
+            {aprobados.length > 0 && (
+              <div style={{marginTop:10,padding:'8px 12px',background:'rgba(255,255,255,.1)',borderRadius:6,fontSize:12,color:'#5dc98a'}}>
+                ✅ {aprobados.length} ítem(s) aprobado(s) — listos para convertir a presupuesto
+              </div>
+            )}
+          </div>
+        )}
+      </div>
   }
 
   async function handleSave() {
@@ -558,28 +788,6 @@ function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, onSave, on
         </div>
       </div>
 
-      {/* Opciones */}
-      <div style={{ marginBottom:12, display:'flex', alignItems:'center', gap:10 }}>
-        <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', flex:1 }}>Opciones</h3>
-        <Btn size="sm" variant="secondary" onClick={addOpcion}>+ Agregar opción</Btn>
-      </div>
-
-      {(pf.opciones||[]).length === 0 && (
-        <div style={{ textAlign:'center', padding:'2rem', color:'#aaa', fontSize:13, border:'2px dashed #e8e8e8', borderRadius:12, marginBottom:16 }}>
-          No hay opciones aún. Hacé clic en "+ Agregar opción" para comenzar.
-        </div>
-      )}
-
-      {(pf.opciones||[]).map((op, i) => (
-        <OpcionEditor key={op.id} opcion={op} index={i}
-          oh_pct={pf.oh_pct} fee_agencia={pf.fee_agencia}
-          aprobada={pf.opcion_aprobada === op.id}
-          onChange={data=>updateOpcion(op.id, data)}
-          onDelete={()=>deleteOpcion(op.id)}
-          onAprobar={()=>aprobarOpcion(op.id)}
-        />
-      ))}
-
       <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:16 }}>
         <Btn variant="secondary" onClick={onCancel}>Cancelar</Btn>
         <Btn variant="secondary" onClick={generatePDF}>📄 PDF cliente</Btn>
@@ -591,44 +799,43 @@ function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, onSave, on
 
 // ── Generador de PDF cliente ──────────────────────────────────
 function buildPDFHtml(pf) {
-  const opciones = pf.opciones || [];
+  const items = (pf.items || []).filter(it => !it._type);
 
   function fmtN(n) { return '$' + (Number(n)||0).toLocaleString('es-EC', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
   function fmtD(s) { if (!s) return '—'; const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; }
 
-  const opcionesHtml = opciones.map((op, idx) => {
-    let subtotalPrecio = 0;
-    const itemsHtml = (op.items||[]).map(it => {
-      const qty  = Number(it.cantidad||0);
-      const dias = Number(it.dias||1);
-      const pu   = Number(it.precio_unit||0);
-      const ptotal = qty * dias * pu;
-      const fee  = ptotal * ((pf.fee_agencia||0)/100);
-      const sinIva = ptotal + fee;
-      const iva  = sinIva * 0.15;
-      const total = sinIva + iva;
-      subtotalPrecio += ptotal;
-      return `
-        <tr style="border-bottom:1px solid #f0f0f0;">
-          <td style="padding:7px 6px; font-size:11px; color:#666;">${it.subcategoria||''}</td>
-          <td style="padding:7px 6px; font-size:12px; font-weight:600;">${it.nombre||''}</td>
-          <td style="padding:7px 6px; font-size:11px; color:#555;">${it.descripcion||''}</td>
-          <td style="padding:7px 4px; text-align:center;">${it.imagen_url ? `<img src="${it.imagen_url}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;"/>` : ''}</td>
-          <td style="padding:7px 6px; text-align:center; font-size:12px;">${qty}</td>
-          <td style="padding:7px 6px; text-align:center; font-size:12px;">${dias}</td>
-          <td style="padding:7px 6px; text-align:right; font-size:12px;">${fmtN(pu)}</td>
-          <td style="padding:7px 6px; text-align:right; font-size:12px; font-weight:600;">${fmtN(ptotal)}</td>
-          <td style="padding:7px 6px; text-align:right; font-size:12px; color:#888;">${fmtN(fee)}</td>
-          <td style="padding:7px 6px; text-align:right; font-size:12px; color:#0d3b5e; font-weight:600;">${fmtN(sinIva)}</td>
-          <td style="padding:7px 6px; text-align:right; font-size:12px;">${fmtN(iva)}</td>
-          <td style="padding:7px 6px; text-align:right; font-size:13px; font-weight:700; color:#0d3b5e;">${fmtN(total)}</td>
-        </tr>`;
-    }).join('');
+  let subtotalPrecio = 0;
+  const itemsHtml = items.map((it, i) => {
+    const qty  = Number(it.cantidad||0);
+    const dias = Number(it.dias||1);
+    const pu   = Number(it.precio_unit||0);
+    const ptotal = qty * dias * pu;
+    const fee  = ptotal * ((pf.fee_agencia||0)/100);
+    const sinIva = ptotal + fee;
+    const iva  = sinIva * 0.15;
+    const total = sinIva + iva;
+    subtotalPrecio += ptotal;
+    return `
+      <tr style="background:${i%2?'#f8fafc':'#fff'};border-bottom:1px solid #f0f0f0;">
+        <td style="padding:7px 8px;font-size:11px;color:#666;">${it.subcategoria||''}</td>
+        <td style="padding:7px 8px;font-size:12px;font-weight:600;">${it.nombre||''}</td>
+        <td style="padding:7px 8px;font-size:11px;color:#555;">${it.detalle||''}</td>
+        <td style="padding:7px 4px;text-align:center;">${it.imagen_url?`<img src="${it.imagen_url}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;"/>`:'—'}</td>
+        <td style="padding:7px 8px;text-align:center;font-size:12px;">${qty}</td>
+        <td style="padding:7px 8px;text-align:center;font-size:12px;">${dias}</td>
+        <td style="padding:7px 8px;text-align:right;font-size:12px;">${fmtN(pu)}</td>
+        <td style="padding:7px 8px;text-align:right;font-size:12px;font-weight:600;">${fmtN(ptotal)}</td>
+        <td style="padding:7px 8px;text-align:right;font-size:12px;color:#888;">${fmtN(fee)}</td>
+        <td style="padding:7px 8px;text-align:right;font-size:12px;color:#0d3b5e;font-weight:600;">${fmtN(sinIva)}</td>
+        <td style="padding:7px 8px;text-align:right;font-size:12px;">${fmtN(iva)}</td>
+        <td style="padding:7px 8px;text-align:right;font-size:13px;font-weight:700;color:#0d3b5e;">${fmtN(total)}</td>
+      </tr>`;
+  }).join('');
 
-    const fee     = subtotalPrecio * ((pf.fee_agencia||0)/100);
-    const sinIva  = subtotalPrecio + fee;
-    const iva     = sinIva * 0.15;
-    const total   = sinIva + iva;
+  const fee    = subtotalPrecio * ((pf.fee_agencia||0)/100);
+  const sinIva = subtotalPrecio + fee;
+  const iva    = sinIva * 0.15;
+  const total  = sinIva + iva;
 
     return `
       <div style="margin-bottom:28px; border:1px solid #e8e8e8; border-radius:10px; overflow:hidden; page-break-inside:avoid;">
@@ -660,11 +867,11 @@ function buildPDFHtml(pf) {
           ${[['Subtotal precio',fmtN(subtotalPrecio),'#555'],['Fee agencia',fmtN(fee),'#888'],['Subtotal s/IVA',fmtN(sinIva),'#0d3b5e'],['IVA 15%',fmtN(iva),'#555'],['TOTAL',fmtN(total),'#0d3b5e']].map(([l,v,col])=>`
             <div style="text-align:right;">
               <div style="font-size:9px; color:#aaa; margin-bottom:2px; text-transform:uppercase;">${l}</div>
-              <div style="font-size:14px; font-weight:700; color:${col};">${v}</div>
+              <div style="font-size:14px; font-weight:700; color:#0d3b5e;">${v}</div>
             </div>`).join('')}
         </div>
       </div>`;
-  }).join('');
+  // end unused
 
   const headerFields = [
     ['Cliente',    pf.cliente_nombre],
@@ -675,6 +882,34 @@ function buildPDFHtml(pf) {
     ['PAX',        pf.personas > 0 ? `${pf.personas} personas` : null],
     ['Días',       pf.dias_evento > 1 ? `${pf.dias_evento} días` : null],
   ].filter(([,v]) => v);
+
+  const tablaHtml = items.length > 0 ? `
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:800px;">
+        <thead><tr style="background:#f0f4f8;">
+          <th style="padding:7px 8px;text-align:left;font-size:10px;color:#666;">Subcategoría</th>
+          <th style="padding:7px 8px;text-align:left;font-size:10px;color:#666;">Ítem</th>
+          <th style="padding:7px 8px;text-align:left;font-size:10px;color:#666;">Detalle</th>
+          <th style="padding:7px 4px;text-align:center;font-size:10px;color:#666;">Imagen</th>
+          <th style="padding:7px 8px;text-align:center;font-size:10px;color:#666;">Cant.</th>
+          <th style="padding:7px 8px;text-align:center;font-size:10px;color:#666;">Días</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;color:#666;">P.Unit</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;color:#666;">P.Total</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;color:#888;">Fee</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;color:#0d3b5e;">Sub s/IVA</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;color:#666;">IVA</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;color:#0d3b5e;">Total</th>
+        </tr></thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+    </div>
+    <div style="padding:12px 16px;background:#f8fafc;border-top:1px solid #eee;display:flex;justify-content:flex-end;gap:20px;flex-wrap:wrap;">
+      ${[['Subtotal',fmtN(subtotalPrecio),'#555'],['Fee',fmtN(fee),'#888'],['Subtotal s/IVA',fmtN(sinIva),'#0d3b5e'],['IVA 15%',fmtN(iva),'#555'],['TOTAL',fmtN(total),'#0d3b5e']].map(([l,v,col])=>`
+        <div style="text-align:right;">
+          <div style="font-size:9px;color:#aaa;margin-bottom:2px;text-transform:uppercase;">${l}</div>
+          <div style="font-size:14px;font-weight:700;color:${col};">${v}</div>
+        </div>`).join('')}
+    </div>` : '<div style="padding:2rem;text-align:center;color:#aaa;">Sin ítems</div>';
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>Proforma — ${pf.nombre}</title>
@@ -700,7 +935,7 @@ function buildPDFHtml(pf) {
         </div>`).join('')}
     </div>
   </div>
-  <div style="padding:20px 32px;">${opcionesHtml}</div>
+  <div style="padding:20px 32px;border:1px solid #e8e8e8;border-radius:0 0 10px 10px;margin:0 0 20px;">${tablaHtml}</div>
   <div style="margin:0 32px 24px;background:#fdf8ee;border:1px solid #e8d8a0;border-radius:6px;padding:12px 16px;">
     <div style="font-size:10px;color:#7a5500;line-height:1.7;"><strong>NOTA:</strong> LA PRESENTE COTIZACIÓN TIENE UNA VIGENCIA DE 30 DÍAS CALENDARIO A PARTIR DE LA FECHA DE EMISIÓN.<br>VENCIDO ESTE PLAZO, LOS VALORES PODRÁN SER AJUSTADOS SEGÚN LAS CONDICIONES DEL MERCADO.</div>
   </div>
