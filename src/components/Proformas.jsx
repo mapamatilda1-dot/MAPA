@@ -480,7 +480,12 @@ export default function Proformas({ userRole, userEmail }) {
     if(!pf.cliente_id){alert('Seleccioná un cliente');return;}
     // Limpiar campos que pueden causar errores
     const {items,...pfRest}=pf;
-    const pfClean={...pfRest, brief_id:pf.brief_id||null, cliente_id:pf.cliente_id||null};
+    const pfClean={
+      ...pfRest,
+      brief_id:     pf.brief_id     || null,
+      cliente_id:   pf.cliente_id   || null,
+      fecha_evento: pf.fecha_evento  || null,
+    };
     if(pf.id){
       const {error}=await supabase.from('proformas').update(pfClean).eq('id',pf.id);
       if(error){alert('Error: '+error.message);return;}
