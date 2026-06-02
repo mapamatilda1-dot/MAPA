@@ -220,7 +220,10 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
     if (exceso.length > 0) {
       alert(`⚠️ Advertencia: Los ítems "${exceso.map(it=>it.item).join(', ')}" superan el costo presupuestado. Se guardará el borrador de todas formas.`);
     }
-    const data = { ...form, items: form.items.filter(it=>it.seleccionado), _sols_previas: undefined };
+    // Limpiar campos internos antes de guardar
+    const cleanItems = form.items.filter(it=>it.seleccionado).map(({_saldo_inicial,...it})=>it);
+    const { _sols_previas, ...formClean } = form;
+    const data = { ...formClean, items: cleanItems };
     await onSave(data);
     setSaving(false);
   }
@@ -240,13 +243,14 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
     if (!window.confirm('¿Enviar la solicitud a Financiero? No podrá modificarse después.')) return;
     setSaving(true);
     const exceso = itemsConExceso();
+    const cleanItems = form.items.filter(it=>it.seleccionado).map(({_saldo_inicial,...it})=>it);
+    const { _sols_previas, ...formClean } = form;
     const data = {
-      ...form,
-      items: form.items.filter(it=>it.seleccionado),
+      ...formClean,
+      items: cleanItems,
       estado:'enviada',
       tiene_exceso: exceso.length > 0,
       justificacion_exceso: justif || '',
-      _sols_previas: undefined,
     };
     await onEnviar(data);
     setSaving(false);
@@ -315,7 +319,6 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
                       {s.label}<br/><span style={{fontSize:9,fontWeight:400,opacity:.8}}>{ESTADOS[s.estado]?.label}</span>
                     </th>
                   ))}
-                  {solsAntHeaders.length>0 && <th style={{padding:'8px 6px',textAlign:'right',fontSize:11,color:'#991b1b',fontWeight:700,whiteSpace:'nowrap'}}>Rechazado</th>}
                   <th style={{padding:'8px 6px',textAlign:'right',fontSize:11,color:'#2e8b4e',fontWeight:700,whiteSpace:'nowrap'}}>Saldo disp.</th>
                   {!bloqueado && <th style={{padding:'8px 6px',textAlign:'right',fontSize:11,color:'#0d3b5e',fontWeight:700,whiteSpace:'nowrap'}}>A solicitar</th>}
                   {!bloqueado && <th style={{padding:'8px 6px',textAlign:'left',fontSize:11,color:'#666',fontWeight:700}}>Notas</th>}
@@ -343,18 +346,15 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
                           </td>
                         );
                       })}
-                      {solsAntHeaders.length>0 && <td style={{padding:'8px 6px',textAlign:'right',color:rechazado>0?'#991b1b':'#ccc',fontWeight:rechazado>0?600:400,background:'#fff8f8'}}>{rechazado>0?fmt(rechazado):'—'}</td>}
                       <td style={{padding:'8px 6px',textAlign:'right',fontWeight:700,color:disponible>0?'#2e8b4e':'#dc2626'}}>{fmt(disponible)}</td>
                       {!bloqueado && <td style={{padding:'8px 4px',minWidth:120}}>
-                        <input type="number" min="0" max={disponible} step="0.01"
-                          value={it.valor_solicitado||''} disabled={!it.seleccionado||bloqueado}
+                        <input type="number" min="0" step="0.01"
+                          value={it.valor_solicitado===0?'':it.valor_solicitado}
+                          disabled={!it.seleccionado}
                           placeholder="0.00"
-                          onChange={e=>{
-                            const val=Number(e.target.value);
-                            updItem(it.id,'valor_solicitado',val>disponible?disponible:val);
-                          }}
+                          onChange={e=>updItem(it.id,'valor_solicitado',Number(e.target.value))}
                           onWheel={e=>e.target.blur()}
-                          style={{...inp,padding:'5px 8px',fontSize:12,textAlign:'right',background:it.seleccionado?'#fff':'#f8f8f8'}}/>
+                          style={{...inp,padding:'5px 8px',fontSize:12,textAlign:'right',background:it.seleccionado?'#fff':'#f5f5f5',color:it.seleccionado?'#000':'#999'}}/>
                       </td>}
                       {!bloqueado && <td style={{padding:'8px 4px',minWidth:140}}>
                         <input value={it.notas||''} disabled={!it.seleccionado||bloqueado}
