@@ -85,7 +85,7 @@ export default function App() {
       case 'briefs':           return <Briefs userRole={role} userEmail={email} />;
       case 'propuestas':       return <Propuestas userRole={role} userEmail={email} />;
       case 'proformas':        return <Proformas userRole={role} userEmail={email} />;
-      case 'presupuestos':     return <Presupuestos userRole={role} userEmail={email} logoUrl={null} />;
+      case 'presupuestos':     return <Presupuestos userRole={role} userEmail={email} logoUrl={null} onNavigate={tab=>setActiveTab(tab)} />;
       case 'solicitudes':      return <Solicitudes userRole={role} userEmail={email} userName={email.split('@')[0]} />;
       case 'liquidaciones':    return <LiquidacionesTab userRole={role} />;
       case 'calendario':       return <Calendario />;

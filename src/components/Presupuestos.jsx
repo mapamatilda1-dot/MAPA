@@ -11,7 +11,7 @@ import EditorPpto from './EditorPpto';
 import { generatePdfClienteHTML, generatePdfFinancieroHTML } from './PdfCliente';
 import ExpedientePanel from './ExpedientePanel';
 
-export default function Presupuestos({ userRole, userEmail, logoUrl }) {
+export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate }) {
   const [pptos, setPptos]         = useState([]);
   const [categorias, setCats]     = useState([]);
   const [clientes, setClis]       = useState([]);
@@ -362,7 +362,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
             <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap' }}>
               {canDownloadPdfCliente(userRole) && <button style={S.btnPrimary} onClick={() => { const html=generatePdfClienteHTML(popupPpto,logoUrl); const w=window.open('','_blank'); w.document.write(html); w.document.close(); }}>📄 PDF cliente</button>}
               {canDownloadPdfFinanciero(userRole) && <button style={{ ...S.btnSecondary, color:'#c8264a', borderColor:'#c8264a44' }} onClick={() => { const html=generatePdfFinancieroHTML(popupPpto,logoUrl); const w=window.open('','_blank'); w.document.write(html); w.document.close(); }}>📊 PDF financiero</button>}
-              {['admin','produccion'].includes(userRole) && <button style={{ ...S.btnSecondary, color:'#0d3b5e' }} onClick={() => { setPopupPpto(null); setSolicitudPptoId(popupPpto.id); }}>📤 Nueva solicitud</button>}
+              {['admin','produccion'].includes(userRole) && <button style={{ ...S.btnSecondary, color:'#0d3b5e' }} onClick={() => { setPopupPpto(null); if(onNavigate) onNavigate('solicitudes'); }}>📤 Nueva solicitud</button>}
               <button style={S.btnSecondary} onClick={() => { setEditing(popupPpto); setPopupPpto(null); }}>✏️ Editar</button>
               <button style={S.btnSm} onClick={() => { duplicatePpto(popupPpto); setPopupPpto(null); }}>📋 Duplicar</button>
             </div>
