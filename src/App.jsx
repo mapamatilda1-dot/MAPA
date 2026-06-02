@@ -42,6 +42,7 @@ export default function App() {
   const [session, setSession]   = useState(null);
   const [loading, setLoading]   = useState(true);
   const [activeTab, setActiveTab] = useState(null);
+  const [pptoInicial, setPptoInicial] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -85,8 +86,8 @@ export default function App() {
       case 'briefs':           return <Briefs userRole={role} userEmail={email} />;
       case 'propuestas':       return <Propuestas userRole={role} userEmail={email} />;
       case 'proformas':        return <Proformas userRole={role} userEmail={email} />;
-      case 'presupuestos':     return <Presupuestos userRole={role} userEmail={email} logoUrl={null} onNavigate={tab=>setActiveTab(tab)} />;
-      case 'solicitudes':      return <Solicitudes userRole={role} userEmail={email} userName={email.split('@')[0]} />;
+      case 'presupuestos':     return <Presupuestos userRole={role} userEmail={email} logoUrl={null} onNavigate={(tab,pptoId)=>{if(pptoId)setPptoInicial(pptoId);setActiveTab(tab);}} />;
+      case 'solicitudes':      return <Solicitudes userRole={role} userEmail={email} userName={email.split('@')[0]} presupuesto_id_inicial={pptoInicial} onClearPptoInicial={()=>setPptoInicial(null)}/>;
       case 'liquidaciones':    return <LiquidacionesTab userRole={role} />;
       case 'calendario':       return <Calendario />;
       case 'implementaciones': return <Implementaciones userRole={role} />;
