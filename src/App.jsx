@@ -11,8 +11,6 @@ import LiquidacionesTab from './components/LiquidacionesTab';
 import Implementaciones from './components/Implementaciones';
 import AdminPanel from './components/AdminPanel';
 import Proformas from './components/Proformas';
-import Solicitudes from './components/Solicitudes';
-import Dashboard from './components/Dashboard';
 
 // Placeholders — se reemplazarán en las fases siguientes
 const Placeholder = ({ nombre }) => (
@@ -30,11 +28,9 @@ const TAB_CONFIG = {
   propuestas:       { label: 'Propuestas',      icon: '◈' },
   proformas:        { label: 'Proformas',       icon: '📋' },
   presupuestos:     { label: 'Presupuestos',    icon: '💰' },
-  solicitudes:      { label: 'Solicitudes',     icon: '📤' },
   liquidaciones:    { label: 'Liquidaciones',   icon: '🧾' },
   calendario:       { label: 'Calendario',      icon: '📅' },
   implementaciones: { label: 'Implementac.',    icon: '⚙️' },
-  dashboard:        { label: 'Dashboard',       icon: '📊' },
   admin_panel:      { label: 'Admin',           icon: '⚙' },
 };
 
@@ -86,11 +82,9 @@ export default function App() {
       case 'propuestas':       return <Propuestas userRole={role} userEmail={email} />;
       case 'proformas':        return <Proformas userRole={role} userEmail={email} />;
       case 'presupuestos':     return <Presupuestos userRole={role} userEmail={email} logoUrl={null} />;
-      case 'solicitudes':      return <Solicitudes userRole={role} userEmail={email} userName={email.split('@')[0]} />;
       case 'liquidaciones':    return <LiquidacionesTab userRole={role} />;
       case 'calendario':       return <Calendario />;
       case 'implementaciones': return <Implementaciones userRole={role} />;
-      case 'dashboard':        return <Dashboard />;
       case 'admin_panel':      return <AdminPanel />;
       default:                 return <Placeholder nombre="Seleccioná una sección" />;
     }

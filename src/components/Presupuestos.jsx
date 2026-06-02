@@ -5,7 +5,6 @@ import { calcPpto, fmt, fmtPct } from '../calc';
 import {
   ESTADOS_PPTO, ESTADOS_PPTO_LABELS, ESTADOS_PPTO_COLORS,
   canChangeEstadoPpto, canEditPpto, canMarkEjecutado, canViewPresupuestos,
-  canDownloadPdfFinanciero, canDownloadExcel, canDownloadPdfCliente,
 } from '../roles';
 import EditorPpto from './EditorPpto';
 import { generatePdfClienteHTML, generatePdfFinancieroHTML } from './PdfCliente';
@@ -25,21 +24,14 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
   const [popupPpto, setPopupPpto] = useState(null);
   const [expedienteId, setExpedienteId] = useState(null);
   const [vincularPpto, setVincularPpto] = useState(null);
-  const [solicitudPptoId, setSolicitudPptoId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [exportPeriod, setExportPeriod] = useState({ type:'mes', mes:new Date().getMonth()+1, anio:new Date().getFullYear() });
-  // Filtro por usuario — Producción ve solo los suyos por defecto, Admin ve todos
-  const [soloMios, setSoloMios]   = useState(userRole === 'produccion');
-  const [loading, setLoading]     = useState(false);
 
-  useEffect(() => { fetchAll(); }, [soloMios]);
+  useEffect(() => { fetchAll(); }, []);
 
   async function fetchAll() {
-    setLoading(true);
-    let query = supabase.from('presupuestos').select('*').order('created_at', { ascending: false });
-    if (soloMios) query = query.eq('created_by', userEmail);
     const [ppR, catR, cliR, cfgR, ejecR, brR] = await Promise.all([
-      query,
+      supabase.from('presupuestos').select('*').order('created_at', { ascending: false }),
       supabase.from('categorias').select('*').order('nombre'),
       supabase.from('clientes').select('*').order('nombre'),
       supabase.from('config').select('*').single(),
@@ -52,7 +44,6 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
     if (cfgR.data)  setCfg(cfgR.data);
     if (ejecR.data) setEjecs(ejecR.data);
     if (brR.data)   setBriefs(brR.data);
-    setLoading(false);
   }
 
   function showToast(m) { setToast(m); setTimeout(() => setToast(''), 3000); }
@@ -77,39 +68,17 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
     const { count } = await supabase.from('presupuestos').select('*', { count:'exact', head:true });
     const { genNomenclatura } = await import('../calc');
     const newNom = genNomenclatura(ppto.nombre, ppto.cliente, (count || 0) + 1);
-
-    // Mantener todos los ítems con sus costos intactos
-    // Solo resetear campos de trazabilidad de ejecución
     const items = (ppto.items || []).map(it => {
       if (it._type === 'subcat') return { ...it, id: crypto.randomUUID() };
-      return {
-        ...it,
-        id:              crypto.randomUUID(),
-        costo_real_unit: null,
-        bco_real_pct:    null,
-        costo_aprobado:  false,
-        num_factura_prov: '',
-        foto_referencia: null,
-        // costo_unit se mantiene igual al original
-      };
+      return { ...it, id: crypto.randomUUID(), costo_real_unit: null, bco_real_pct: null, costo_aprobado: false, num_factura_prov: '', foto_referencia: null };
     });
-
     const { error } = await supabase.from('presupuestos').insert({
-      ...ppto,
-      id:           undefined,
-      nomenclatura: newNom,
-      nombre:       '',          // título vacío — es un nuevo presupuesto
-      fecha_evento: null,        // fecha limpia
-      brief_id:     null,        // proyecto vinculado limpio
-      estado:       'borrador',
-      ejecutado:    false,
-      created_at:   undefined,
-      updated_at:   undefined,
-      items,
+      ...ppto, id: undefined, nomenclatura: newNom,
+      nombre: `COPIA - ${ppto.nombre || ''}`, estado: 'borrador',
+      ejecutado: false, items, created_at: undefined, updated_at: undefined,
     });
     if (error) { showToast('Error: ' + error.message); return; }
-    showToast('Presupuesto duplicado ✓ — editá el nombre y la fecha');
-    fetchAll();
+    showToast('Presupuesto duplicado ✓'); fetchAll();
   }
 
   async function deletePpto(id) {
@@ -233,19 +202,6 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, flexWrap:'wrap', gap:10 }}>
         <h2 style={{ fontSize:20, fontWeight:700, color:'#0d3b5e' }}>📊 Presupuestos {anioActual}</h2>
         <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-          {/* Toggle mis presupuestos / todos */}
-          <button
-            onClick={() => setSoloMios(v => !v)}
-            style={{
-              padding:'7px 14px', borderRadius:8, fontSize:12, fontWeight:500,
-              cursor:'pointer', fontFamily:'inherit', border:'1px solid',
-              background: soloMios ? '#0d3b5e' : '#fff',
-              color:      soloMios ? '#fff'    : '#0d3b5e',
-              borderColor: '#0d3b5e',
-            }}
-          >
-            {soloMios ? '👤 Mis presupuestos' : '👥 Todos'}
-          </button>
           <select style={{ ...S.select, width:'auto' }} value={exportPeriod.type} onChange={e => setExportPeriod(p => ({...p, type:e.target.value}))}>
             <option value="mes">Por mes</option><option value="anio">Por año</option>
           </select>
@@ -255,7 +211,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
             </select>
           )}
           <input type="number" style={{ ...S.input, width:80 }} value={exportPeriod.anio} onChange={e => setExportPeriod(p => ({...p, anio:parseInt(e.target.value)||anioActual}))}/>
-          {canDownloadExcel(userRole) && <button style={S.btnPrimary} onClick={exportExcel}>📊 Exportar</button>}
+          <button style={S.btnPrimary} onClick={exportExcel}>📊 Exportar</button>
           <button style={{ ...S.btnPrimary, background:'#c8264a' }} onClick={() => setEditing('new')}>+ Nuevo presupuesto</button>
         </div>
       </div>
@@ -360,9 +316,8 @@ export default function Presupuestos({ userRole, userEmail, logoUrl }) {
               )}
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap' }}>
-              {canDownloadPdfCliente(userRole) && <button style={S.btnPrimary} onClick={() => { const html=generatePdfClienteHTML(popupPpto,logoUrl); const w=window.open('','_blank'); w.document.write(html); w.document.close(); }}>📄 PDF cliente</button>}
-              {canDownloadPdfFinanciero(userRole) && <button style={{ ...S.btnSecondary, color:'#c8264a', borderColor:'#c8264a44' }} onClick={() => { const html=generatePdfFinancieroHTML(popupPpto,logoUrl); const w=window.open('','_blank'); w.document.write(html); w.document.close(); }}>📊 PDF financiero</button>}
-              {['admin','produccion'].includes(userRole) && <button style={{ ...S.btnSecondary, color:'#0d3b5e' }} onClick={() => { setPopupPpto(null); setSolicitudPptoId(popupPpto.id); }}>📤 Nueva solicitud</button>}
+              <button style={S.btnPrimary} onClick={() => { const html=generatePdfClienteHTML(popupPpto,logoUrl); const w=window.open('','_blank'); w.document.write(html); w.document.close(); }}>📄 PDF cliente</button>
+              <button style={{ ...S.btnSecondary, color:'#c8264a', borderColor:'#c8264a44' }} onClick={() => { const html=generatePdfFinancieroHTML(popupPpto,logoUrl); const w=window.open('','_blank'); w.document.write(html); w.document.close(); }}>📊 PDF financiero</button>
               <button style={S.btnSecondary} onClick={() => { setEditing(popupPpto); setPopupPpto(null); }}>✏️ Editar</button>
               <button style={S.btnSm} onClick={() => { duplicatePpto(popupPpto); setPopupPpto(null); }}>📋 Duplicar</button>
             </div>

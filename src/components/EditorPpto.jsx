@@ -3,13 +3,9 @@ import { supabase } from '../lib/supabase';
 import { S, Label, Badge, Toast } from '../styles.jsx';
 import { calcItem, calcPpto, genNomenclatura, fmt, fmtPct } from '../calc';
 import { generatePdfClienteHTML, generatePdfFinancieroHTML, generateExcelFinancieroData } from './PdfCliente';
-import AlcanceTab from './AlcanceTab';
 import {
-  ESTADOS_PPTO, ESTADOS_PPTO_LABELS, ESTADOS_PPTO_COLORS,
+  ESTADOS_PPTO, ESTADOS_PPTO_LABELS,
   canChangeEstadoPpto, canEditPpto, canApproveCostoReal, canEditBcoReal,
-  canMarkEjecutado, canMarkCerradoProduccion,
-  canDownloadPdfFinanciero, canDownloadExcel, canDownloadPdfCliente,
-  getFlujoBtnLabel, getFlujoBtnNextEstado, getFeeForCliente,
 } from '../roles';
 
 const SESSION_KEY = 'matilda_editor_draft';
@@ -27,157 +23,6 @@ function emptyItem(p) {
     categoria:'', subcategoria:'', es_liquidacion:false,
     foto_referencia:null,
   };
-}
-
-// ── Componente de opciones adicionales ───────────────────────
-function OpcionesAdicionales({ p, setP, bloqueado, fmt, fmtPct, calcItem, S, Label }) {
-  const [openOp, setOpenOp] = useState(null);
-  const opciones = p.opciones_adicionales || [];
-
-  function addOpcion() {
-    const nombre = window.prompt('Nombre de la opción (ej: Opción A - Centro de mesa alternativo):');
-    if (!nombre?.trim()) return;
-    const nueva = { id: crypto.randomUUID(), nombre: nombre.trim(), items: [] };
-    setP(prev => ({ ...prev, opciones_adicionales: [...(prev.opciones_adicionales||[]), nueva] }));
-    setOpenOp(nueva.id);
-  }
-
-  function updateOpcion(opId, changes) {
-    setP(prev => ({
-      ...prev,
-      opciones_adicionales: (prev.opciones_adicionales||[]).map(o => o.id===opId ? {...o,...changes} : o)
-    }));
-  }
-
-  function deleteOpcion(opId) {
-    setP(prev => ({ ...prev, opciones_adicionales: (prev.opciones_adicionales||[]).filter(o=>o.id!==opId) }));
-    if (openOp===opId) setOpenOp(null);
-  }
-
-  function addItemToOp(opId) {
-    const items = (opciones.find(o=>o.id===opId)?.items||[]).concat({
-      id:crypto.randomUUID(), item:'', detalle:'', cantidad:1, dias:1,
-      precio_unit:0, costo_unit:0, oh_pct:Number(p.oh_pct||15), bco_pct:Number(p.bco_pct||5.5),
-      subcategoria:'', categoria:'',
-    });
-    updateOpcion(opId, { items });
-  }
-
-  function updItemOp(opId, itemId, field, value) {
-    const nums = ['costo_unit','precio_unit','cantidad','dias','oh_pct','bco_pct'];
-    const items = (opciones.find(o=>o.id===opId)?.items||[]).map(it =>
-      it.id===itemId ? {...it,[field]:nums.includes(field)?Number(value):value} : it
-    );
-    updateOpcion(opId, { items });
-  }
-
-  function promoverAItems(opId) {
-    const op = opciones.find(o=>o.id===opId);
-    if (!op) return;
-    if (!window.confirm(`¿Agregar los ítems de "${op.nombre}" al presupuesto principal?`)) return;
-    // Agregar como nueva subcategoría en el presupuesto principal
-    const subcat = { id:crypto.randomUUID(), _type:'subcat', subcategoria:op.nombre, item:'', detalle:'', cantidad:0, dias:0, costo_unit:0, precio_unit:0, oh_pct:0, bco_pct:0, categoria:'', es_liquidacion:false };
-    const itemsNuevos = op.items.map(it => ({ ...it, id:crypto.randomUUID(), subcategoria:op.nombre }));
-    setP(prev => ({
-      ...prev,
-      items: [...prev.items, subcat, ...itemsNuevos],
-      opciones_adicionales: (prev.opciones_adicionales||[]).filter(o=>o.id!==opId),
-    }));
-  }
-
-  return (
-    <div style={{ marginTop:24, borderTop:'2px dashed #dde6ef', paddingTop:16 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-        <div>
-          <div style={{ fontSize:14, fontWeight:700, color:'#7c3aed' }}>✦ Opciones adicionales</div>
-          <div style={{ fontSize:11, color:'#aaa' }}>Aparecen en el PDF cliente después de los totales — no entran en los cálculos</div>
-        </div>
-        {!bloqueado && <button style={{...S.btnPrimary,background:'#7c3aed'}} onClick={addOpcion}>+ Agregar opción</button>}
-      </div>
-
-      {opciones.length===0 && (
-        <div style={{ textAlign:'center', padding:'1.5rem', color:'#ccc', fontSize:13, border:'1px dashed #e8e8e8', borderRadius:10 }}>
-          Sin opciones adicionales
-        </div>
-      )}
-
-      {opciones.map(op => {
-        const totalOp = (op.items||[]).reduce((a,it) => a + calcItem(it).precio, 0);
-        const isOpen  = openOp===op.id;
-        return (
-          <div key={op.id} style={{ border:`1px solid ${isOpen?'#7c3aed':'#e8e8e8'}`, borderRadius:10, marginBottom:10, overflow:'hidden' }}>
-            {/* Header opción */}
-            <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:isOpen?'#f5f3ff':'#fafafa', cursor:'pointer' }}
-              onClick={()=>setOpenOp(isOpen?null:op.id)}>
-              <span style={{ fontSize:13, fontWeight:600, color:'#7c3aed', flex:1 }}>{op.nombre}</span>
-              <span style={{ fontSize:12, color:'#888' }}>{(op.items||[]).length} ítems · {fmt(totalOp)}</span>
-              {!bloqueado && <>
-                <button onClick={e=>{e.stopPropagation();promoverAItems(op.id);}}
-                  style={{...S.btnSm,background:'#2e8b4e',color:'#fff',border:'none',fontSize:11}}>→ Promover a principal</button>
-                <button onClick={e=>{e.stopPropagation();deleteOpcion(op.id);}}
-                  style={{...S.btnRed,fontSize:11}}>✕</button>
-              </>}
-            </div>
-
-            {/* Ítems de la opción */}
-            {isOpen && (
-              <div style={{ padding:'12px 14px', borderTop:'1px solid #e8e8e8' }}>
-                <div style={{ overflowX:'auto' }}>
-                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-                    <thead>
-                      <tr style={{ background:'#f0f4f8' }}>
-                        {['Ítem','Detalle','Cant.','Días','P.Unit','Total',''].map(h=>(
-                          <th key={h} style={{ padding:'6px 8px', textAlign:['Cant.','Días','P.Unit','Total'].includes(h)?'right':'left', fontSize:11, color:'#666', fontWeight:700 }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(op.items||[]).map(it => {
-                        const c = calcItem(it);
-                        return (
-                          <tr key={it.id} style={{ borderBottom:'1px solid #f0f0f0' }}>
-                            <td style={{ padding:'5px 8px' }}>
-                              <input value={it.item||''} onChange={e=>updItemOp(op.id,it.id,'item',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12}} placeholder="Nombre del ítem"/>
-                            </td>
-                            <td style={{ padding:'5px 8px' }}>
-                              <input value={it.detalle||''} onChange={e=>updItemOp(op.id,it.id,'detalle',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12}} placeholder="Detalle"/>
-                            </td>
-                            <td style={{ padding:'5px 4px', width:60 }}>
-                              <input type="number" value={it.cantidad} onChange={e=>updItemOp(op.id,it.id,'cantidad',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right'}}/>
-                            </td>
-                            <td style={{ padding:'5px 4px', width:55 }}>
-                              <input type="number" value={it.dias} onChange={e=>updItemOp(op.id,it.id,'dias',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right'}}/>
-                            </td>
-                            <td style={{ padding:'5px 4px', width:90 }}>
-                              <input type="number" step="0.01" value={it.precio_unit} onChange={e=>updItemOp(op.id,it.id,'precio_unit',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right'}}/>
-                            </td>
-                            <td style={{ padding:'5px 8px', textAlign:'right', fontWeight:600, color:'#7c3aed' }}>{fmt(c.precio)}</td>
-                            <td style={{ padding:'5px 4px', width:30 }}>
-                              <button onClick={()=>updateOpcion(op.id,{items:(op.items||[]).filter(x=>x.id!==it.id)})}
-                                style={{background:'none',border:'none',color:'#dc2626',cursor:'pointer',fontSize:14}}>✕</button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8 }}>
-                  <button onClick={()=>addItemToOp(op.id)} style={{...S.btnSm,background:'#7c3aed',color:'#fff',border:'none',fontSize:12}}>+ Ítem</button>
-                  <span style={{ fontSize:13, fontWeight:600, color:'#7c3aed' }}>Total: {fmt(totalOp)}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
 }
 
 export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, clientes, ejecutivos, logoUrl, userRole='produccion', briefs=[] }) {
@@ -225,7 +70,6 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
         oh_pct:      cfg?.oh_pct      ?? 15,
         bco_pct:     cfg?.bco_pct     ?? 5.5,
         apply_rebate:false, estado:'borrador', notas:'', items:[], nomenclatura:'',
-        ejecutado: false, cerrado_produccion: false,
         ejecutivo_nombre:'', ejecutivo_email:'',
       });
     }
@@ -235,19 +79,7 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
   function showToast(m){setToast(m);setTimeout(()=>setToast(''),2500);}
   function setField(k,v){setP(prev=>({...prev,[k]:v}));}
   function setNum(k,v){setP(prev=>({...prev,[k]:v===''?0:parseFloat(v)??0}));}
-  function setCliente(n) {
-    // Buscar el cliente en la lista para obtener su fee y BCO configurados
-    const clienteObj = clientes.find(c => c.nombre === n);
-    const feeData = clienteObj
-      ? { fee: clienteObj.fee_agencia || 0, bco: !!clienteObj.bco_aplica }
-      : getFeeForCliente(n); // fallback a tabla hardcoded
-    setP(prev => ({
-      ...prev,
-      cliente: n,
-      apply_rebate: feeData?.bco ?? n.toUpperCase().includes('TESALIA'),
-      ...(feeData?.fee !== undefined ? { fee_agencia: feeData.fee } : {}),
-    }));
-  }
+  function setCliente(n){setP(prev=>({...prev,cliente:n,apply_rebate:n.toUpperCase().includes('TESALIA')}));}
 
   function selectBrief(briefId) {
     if (!briefId) { setP(prev=>({...prev, brief_id:''})); return; }
@@ -303,40 +135,19 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
       nomenclatura=genNomenclatura(p.nombre,p.cliente,(count||0)+1);
     }
     const payload={...p,nomenclatura};
-    // Limpiar campos UUID — string vacío rompe Postgres
-    if (!payload.brief_id)   payload.brief_id   = null;
-    if (!payload.cliente_id) payload.cliente_id  = null;
     let error,data;
     if(p.id){({error}=await supabase.from('presupuestos').update(payload).eq('id',p.id));}
     else{({data,error}=await supabase.from('presupuestos').insert(payload).select().single());if(data)setP(prev=>({...prev,id:data.id,nomenclatura}));}
     setSaving(false);
     if(error){showToast('Error: '+error.message);return;}
     try{sessionStorage.removeItem(SESSION_KEY);sessionStorage.removeItem(SESSION_TAB);}catch{}
-    showToast('Guardado ✓');
-    // Nos quedamos en la página para seguir editando
+    showToast('Guardado ✓');onSave();
   }
 
   function openPdfCliente(){
     if(!p)return;
     const html=generatePdfClienteHTML(p,logoUrl);
     const w=window.open('','_blank');w.document.write(html);w.document.close();
-  }
-
-  async function saveVersion(ppto, estado) {
-    try {
-      const html = generatePdfClienteHTML(ppto, logoUrl);
-      const blob = new Blob([html], { type:'text/html' });
-      const fileName = `${(ppto.nomenclatura||ppto.id).replace(/[^a-zA-Z0-9-_]/g,'_')}_v${Date.now()}.html`;
-      await supabase.storage.from('versiones-pdf').upload(fileName, blob, { contentType:'text/html' });
-      const { data:urlData } = supabase.storage.from('versiones-pdf').getPublicUrl(fileName);
-      const { count } = await supabase.from('versiones_ppto').select('*',{count:'exact',head:true}).eq('presupuesto_id',ppto.id);
-      await supabase.from('versiones_ppto').insert({
-        presupuesto_id: ppto.id, estado,
-        version_num: (count||0)+1,
-        pdf_url: urlData?.publicUrl||'',
-        created_by: ppto.ejecutivo_email||ppto.created_by||'',
-      });
-    } catch(e) { console.warn('No se pudo guardar versión:', e); }
   }
 
   function openPdfFinanciero(){
@@ -513,27 +324,22 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
         <Badge estado={p.estado}/>
         <select style={{...S.select,width:'auto'}} value={p.estado}
           disabled={!canEditPpto(userRole,p.estado)&&userRole!=='admin'}
-          onChange={async e=>{
+          onChange={e=>{
             if(!canChangeEstadoPpto(userRole,e.target.value)){showToast('⚠️ Sin permiso para este estado');return;}
             if(!canEditPpto(userRole,p.estado)){showToast('⚠️ Presupuesto bloqueado');return;}
-            const nuevoEstado = e.target.value;
-            setField('estado', nuevoEstado);
-            if (p.id) {
-              await supabase.from('presupuestos').update({ estado: nuevoEstado }).eq('id', p.id);
-              await saveVersion({ ...p, estado: nuevoEstado }, nuevoEstado);
-            }
+            setField('estado',e.target.value);
           }}>
           {ESTADOS_PPTO.map(e=><option key={e} value={e} disabled={!canChangeEstadoPpto(userRole,e)&&p.estado!==e}>{ESTADOS_PPTO_LABELS[e]}</option>)}
         </select>
         <button style={S.btnSecondary} onClick={openPdfCliente}>📄 PDF cliente</button>
-        {canDownloadPdfFinanciero(userRole) && <button style={{...S.btnSecondary,color:'#c8264a',borderColor:'#c8264a44'}} onClick={openPdfFinanciero}>📊 PDF financiero</button>}
-        {canDownloadExcel(userRole) && <button style={S.btnSecondary} onClick={downloadExcel}>📥 Excel</button>}
+        <button style={{...S.btnSecondary,color:'#c8264a',borderColor:'#c8264a44'}} onClick={openPdfFinanciero}>📊 PDF financiero</button>
+        <button style={S.btnSecondary} onClick={downloadExcel}>📥 Excel</button>
         <button style={S.btnPrimary} onClick={save} disabled={saving}>{saving?'Guardando…':'💾 Guardar'}</button>
       </div>
 
       {/* Tabs */}
       <div style={{display:'flex',gap:4,marginBottom:16,borderBottom:'2px solid #dde6ef',paddingBottom:0}}>
-        {[['info','📋 Info'],['items','📦 Ítems'],['totales','💰 Totales'],...(['aprobado','pendiente_facturar','facturado'].includes(p.estado)?[['alcance','➕ Alcance']]:[] ),['vista','👁 Vista previa']].map(([k,l])=>(
+        {[['info','📋 Info'],['items','📦 Ítems'],['totales','💰 Totales'],['vista','👁 Vista previa']].map(([k,l])=>(
           <button key={k} onClick={()=>setTab(k)} style={{
             padding:'8px 16px',border:'none',cursor:'pointer',fontSize:13,background:'none',
             borderBottom:tab===k?'2px solid #c8264a':'2px solid transparent',
@@ -615,12 +421,6 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
               {p.items.length} ítems · Precio total: <strong style={{color:'#0d3b5e'}}>{fmt(totales.subtotalPrecio)}</strong>
             </span>
             <div style={{display:'flex',gap:8}}>
-              {p.estado==='enviado_cliente' && p.id && (
-                <button style={{...S.btnPrimary,background:'#7c3aed'}} onClick={async()=>{
-                  await saveVersion(p, p.estado);
-                  showToast('📄 Versión guardada en el expediente ✓');
-                }}>📄 Nueva versión</button>
-              )}
               <button style={{...S.btnPrimary,background:'#0d3b5e'}} onClick={()=>{
                 const nombre=window.prompt('Nombre de la subcategoría:');
                 if(!nombre||!nombre.trim())return;
@@ -722,7 +522,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                           <span style={{flex:1,fontWeight:600,fontSize:14,color:c.hasWarning?'#c8264a':'#1a1a2e'}}>{it.item||<span style={{color:'#bbb'}}>Sin nombre</span>}</span>
                           {c.hasWarning&&<span style={{fontSize:11,color:'#c8264a',fontWeight:700}}>⚠️ Costo &gt; Precio</span>}
                           {it.costo_aprobado&&<span style={{fontSize:10,background:'#edf7ed',color:'#2e8b4e',padding:'2px 6px',borderRadius:4,fontWeight:700,border:'1px solid #2e8b4e44'}}>✅ Aprobado</span>}
-                          
+                          {it.es_liquidacion&&<span style={{fontSize:10,background:'#e0f7f6',color:'#3dbfb8',padding:'2px 7px',borderRadius:4,fontWeight:700,border:'1px solid #3dbfb8'}}>LIQ</span>}
                           {it.categoria&&<span style={{fontSize:11,background:'#e8f0f8',color:'#0d3b5e',padding:'2px 7px',borderRadius:4,fontWeight:600}}>{it.categoria}</span>}
                           {tieneReal&&<span style={{fontSize:11,background:'#edf7ed',color:'#2e8b4e',padding:'2px 7px',borderRadius:4,fontWeight:600,border:'1px solid #2e8b4e44'}}>Ahorro: {fmt(c.ahorro)}</span>}
                           <span style={{fontSize:12,color:'#8aa0b8'}}>Costo: <strong>{fmt(c.costoTotal)}</strong></span>
@@ -835,91 +635,6 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                               <div><Label># Factura proveedor</Label><input style={S.input} value={it.num_factura_prov||''} onChange={e=>updItem(it.id,'num_factura_prov',e.target.value)} placeholder="Ej: 001-001-000123456"/></div>
                               <div><Label>Info general</Label><input style={S.input} value={it.info||''} onChange={e=>updItem(it.id,'info',e.target.value)}/></div>
 
-                              {/* CONDICIÓN DE PAGO */}
-                              <div style={{gridColumn:'1/-1',background:'#fdf8ee',borderRadius:8,padding:'10px 12px',border:'1px solid #e8d8a0'}}>
-                                <div style={{fontSize:12,fontWeight:700,color:'#7a5500',marginBottom:8}}>💳 Condición de pago</div>
-                                <div style={{display:'flex',gap:8,marginBottom:10}}>
-                                  {['Contado','Crédito','Abono'].map(op => (
-                                    <button key={op} onClick={()=>updItem(it.id,'condicion_pago',op)}
-                                      style={{padding:'5px 14px',borderRadius:7,border:'1px solid',fontSize:12,cursor:'pointer',fontFamily:'inherit',fontWeight:500,
-                                        background: it.condicion_pago===op?'#7a5500':'#fff',
-                                        color:      it.condicion_pago===op?'#fff':'#7a5500',
-                                        borderColor:'#c8a840',
-                                      }}>{op}</button>
-                                  ))}
-                                </div>
-                                {it.condicion_pago==='Crédito' && (
-                                  <div style={{display:'grid',gridTemplateColumns:'1fr',gap:8}}>
-                                    <div><Label>Días de crédito</Label>
-                                      <input type="number" min="0" style={S.input} value={it.dias_credito||''} placeholder="Ej: 30" onChange={e=>updItem(it.id,'dias_credito',e.target.value)}/>
-                                    </div>
-                                  </div>
-                                )}
-                                {it.condicion_pago==='Abono' && (()=>{
-                                  const pct = Number(it.abono_pct||50);
-                                  const totalItem = Number(it.costo_unit||0)*Number(it.cantidad||1)*Number(it.dias||1);
-                                  const valorAbono = totalItem * (pct/100);
-                                  const saldo = totalItem - valorAbono;
-                                  return (
-                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
-                                      <div><Label>% de abono</Label>
-                                        <input type="number" min="0" max="100" style={S.input} value={it.abono_pct||50} onChange={e=>updItem(it.id,'abono_pct',Number(e.target.value))}/>
-                                      </div>
-                                      <div><Label>Valor abono</Label>
-                                        <input style={S.inputRO} readOnly value={fmt(valorAbono)}/>
-                                      </div>
-                                      <div><Label>Días crédito del saldo</Label>
-                                        <input type="number" min="0" style={S.input} value={it.dias_credito_saldo||''} placeholder="Ej: 30" onChange={e=>updItem(it.id,'dias_credito_saldo',e.target.value)}/>
-                                      </div>
-                                      <div style={{gridColumn:'1/-1',fontSize:12,color:'#7a5500',background:'#fff8e6',borderRadius:6,padding:'6px 10px'}}>
-                                        Saldo a recibir en {it.dias_credito_saldo||'—'} días: <strong>{fmt(saldo)}</strong>
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-
-                              {/* MULTI-PROVEEDOR */}
-                              <div style={{gridColumn:'1/-1',background:'#f8fafc',borderRadius:8,padding:'10px 12px',border:'1px solid #dde6ef'}}>
-                                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-                                  <div style={{fontSize:12,fontWeight:700,color:'#5a7a9a'}}>🏭 Proveedores adicionales</div>
-                                  <button onClick={()=>{
-                                    const provs = [...(it.proveedores_adicionales||[]), {id:crypto.randomUUID(),razon_social:'',factura:'',costo:0}];
-                                    updItem(it.id,'proveedores_adicionales',provs);
-                                  }} style={{fontSize:11,padding:'3px 10px',borderRadius:6,border:'1px solid #0d3b5e',background:'transparent',color:'#0d3b5e',cursor:'pointer',fontFamily:'inherit'}}>
-                                    + Agregar proveedor
-                                  </button>
-                                </div>
-                                {(it.proveedores_adicionales||[]).length === 0 && (
-                                  <div style={{fontSize:12,color:'#aaa',fontStyle:'italic'}}>Sin proveedores adicionales — el precio al cliente es uno solo</div>
-                                )}
-                                {(it.proveedores_adicionales||[]).map((prov,pi) => (
-                                  <div key={prov.id} style={{display:'grid',gridTemplateColumns:'1fr 1fr auto auto',gap:8,marginBottom:8,padding:'8px',background:'#fff',borderRadius:6,border:'1px solid #eee'}}>
-                                    <div><Label>Razón social</Label>
-                                      <input style={S.input} value={prov.razon_social||''} placeholder="Nombre del proveedor"
-                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],razon_social:e.target.value};updItem(it.id,'proveedores_adicionales',ps);}}/>
-                                    </div>
-                                    <div><Label># Factura</Label>
-                                      <input style={S.input} value={prov.factura||''} placeholder="001-001-000123"
-                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],factura:e.target.value};updItem(it.id,'proveedores_adicionales',ps);}}/>
-                                    </div>
-                                    <div><Label>Costo ($)</Label>
-                                      <input type="number" step="0.01" style={S.input} value={prov.costo||0}
-                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],costo:Number(e.target.value)};updItem(it.id,'proveedores_adicionales',ps);}}/>
-                                    </div>
-                                    <div style={{display:'flex',alignItems:'flex-end',paddingBottom:2}}>
-                                      <button onClick={()=>{const ps=(it.proveedores_adicionales||[]).filter((_,i)=>i!==pi);updItem(it.id,'proveedores_adicionales',ps);}}
-                                        style={{background:'#fee2e2',border:'none',borderRadius:6,color:'#dc2626',cursor:'pointer',padding:'7px 10px',fontSize:13}}>✕</button>
-                                    </div>
-                                  </div>
-                                ))}
-                                {(it.proveedores_adicionales||[]).length > 0 && (
-                                  <div style={{fontSize:12,color:'#5a7a9a',marginTop:4,padding:'6px 10px',background:'#eef4fb',borderRadius:6}}>
-                                    Costo adicional total: <strong>{fmt((it.proveedores_adicionales||[]).reduce((a,p)=>a+Number(p.costo||0),0))}</strong> — el precio al cliente no cambia
-                                  </div>
-                                )}
-                              </div>
-
                               {/* Foto de referencia */}
                               <div style={{gridColumn:'1/-1',background:'#f8fafc',borderRadius:8,padding:'10px 12px',border:'1px dashed #c8d8e8'}}>
                                 <Label>📸 Foto de referencia (aparece en PDF y vista cliente)</Label>
@@ -938,7 +653,10 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                                 )}
                               </div>
 
-
+                              <div style={{gridColumn:'1/-1',display:'flex',alignItems:'center',gap:10,padding:'8px 12px',background:it.es_liquidacion?'#e0f7f6':'#f8fafc',borderRadius:6,border:`1px solid ${it.es_liquidacion?'#3dbfb8':'#dde6ef'}`}}>
+                                <input type="checkbox" id={`liq-${it.id}`} checked={!!it.es_liquidacion} onChange={e=>updItem(it.id,'es_liquidacion',e.target.checked)} style={{width:16,height:16,cursor:'pointer',accentColor:'#3dbfb8'}}/>
+                                <label htmlFor={`liq-${it.id}`} style={{fontSize:13,cursor:'pointer',fontWeight:600,color:it.es_liquidacion?'#3dbfb8':'#5a7a9a'}}>Ítem de liquidación</label>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -957,9 +675,6 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             const subcat={id:crypto.randomUUID(),_type:'subcat',subcategoria:nombre.trim(),item:'',detalle:'',cantidad:0,dias:0,costo_unit:0,precio_unit:0,oh_pct:0,bco_pct:0,categoria:'',es_liquidacion:false};
             setP(prev=>({...prev,items:[...prev.items,subcat]}));
           }}>+ Nueva subcategoría</button>}
-
-          {/* ── Opciones adicionales ── */}
-          <OpcionesAdicionales p={p} setP={setP} bloqueado={bloqueado} fmt={fmt} fmtPct={fmtPct} calcItem={calcItem} S={S} Label={Label} />
         </div>
       )}
 
@@ -1070,65 +785,16 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
         </div>
       )}
 
-      {/* ══ ALCANCE ══ */}
-      {tab==='alcance'&&(
-        <AlcanceTab
-          presupuestoId={p.id}
-          presupuesto={p}
-          cfg={cfg}
-          logoUrl={logoUrl}
-          userRole={userRole}
-        />
-      )}
-
       {/* ══ VISTA PREVIA ══ */}
       {tab==='vista'&&(
         <div>
-          {/* Botón de flujo de trabajo */}
-          {getFlujoBtnLabel(p.estado) && (
-            <div style={{marginBottom:14,padding:'14px 16px',background:'#eef4fb',border:'1px solid #c8d8e8',borderRadius:10,display:'flex',alignItems:'center',gap:12}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:12,color:'#5a7a9a',marginBottom:2}}>Siguiente paso en el flujo</div>
-                <div style={{fontSize:13,fontWeight:600,color:'#0d3b5e'}}>{ESTADOS_PPTO_LABELS[getFlujoBtnNextEstado(p.estado)]}</div>
-              </div>
-              <button
-                style={{...S.btnPrimary,background:'#0d3b5e',padding:'10px 20px',fontSize:13}}
-                onClick={async () => {
-                  const nextEstado = getFlujoBtnNextEstado(p.estado);
-                  if (!nextEstado) return;
-                  if (!canChangeEstadoPpto(userRole, nextEstado)) { showToast('⚠️ Sin permiso'); return; }
-                  setField('estado', nextEstado);
-                  await supabase.from('presupuestos').update({ estado: nextEstado }).eq('id', p.id);
-                  await saveVersion({ ...p, estado: nextEstado }, nextEstado);
-                  showToast(`Estado actualizado: ${ESTADOS_PPTO_LABELS[nextEstado]}`);
-                }}
-              >
-                {getFlujoBtnLabel(p.estado)} →
-              </button>
-            </div>
-          )}
-
-          {/* Check cerrado por producción */}
-          {canMarkCerradoProduccion(userRole) && ESTADOS_CIERRE.includes(p.estado) && p.ejecutado && (
-            <div style={{marginBottom:14,padding:'12px 16px',background: p.cerrado_produccion?'#e8f5ee':'#f8fafc',border:`1px solid ${p.cerrado_produccion?'#2e8b4e':'#dde6ef'}`,borderRadius:10,display:'flex',alignItems:'center',gap:12}}>
-              <input type="checkbox" id="cerrado_prod" checked={!!p.cerrado_produccion}
-                onChange={e => setField('cerrado_produccion', e.target.checked)}
-                style={{width:18,height:18,cursor:'pointer',accentColor:'#2e8b4e'}}
-              />
-              <label htmlFor="cerrado_prod" style={{fontSize:13,fontWeight:600,cursor:'pointer',color: p.cerrado_produccion?'#2e8b4e':'#0d3b5e'}}>
-                {p.cerrado_produccion ? '✅ Cerrado por producción' : 'Cerrar por producción'}
-              </label>
-              {p.cerrado_produccion && <span style={{fontSize:11,color:'#2e8b4e',marginLeft:'auto'}}>Notificación enviada a Financiero</span>}
-            </div>
-          )}
-
           <div style={{display:'flex',gap:8,marginBottom:16}}>
             <button style={{...S.btnPrimary,opacity:previewMode==='cliente'?1:0.55}} onClick={()=>setPreviewMode('cliente')}>👤 Vista cliente</button>
             <button style={{...S.btnSecondary,opacity:previewMode==='financiero'?1:0.55,border:'1px solid #0d3b5e',color:'#0d3b5e'}} onClick={()=>setPreviewMode('financiero')}>💼 Vista financiera</button>
             <div style={{flex:1}}/>
             <button style={{...S.btnPrimary,background:'#c8264a'}} onClick={openPdfCliente}>📄 PDF cliente</button>
-            {canDownloadPdfFinanciero(userRole) && <button style={{...S.btnSecondary,color:'#c8264a',borderColor:'#c8264a44'}} onClick={openPdfFinanciero}>📊 PDF financiero</button>}
-            {canDownloadExcel(userRole) && <button style={S.btnSecondary} onClick={downloadExcel}>📥 Excel</button>}
+            <button style={{...S.btnSecondary,color:'#c8264a',borderColor:'#c8264a44'}} onClick={openPdfFinanciero}>📊 PDF financiero</button>
+            <button style={S.btnSecondary} onClick={downloadExcel}>📥 Excel</button>
           </div>
           {!previewMode&&<div style={S.empty}>Selecciona una vista arriba para previsualizar</div>}
           {previewMode&&(()=>{

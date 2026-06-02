@@ -309,18 +309,20 @@ export default function Proformas({ userRole, userEmail }) {
   async function saveProforma(pf) {
     if (!pf.nombre.trim()) { alert('El nombre es obligatorio'); return; }
     if (!pf.cliente_id)    { alert('Seleccioná un cliente'); return; }
-    // Limpiar campos UUID
     const pfClean = { ...pf, brief_id: pf.brief_id || null, cliente_id: pf.cliente_id || null };
     if (pf.id) {
       await supabase.from('proformas').update(pfClean).eq('id', pf.id);
+      showToast('Proforma guardada ✓');
+      loadAll();
     } else {
-      const count = proformas.length + 1;
-      const nom = `PF-${String(count).padStart(3,'0')}-${pf.cliente_nombre?.slice(0,10).toUpperCase()}-${new Date().getFullYear()}`;
-      await supabase.from('proformas').insert({ ...pfClean, nomenclatura: nom, created_by: userEmail });
+      const count = (await supabase.from('proformas').select('*',{count:'exact',head:true})).count || 0;
+      const nom = `PF-${String(count+1).padStart(3,'0')}-${pf.cliente_nombre?.slice(0,10).toUpperCase()}-${new Date().getFullYear()}`;
+      const { data: newPf } = await supabase.from('proformas').insert({ ...pfClean, nomenclatura: nom, created_by: userEmail }).select().single();
+      showToast('Proforma guardada ✓');
+      loadAll();
+      // Quedarse en el editor con el id asignado
+      if (newPf) setEditing(newPf);
     }
-    setEditing(null);
-    loadAll();
-    showToast('Proforma guardada ✓');
   }
 
   if (loading) return <div style={{ padding:'2rem', textAlign:'center', color:'#888' }}>Cargando proformas…</div>;
