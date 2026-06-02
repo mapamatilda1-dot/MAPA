@@ -530,7 +530,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
 
       {/* Tabs */}
       <div style={{display:'flex',gap:4,marginBottom:16,borderBottom:'2px solid #dde6ef',paddingBottom:0}}>
-        {[['info','📋 Info'],['items','📦 Ítems'],['totales','💰 Totales'],['alcance','➕ Alcance'],['vista','👁 Vista previa']].map(([k,l])=>(
+        {[['info','📋 Info'],['items','📦 Ítems'],['totales','💰 Totales'],...(['aprobado','pendiente_facturar','facturado'].includes(p.estado)?[['alcance','➕ Alcance']]:[] ),['vista','👁 Vista previa']].map(([k,l])=>(
           <button key={k} onClick={()=>setTab(k)} style={{
             padding:'8px 16px',border:'none',cursor:'pointer',fontSize:13,background:'none',
             borderBottom:tab===k?'2px solid #c8264a':'2px solid transparent',
