@@ -591,80 +591,118 @@ function buildPDFHtml(pf) {
   const opciones = pf.opciones || [];
 
   function fmtN(n) { return '$' + (Number(n)||0).toLocaleString('es-EC', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+  function fmtD(s) { if (!s) return '—'; const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; }
 
   const opcionesHtml = opciones.map((op, idx) => {
+    let subtotalPrecio = 0;
     const itemsHtml = (op.items||[]).map(it => {
       const qty  = Number(it.cantidad||0);
       const dias = Number(it.dias||1);
       const pu   = Number(it.precio_unit||0);
-      const total = qty * dias * pu;
+      const ptotal = qty * dias * pu;
+      const fee  = ptotal * ((pf.fee_agencia||0)/100);
+      const sinIva = ptotal + fee;
+      const iva  = sinIva * 0.15;
+      const total = sinIva + iva;
+      subtotalPrecio += ptotal;
       return `
-        <tr>
-          <td style="padding:8px 6px; border-bottom:1px solid #f0f0f0;">${it.imagen_url ? `<img src="${it.imagen_url}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;"/>` : ''}</td>
-          <td style="padding:8px 6px; border-bottom:1px solid #f0f0f0; font-size:12px; color:#666;">${it.subcategoria||''}</td>
-          <td style="padding:8px 6px; border-bottom:1px solid #f0f0f0; font-size:13px;">${it.nombre||''}</td>
-          <td style="padding:8px 6px; border-bottom:1px solid #f0f0f0; text-align:right; font-size:12px;">${qty}</td>
-          <td style="padding:8px 6px; border-bottom:1px solid #f0f0f0; text-align:right; font-size:12px;">${dias}</td>
-          <td style="padding:8px 6px; border-bottom:1px solid #f0f0f0; text-align:right; font-size:12px;">${fmtN(pu)}</td>
-          <td style="padding:8px 6px; border-bottom:1px solid #f0f0f0; text-align:right; font-size:13px; font-weight:600; color:#0d3b5e;">${fmtN(total)}</td>
+        <tr style="border-bottom:1px solid #f0f0f0;">
+          <td style="padding:7px 6px; font-size:11px; color:#666;">${it.subcategoria||''}</td>
+          <td style="padding:7px 6px; font-size:12px; font-weight:600;">${it.nombre||''}</td>
+          <td style="padding:7px 6px; font-size:11px; color:#555;">${it.descripcion||''}</td>
+          <td style="padding:7px 4px; text-align:center;">${it.imagen_url ? `<img src="${it.imagen_url}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;"/>` : ''}</td>
+          <td style="padding:7px 6px; text-align:center; font-size:12px;">${qty}</td>
+          <td style="padding:7px 6px; text-align:center; font-size:12px;">${dias}</td>
+          <td style="padding:7px 6px; text-align:right; font-size:12px;">${fmtN(pu)}</td>
+          <td style="padding:7px 6px; text-align:right; font-size:12px; font-weight:600;">${fmtN(ptotal)}</td>
+          <td style="padding:7px 6px; text-align:right; font-size:12px; color:#888;">${fmtN(fee)}</td>
+          <td style="padding:7px 6px; text-align:right; font-size:12px; color:#0d3b5e; font-weight:600;">${fmtN(sinIva)}</td>
+          <td style="padding:7px 6px; text-align:right; font-size:12px;">${fmtN(iva)}</td>
+          <td style="padding:7px 6px; text-align:right; font-size:13px; font-weight:700; color:#0d3b5e;">${fmtN(total)}</td>
         </tr>`;
     }).join('');
 
-    let subtotalPrecio=0;
-    (op.items||[]).forEach(it => { subtotalPrecio += Number(it.cantidad||0)*Number(it.dias||1)*Number(it.precio_unit||0); });
     const fee     = subtotalPrecio * ((pf.fee_agencia||0)/100);
     const sinIva  = subtotalPrecio + fee;
     const iva     = sinIva * 0.15;
     const total   = sinIva + iva;
 
     return `
-      <div style="margin-bottom:32px; border:1px solid #e8e8e8; border-radius:10px; overflow:hidden; page-break-inside:avoid;">
-        <div style="background:#0d3b5e; padding:12px 16px;">
-          <h3 style="color:#fff; margin:0; font-size:15px;">Opción ${idx+1}${op.nombre?' — '+op.nombre:''}</h3>
+      <div style="margin-bottom:28px; border:1px solid #e8e8e8; border-radius:10px; overflow:hidden; page-break-inside:avoid;">
+        <div style="background:#0d3b5e; padding:10px 16px;">
+          <span style="color:#fff; font-size:14px; font-weight:700;">Opción ${idx+1}${op.nombre?' — '+op.nombre:''}</span>
         </div>
-        <table style="width:100%; border-collapse:collapse;">
-          <thead>
-            <tr style="background:#f0f4f8;">
-              <th style="padding:8px 6px; text-align:left; font-size:11px; color:#666;">Img</th>
-              <th style="padding:8px 6px; text-align:left; font-size:11px; color:#666;">Subcategoría</th>
-              <th style="padding:8px 6px; text-align:left; font-size:11px; color:#666;">Ítem</th>
-              <th style="padding:8px 6px; text-align:right; font-size:11px; color:#666;">Cant.</th>
-              <th style="padding:8px 6px; text-align:right; font-size:11px; color:#666;">Días</th>
-              <th style="padding:8px 6px; text-align:right; font-size:11px; color:#666;">P. Unit.</th>
-              <th style="padding:8px 6px; text-align:right; font-size:11px; color:#666;">Total</th>
-            </tr>
-          </thead>
-          <tbody>${itemsHtml}</tbody>
-        </table>
-        <div style="padding:12px 16px; background:#f8fafc; display:flex; justify-content:flex-end; gap:24px; flex-wrap:wrap;">
-          ${[['Subtotal',fmtN(subtotalPrecio)],['Fee agencia',fmtN(fee)],['Subtotal s/IVA',fmtN(sinIva)],['IVA 15%',fmtN(iva)],['TOTAL',fmtN(total)]].map(([l,v])=>`
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:12px; min-width:800px;">
+            <thead>
+              <tr style="background:#f0f4f8;">
+                <th style="padding:7px 6px; text-align:left; font-size:10px; color:#666; white-space:nowrap;">Subcategoría</th>
+                <th style="padding:7px 6px; text-align:left; font-size:10px; color:#666; white-space:nowrap;">Ítem</th>
+                <th style="padding:7px 6px; text-align:left; font-size:10px; color:#666; white-space:nowrap;">Descripción</th>
+                <th style="padding:7px 4px; text-align:center; font-size:10px; color:#666; white-space:nowrap;">Imagen</th>
+                <th style="padding:7px 6px; text-align:center; font-size:10px; color:#666; white-space:nowrap;">Cant.</th>
+                <th style="padding:7px 6px; text-align:center; font-size:10px; color:#666; white-space:nowrap;">Días</th>
+                <th style="padding:7px 6px; text-align:right; font-size:10px; color:#666; white-space:nowrap;">P. Unitario</th>
+                <th style="padding:7px 6px; text-align:right; font-size:10px; color:#666; white-space:nowrap;">P. Total</th>
+                <th style="padding:7px 6px; text-align:right; font-size:10px; color:#888; white-space:nowrap;">Fee</th>
+                <th style="padding:7px 6px; text-align:right; font-size:10px; color:#0d3b5e; white-space:nowrap;">Subtotal s/IVA</th>
+                <th style="padding:7px 6px; text-align:right; font-size:10px; color:#666; white-space:nowrap;">IVA</th>
+                <th style="padding:7px 6px; text-align:right; font-size:10px; color:#0d3b5e; white-space:nowrap;">Total</th>
+              </tr>
+            </thead>
+            <tbody>${itemsHtml}</tbody>
+          </table>
+        </div>
+        <div style="padding:10px 16px; background:#f8fafc; border-top:1px solid #eee; display:flex; justify-content:flex-end; gap:20px; flex-wrap:wrap;">
+          ${[['Subtotal precio',fmtN(subtotalPrecio),'#555'],['Fee agencia',fmtN(fee),'#888'],['Subtotal s/IVA',fmtN(sinIva),'#0d3b5e'],['IVA 15%',fmtN(iva),'#555'],['TOTAL',fmtN(total),'#0d3b5e']].map(([l,v,col])=>`
             <div style="text-align:right;">
-              <div style="font-size:10px; color:#888; margin-bottom:2px;">${l}</div>
-              <div style="font-size:14px; font-weight:700; color:#0d3b5e;">${v}</div>
+              <div style="font-size:9px; color:#aaa; margin-bottom:2px; text-transform:uppercase;">${l}</div>
+              <div style="font-size:14px; font-weight:700; color:${col};">${v}</div>
             </div>`).join('')}
         </div>
       </div>`;
   }).join('');
 
+  const headerFields = [
+    ['Cliente',    pf.cliente_nombre],
+    ['Ejecutivo',  pf.ejecutivo_nombre],
+    ['Fecha evento', pf.fecha_evento ? fmtD(pf.fecha_evento) : null],
+    ['Lugar',      pf.lugar],
+    ['Ciudad',     pf.ciudad],
+    ['PAX',        pf.personas > 0 ? `${pf.personas} personas` : null],
+    ['Días',       pf.dias_evento > 1 ? `${pf.dias_evento} días` : null],
+  ].filter(([,v]) => v);
+
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>Proforma — ${pf.nombre}</title>
-  <style>body{font-family:Arial,sans-serif;margin:0;padding:24px;color:#1a1a1a;}@media print{body{padding:0;}}</style>
+  <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;color:#1a1a2e;background:#f5f5f5;}@media print{body{background:#fff;}.no-print{display:none;}}</style>
   </head><body>
-  <div style="background:#0d3b5e;padding:24px 32px;border-radius:10px;margin-bottom:24px;">
-    <div style="color:#fff;font-size:22px;font-weight:700;margin-bottom:4px;">${pf.nombre}</div>
-    <div style="color:rgba(255,255,255,0.7);font-size:13px;">${pf.nomenclatura||''}</div>
+  <button class="no-print" onclick="window.print()" style="position:fixed;top:16px;right:16px;background:#0d3b5e;color:#fff;border:none;padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;">⬇ PDF</button>
+  <div style="max-width:1000px;margin:0 auto;background:#fff;min-height:100vh;">
+  <div style="background:#0d3b5e;padding:20px 32px;display:flex;justify-content:space-between;align-items:center;">
+    <div style="color:#fff;font-size:22px;font-style:italic;font-weight:900;">matilda <span style="font-size:10px;color:#3dbfb8;letter-spacing:2px;font-style:normal;font-weight:400;">EVENT DESIGNERS</span></div>
+    <div style="text-align:right;">
+      <div style="color:#3dbfb8;font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;">Propuesta Comercial</div>
+      <div style="color:rgba(255,255,255,0.8);font-size:11px;">${pf.nomenclatura||''}</div>
+    </div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
-    ${[['Cliente',pf.cliente_nombre],['Ejecutivo',pf.ejecutivo_nombre],['Fecha',pf.fecha_evento?fmtDate(pf.fecha_evento):'—'],['Lugar',pf.lugar],['Ciudad',pf.ciudad],['PAX',pf.personas]].filter(([,v])=>v).map(([l,v])=>`
-      <div style="background:#f8fafc;border-radius:8px;padding:10px 14px;">
-        <div style="font-size:10px;color:#888;text-transform:uppercase;margin-bottom:3px;">${l}</div>
-        <div style="font-size:13px;font-weight:600;color:#0d3b5e;">${v}</div>
-      </div>`).join('')}
+  <div style="background:#c8264a;height:3px;"></div>
+  <div style="padding:16px 32px;background:#f8fafc;border-bottom:1px solid #dde6ef;">
+    <div style="font-size:20px;font-weight:700;color:#0d3b5e;margin-bottom:12px;">${pf.nombre}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
+      ${headerFields.map(([l,v])=>`
+        <div>
+          <div style="font-size:9px;color:#3dbfb8;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:3px;">${l}</div>
+          <div style="font-size:13px;font-weight:600;color:#0d3b5e;">${v}</div>
+        </div>`).join('')}
+    </div>
   </div>
-  ${opcionesHtml}
-  <div style="margin-top:24px;padding:16px;background:#fdf8ee;border:1px solid #e8d8a0;border-radius:8px;font-size:12px;color:#7a5500;line-height:1.7;">
-    <strong>NOTA:</strong> LA PRESENTE COTIZACIÓN TIENE UNA VIGENCIA DE 30 DÍAS CALENDARIO A PARTIR DE LA FECHA DE EMISIÓN.<br>
-    VENCIDO ESTE PLAZO, LOS VALORES PODRÁN SER AJUSTADOS SEGÚN LAS CONDICIONES DEL MERCADO.
+  <div style="padding:20px 32px;">${opcionesHtml}</div>
+  <div style="margin:0 32px 24px;background:#fdf8ee;border:1px solid #e8d8a0;border-radius:6px;padding:12px 16px;">
+    <div style="font-size:10px;color:#7a5500;line-height:1.7;"><strong>NOTA:</strong> LA PRESENTE COTIZACIÓN TIENE UNA VIGENCIA DE 30 DÍAS CALENDARIO A PARTIR DE LA FECHA DE EMISIÓN.<br>VENCIDO ESTE PLAZO, LOS VALORES PODRÁN SER AJUSTADOS SEGÚN LAS CONDICIONES DEL MERCADO.</div>
   </div>
-  </body></html>`;
+  <div style="background:#0d3b5e;padding:12px 32px;text-align:center;">
+    <div style="font-size:10px;color:#3dbfb8;font-style:italic;">"Donde la estrategia se convierte en experiencia."</div>
+  </div>
+  </div></body></html>`;
 }
