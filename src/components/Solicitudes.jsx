@@ -218,7 +218,14 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
   const seleccionados = form.items.filter(it=>it.seleccionado);
   const totalSolicitado = seleccionados.reduce((a,it)=>a+Number(it.valor_solicitado||0),0);
   const totalPresupuestado = seleccionados.reduce((a,it)=>a+Number(it.costo_presupuestado||0),0);
-  const saldoTotal = totalPresupuestado - totalSolicitado;
+  // Ya solicitado anteriormente (enviado+pagado, sin rechazados) para los ítems seleccionados
+  const totalYaSolicitado = seleccionados.reduce((a,it)=>{
+    const anterior = (solsAnt).filter(s=>['enviada','pagado'].includes(s.estado))
+      .flatMap(s=>s.items||[]).filter(si=>si.id===it.id)
+      .reduce((x,si)=>x+Number(si.valor_solicitado||0),0);
+    return a+anterior;
+  },0);
+  const saldoFinal = totalPresupuestado - totalYaSolicitado - totalSolicitado;
 
   // Solicitudes anteriores del mismo presupuesto (no la actual)
   const solsAnt = (form._sols_previas || solicitudesAnteriores||[]).filter(s=>s.id!==solicitud?.id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
@@ -409,10 +416,11 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
               <div style={{fontSize:13,fontWeight:700,color:'rgba(255,255,255,.8)',marginBottom:10}}>
                 Resumen — {seleccionados.length} ítem(s)
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
-                <div><div style={{fontSize:10,color:'rgba(255,255,255,.6)',marginBottom:3,textTransform:'uppercase'}}>Costo presupuestado</div><div style={{fontSize:16,fontWeight:700,color:'#fff'}}>{fmt(totalPresupuestado)}</div></div>
-                <div><div style={{fontSize:10,color:'rgba(255,255,255,.6)',marginBottom:3,textTransform:'uppercase'}}>Valor solicitado</div><div style={{fontSize:16,fontWeight:700,color:'#3dbfb8'}}>{fmt(totalSolicitado)}</div></div>
-                <div><div style={{fontSize:10,color:'rgba(255,255,255,.6)',marginBottom:3,textTransform:'uppercase'}}>Saldo</div><div style={{fontSize:16,fontWeight:700,color:saldoTotal>=0?'#5dc98a':'#ff6b6b'}}>{fmt(saldoTotal)}</div></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12}}>
+                <div><div style={{fontSize:10,color:'rgba(255,255,255,.6)',marginBottom:3,textTransform:'uppercase'}}>Costo presupuestado</div><div style={{fontSize:15,fontWeight:700,color:'#fff'}}>{fmt(totalPresupuestado)}</div></div>
+                <div><div style={{fontSize:10,color:'rgba(255,255,255,.6)',marginBottom:3,textTransform:'uppercase'}}>Ya solicitado (aprobado/enviado)</div><div style={{fontSize:15,fontWeight:700,color:'#f0a500'}}>{fmt(totalYaSolicitado)}</div></div>
+                <div><div style={{fontSize:10,color:'rgba(255,255,255,.6)',marginBottom:3,textTransform:'uppercase'}}>Valor solicitado actual</div><div style={{fontSize:15,fontWeight:700,color:'#3dbfb8'}}>{fmt(totalSolicitado)}</div></div>
+                <div><div style={{fontSize:10,color:'rgba(255,255,255,.6)',marginBottom:3,textTransform:'uppercase'}}>Saldo disponible</div><div style={{fontSize:15,fontWeight:700,color:saldoFinal>=0?'#5dc98a':'#ff6b6b'}}>{fmt(saldoFinal)}</div></div>
               </div>
             </div>
           )}
