@@ -162,8 +162,8 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride) {
           const total = qty*dias*pu;
           subtotalOp += total;
           return `<tr style="background:${i%2?'#f8fafc':'#fff'};border-bottom:1px solid #f0f0f0;">
-            <td style="padding:7px 8px;text-align:center;">${it.imagen_url ? `<img src="${it.imagen_url}" crossorigin="anonymous" style="width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #e8e8e8;" onerror="this.style.display='none'"/>` : '—'}</td>
-            <td style="padding:7px 10px;font-size:12px;font-weight:500;">${it.item||''}</td>
+            <td style="padding:7px 10px;font-size:12px;font-weight:500;">
+              ${it.imagen_url ? `<img src="${it.imagen_url}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #eee;float:left;margin-right:8px;vertical-align:middle;"/>` : ''}${it.item||''}</td>
             <td style="padding:7px 10px;font-size:11px;color:#666;">${it.detalle||''}</td>
             <td style="padding:7px 8px;text-align:center;font-size:12px;">${qty}</td>
             <td style="padding:7px 8px;text-align:center;font-size:12px;">${dias}</td>
@@ -179,7 +179,6 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride) {
           <div style="background:#f5f3ff;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:700;color:#5b21b6;margin-bottom:6px;">${op.nombre}</div>
           <table style="width:100%;border-collapse:collapse;">
             <thead><tr style="background:#ede9fe;">
-              <th style="padding:6px 8px;text-align:center;font-size:10px;color:#5b21b6;">Img</th>
               <th style="padding:6px 10px;text-align:left;font-size:10px;color:#5b21b6;">Ítem</th>
               <th style="padding:6px 10px;text-align:left;font-size:10px;color:#5b21b6;">Detalle</th>
               <th style="padding:6px 8px;text-align:center;font-size:10px;color:#5b21b6;">Cant.</th>
