@@ -399,16 +399,15 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                         )}
                         {gastosEsta.map((g,gi)=>(
                         <div key={g.id} style={{border:'1px solid #dde6ef',borderRadius:8,padding:12,marginBottom:8}}>
-                <div style={{display:'grid',gridTemplateColumns:'2fr 2fr auto',gap:8,marginBottom:8,alignItems:'end'}}>
-              <Label>Concepto</Label><input style={S.input} value={g.concepto} onChange={e=>updGasto(g.id,'concepto',e.target.value)}/></div>
-                  <div>
-                    <Label>Categoría</Label>
-                    <select style={S.select} value={g.categoria||CATS_LIQUIDACION[0]} onChange={e=>updGasto(g.id,'categoria',e.target.value)}>
-                      {CATS_LIQUIDACION.map(c=><option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <button style={S.btnRed} onClick={()=>delGasto(g.id)}>🗑</button>
-                </div>
+                          <div style={{display:'grid',gridTemplateColumns:'2fr 2fr auto',gap:8,marginBottom:8,alignItems:'end'}}>
+                            <div><Label>Concepto</Label><input style={S.input} value={g.concepto} onChange={e=>updGasto(g.id,'concepto',e.target.value)}/></div>
+                            <div><Label>Categoría</Label>
+                              <select style={S.select} value={g.categoria||CATS_LIQUIDACION[0]} onChange={e=>updGasto(g.id,'categoria',e.target.value)}>
+                                {CATS_LIQUIDACION.map(c=><option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </div>
+                            <button style={S.btnRed} onClick={()=>delGasto(g.id)}>🗑</button>
+                          </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8,marginBottom:8}}>
                   <div><Label>Subtotal 0%</Label><input type="number" style={S.input} value={g.subtotal0} onChange={e=>updGasto(g.id,'subtotal0',e.target.value)}/></div>
                   <div>
