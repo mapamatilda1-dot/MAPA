@@ -77,6 +77,7 @@ export function canCreatePresupuesto(role) {
 export function canEditPpto(role, estadoActual) {
   if (role === 'admin') return true;
   if (role === 'produccion') return !ESTADOS_BLOQUEADOS_PPTO.includes(estadoActual);
+  if (role === 'financiero') return true; // financiero puede cambiar estado
   return false;
 }
 export function canChangeEstadoPpto(role, nuevoEstado) {
