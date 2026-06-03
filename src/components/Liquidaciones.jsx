@@ -70,6 +70,8 @@ export default function Liquidaciones({ presupuestos, userRole }) {
     const { data: solsData } = await supabase.from('solicitudes')
       .select('*').eq('presupuesto_id', id).eq('estado','pagado').order('created_at');
 
+    const solsCount = (solsData||[]).length;
+
     // Crear un gasto por cada ítem de cada solicitud pagada
     const gastosSols = (solsData||[]).flatMap(sol =>
       (sol.items||[]).map(it => ({
@@ -386,7 +388,10 @@ export default function Liquidaciones({ presupuestos, userRole }) {
             <div style={S.divider}/>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <strong style={{fontSize:14,color:'#0d3b5e'}}>Gastos / Facturas</strong>
-              <button style={{...S.btnPrimary,background:'#3dbfb8',fontSize:13}} onClick={addGasto}>+ Agregar gasto</button>
+              {/* Botón global solo cuando NO hay solicitudes pagadas */}
+              {!(editing._solicitudes_pagadas||[]).length && (
+                <button style={{...S.btnPrimary,background:'#3dbfb8',fontSize:13}} onClick={addGasto}>+ Agregar gasto</button>
+              )}
             </div>
 
             {/* Gastos agrupados por solicitud pagada */}
