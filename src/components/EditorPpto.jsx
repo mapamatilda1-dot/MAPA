@@ -32,115 +32,122 @@ function emptyItem(p) {
 // ── Flujo de caja ────────────────────────────────────────────
 function FlujoCaja({ p, fmt, fmtDate }) {
   const items = (p.items||[]).filter(it=>!it._type && it.condicion_pago);
-  if (!items.length) return null;
+  if (!items.length) return (
+    <div style={{marginTop:16,background:'#f8fafc',border:'1px dashed #dde6ef',borderRadius:12,padding:'16px',textAlign:'center',color:'#aaa',fontSize:13}}>
+      Sin ítems con condición de pago — agregá Contado, Crédito o Abono en cada ítem para ver el flujo de caja
+    </div>
+  );
 
-  // Calcular fecha de aprobación (hoy si no hay fecha guardada)
   const hoyStr = new Date().toISOString().slice(0,10);
-  const fechaAprobacion = p.fecha_aprobacion || hoyStr;
+  // Fecha base para créditos: fecha_inicio_produccion o hoy
+  const fechaBase = p.fecha_inicio_produccion || hoyStr;
 
-  // Último día del evento
-  function ultimoDiaEvento() {
-    if (!p.fecha_evento) return null;
-    const d = new Date(p.fecha_evento + 'T12:00');
-    d.setDate(d.getDate() + Math.max(0, (p.dias_evento||1) - 1));
-    return d.toISOString().slice(0,10);
-  }
   function addDays(dateStr, days) {
     if (!dateStr) return null;
     const d = new Date(dateStr + 'T12:00');
-    d.setDate(d.getDate() + days);
+    d.setDate(d.getDate() + Number(days||0));
     return d.toISOString().slice(0,10);
   }
-
-  const ultimoDia = ultimoDiaEvento();
 
   // Agrupar pagos por fecha
   const pagos = {};
   let totalSinFlujo = 0;
 
   items.forEach(it => {
-    const c_item = it.precio_unit * it.cantidad * it.dias;
-    const precio = c_item || 0;
+    const precio = Number(it.precio_unit||0) * Number(it.cantidad||0) * Number(it.dias||1);
     const cond = it.condicion_pago;
 
     if (cond === 'Contado') {
-      const fecha = fechaAprobacion;
-      pagos[fecha] = (pagos[fecha]||0) + precio;
+      // 100% al inicio de producción
+      pagos[fechaBase] = (pagos[fechaBase]||[]);
+      pagos[fechaBase].push({ label:'Contado', monto:precio });
     } else if (cond === 'Crédito') {
+      // 100% desde fecha base + días crédito
       const dias = Number(it.dias_credito||0);
-      const fecha = ultimoDia ? addDays(ultimoDia, dias) : null;
-      if (fecha) pagos[fecha] = (pagos[fecha]||0) + precio;
-      else totalSinFlujo += precio;
+      const fecha = addDays(fechaBase, dias);
+      if (fecha) {
+        pagos[fecha] = (pagos[fecha]||[]);
+        pagos[fecha].push({ label:`Crédito ${dias}d`, monto:precio });
+      } else totalSinFlujo += precio;
     } else if (cond === 'Abono') {
       const pct = Number(it.abono_pct||50) / 100;
       const dias = Number(it.dias_credito_saldo||0);
       const abono = precio * pct;
       const saldo = precio - abono;
-      // Abono al aprobar
-      pagos[fechaAprobacion] = (pagos[fechaAprobacion]||0) + abono;
-      // Saldo tras el evento
-      const fechaSaldo = ultimoDia ? addDays(ultimoDia, dias) : null;
-      if (fechaSaldo) pagos[fechaSaldo] = (pagos[fechaSaldo]||0) + saldo;
-      else totalSinFlujo += saldo;
+      // Abono al inicio de producción
+      pagos[fechaBase] = (pagos[fechaBase]||[]);
+      pagos[fechaBase].push({ label:`Abono ${it.abono_pct||50}%`, monto:abono });
+      // Saldo tras días de crédito
+      const fechaSaldo = addDays(fechaBase, dias);
+      if (fechaSaldo) {
+        pagos[fechaSaldo] = (pagos[fechaSaldo]||[]);
+        pagos[fechaSaldo].push({ label:`Saldo ${dias}d`, monto:saldo });
+      } else totalSinFlujo += saldo;
     } else {
       totalSinFlujo += precio;
     }
   });
 
   const fechasOrdenadas = Object.keys(pagos).sort();
-  const totalFlujo = fechasOrdenadas.reduce((a,f)=>a+pagos[f],0);
-  const totalItems = items.reduce((a,it)=>a+(it.precio_unit*it.cantidad*it.dias||0),0);
+  const totalItems = items.reduce((a,it)=>a+Number(it.precio_unit||0)*Number(it.cantidad||0)*Number(it.dias||1),0);
+  const totalFlujo = fechasOrdenadas.reduce((a,f)=>a+(pagos[f]||[]).reduce((x,p)=>x+p.monto,0),0);
 
   return (
     <div style={{marginTop:16,background:'#fff',border:'1px solid #dde6ef',borderRadius:12,overflow:'hidden'}}>
-      <div style={{background:'#0d3b5e',padding:'10px 16px',display:'flex',alignItems:'center',gap:10}}>
-        <span style={{color:'#fff',fontWeight:700,fontSize:13}}>💰 Flujo de caja estimado</span>
-        <span style={{color:'rgba(255,255,255,.6)',fontSize:11}}>basado en condiciones de pago por ítem · fecha aprobación: {fmtDate(fechaAprobacion)}{p.fecha_evento?` · último día evento: ${fmtDate(ultimoDia||p.fecha_evento)}`:''}</span>
+      <div style={{background:'#0d3b5e',padding:'10px 16px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <span style={{color:'#fff',fontWeight:700,fontSize:13}}>💰 Flujo de caja</span>
+        <span style={{color:'rgba(255,255,255,.6)',fontSize:11}}>
+          Base: {fmtDate(fechaBase)}{p.fecha_inicio_produccion?' (fecha inicio producción)':' (hoy — configurá la fecha en Info)'}
+        </span>
       </div>
       <div style={{padding:'14px 16px'}}>
-        {fechasOrdenadas.length === 0 && (
-          <div style={{textAlign:'center',color:'#aaa',padding:'1rem',fontSize:13}}>Sin ítems con condición de pago definida</div>
-        )}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {fechasOrdenadas.map(fecha=>{
-            const esAprobacion = fecha === fechaAprobacion;
-            const esPostEvento = ultimoDia && fecha > (ultimoDia||'');
-            const bg = esAprobacion ? '#e8f5ee' : esPostEvento ? '#eef4fb' : '#f8fafc';
-            const color = esAprobacion ? '#2e8b4e' : '#0d3b5e';
+            const entradas = pagos[fecha]||[];
+            const totalFecha = entradas.reduce((a,e)=>a+e.monto,0);
+            const esFechaBase = fecha === fechaBase;
             return (
-              <div key={fecha} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',background:bg,borderRadius:8,border:`1px solid ${esAprobacion?'#86efac':'#dde6ef'}`}}>
-                <div style={{width:3,height:36,borderRadius:2,background:color,flexShrink:0}}/>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:12,color:'#888',marginBottom:2}}>
-                    {esAprobacion ? '✅ Al aprobar' : esPostEvento ? `📅 ${ultimoDia&&fecha===addDays(ultimoDia,0)?'Día del evento':'Post evento'}` : '📅 Pago'}
+              <div key={fecha} style={{padding:'10px 14px',background:esFechaBase?'#e8f5ee':'#eef4fb',borderRadius:8,border:`1px solid ${esFechaBase?'#86efac':'#c8d8e8'}`}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:entradas.length>1?6:0}}>
+                  <div>
+                    <div style={{fontSize:11,color:'#888'}}>{esFechaBase?'📅 Inicio de producción':'📅 Cobro'}</div>
+                    <div style={{fontSize:14,fontWeight:600,color:esFechaBase?'#2e8b4e':'#0d3b5e'}}>{fmtDate(fecha)}</div>
                   </div>
-                  <div style={{fontSize:14,fontWeight:600,color}}>{fmtDate(fecha)}</div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:18,fontWeight:700,color:esFechaBase?'#2e8b4e':'#0d3b5e'}}>{fmt(totalFecha)}</div>
+                    <div style={{fontSize:11,color:'#888'}}>{totalItems>0?((totalFecha/totalItems)*100).toFixed(0):0}% del total</div>
+                  </div>
                 </div>
-                <div style={{textAlign:'right'}}>
-                  <div style={{fontSize:18,fontWeight:700,color}}>{fmt(pagos[fecha])}</div>
-                  <div style={{fontSize:11,color:'#888'}}>{((pagos[fecha]/totalItems)*100).toFixed(0)}% del total</div>
-                </div>
+                {entradas.length > 1 && (
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                    {entradas.map((e,i)=>(
+                      <span key={i} style={{fontSize:11,background:'rgba(0,0,0,.06)',padding:'2px 8px',borderRadius:4,color:'#555'}}>
+                        {e.label}: {fmt(e.monto)}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
           {totalSinFlujo > 0 && (
             <div style={{padding:'8px 14px',background:'#fff8f8',borderRadius:8,border:'1px solid #fca5a5',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <span style={{fontSize:12,color:'#991b1b'}}>⚠️ Sin fecha de cobro (ítems sin condición de pago)</span>
+              <span style={{fontSize:12,color:'#991b1b'}}>⚠️ Ítems sin condición de pago definida</span>
               <span style={{fontWeight:700,color:'#991b1b'}}>{fmt(totalSinFlujo)}</span>
             </div>
           )}
         </div>
-        {fechasOrdenadas.length > 0 && (
-          <div style={{marginTop:12,paddingTop:10,borderTop:'1px solid #e8e8e8',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <span style={{fontSize:13,color:'#555'}}>Total en flujo: <strong>{fmt(totalFlujo)}</strong></span>
-            {totalSinFlujo > 0 && <span style={{fontSize:13,color:'#555'}}>Sin asignar: <strong style={{color:'#991b1b'}}>{fmt(totalSinFlujo)}</strong></span>}
-            <span style={{fontSize:13,color:'#555'}}>Total presupuesto: <strong style={{color:'#0d3b5e'}}>{fmt(totalItems)}</strong></span>
-          </div>
-        )}
+        <div style={{marginTop:12,paddingTop:10,borderTop:'1px solid #e8e8e8',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+          <span style={{fontSize:13,color:'#555'}}>En flujo: <strong style={{color:'#0d3b5e'}}>{fmt(totalFlujo)}</strong></span>
+          {totalSinFlujo>0&&<span style={{fontSize:13,color:'#991b1b'}}>Sin asignar: <strong>{fmt(totalSinFlujo)}</strong></span>}
+          <span style={{fontSize:13,color:'#555'}}>Total presupuesto: <strong style={{color:'#0d3b5e'}}>{fmt(totalItems)}</strong></span>
+        </div>
       </div>
     </div>
   );
 }
+
+
 
 // ── Componente de opciones adicionales ───────────────────────
 function OpcionesAdicionales({ p, setP, bloqueado, fmt, fmtPct, calcItem, S, Label }) {
@@ -762,6 +769,19 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                 </div>
               </div>
             )}
+            {['aprobado','pendiente_facturar','facturado'].includes(p.estado) && (
+              <div style={{gridColumn:'1/-1',background:'#eef4fb',borderRadius:8,padding:'12px',border:'1px solid #c8d8e8'}}>
+                <div style={{fontSize:12,fontWeight:700,color:'#0d3b5e',marginBottom:8}}>📅 Producción</div>
+                <div style={S.grid2}>
+                  <div>
+                    <Label>Fecha inicio de producción</Label>
+                    <input type="date" style={S.input} value={p.fecha_inicio_produccion||''} onChange={e=>setField('fecha_inicio_produccion',e.target.value||null)}
+                      placeholder="Por defecto: fecha de aprobación"/>
+                    <div style={{fontSize:11,color:'#888',marginTop:3}}>Base para calcular créditos y abonos en el flujo de caja</div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div style={{gridColumn:'1/-1',background:'#eef4fb',borderRadius:8,padding:'12px',border:'1px solid #c8d8e8'}}>
               <div style={{fontSize:12,fontWeight:700,color:'#0d3b5e',marginBottom:10}}>👤 Ejecutivo de contacto</div>
               <div style={S.grid2}>
@@ -1265,7 +1285,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
       )}
 
       {/* ══ FLUJO DE CAJA ══ */}
-      {tab==='totales' && <FlujoCaja p={p} fmt={fmt} fmtDate={fmtDate} />}
+      {tab==='totales' && ['aprobado','pendiente_facturar','facturado'].includes(p.estado) && <FlujoCaja p={p} fmt={fmt} fmtDate={fmtDate} />}
 
       {/* ══ ALCANCE ══ */}
       {tab==='alcance'&&(
