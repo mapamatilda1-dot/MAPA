@@ -456,9 +456,9 @@ export default function Liquidaciones({ presupuestos, userRole }) {
               </>
             )}
 
-            {(editing.gastos||[]).length>0&&(()=>{
+            {(editing.gastos||[]).length>0 && (() => {
               const t=totalesLiq(editing);
-              return(
+              return (
                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
                   <div style={{display:'flex',gap:16,background:'#f0f4f8',borderRadius:8,padding:'10px 14px',flexWrap:'wrap'}}>
                     <span style={{fontSize:13}}>Justificado: <strong>{fmt(t.justificado)}</strong></span>
