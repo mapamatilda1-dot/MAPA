@@ -650,21 +650,32 @@ export default function Solicitudes({ userRole, userEmail, userName, presupuesto
   }
 
   async function enviarSolicitud(data) {
-    let newSol = data;
+    let savedId = data.id;
     if (!data.id) {
       const {data:created,error} = await supabase.from('solicitudes').insert({...data,created_by:userEmail,created_by_nombre:userName}).select().single();
       if(error){alert('Error: '+error.message);return;}
-      newSol = created;
+      savedId = created?.id;
     } else {
       await supabase.from('solicitudes').update({...data,estado:'enviada'}).eq('id',data.id);
     }
     // Enviar correo — limpiar campos internos antes de serializar
     try {
-      const { _sols_previas, _solicitudes_pagadas, ...solLimpia } = newSol;
+      const solParaCorreo = {
+        id: savedId,
+        presupuesto_nombre: data.presupuesto_nombre,
+        cliente_nombre: data.cliente_nombre,
+        fecha_evento: data.fecha_evento,
+        lugar: data.lugar,
+        items: data.items||[],
+        notas: data.notas||'',
+        estado: 'enviada',
+        created_by: userEmail,
+        created_by_nombre: userName,
+      };
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-solicitud`,{
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':`Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`},
-        body:JSON.stringify({solicitud:{...solLimpia,estado:'enviada'},userEmail,userName}),
+        body:JSON.stringify({solicitud:solParaCorreo,userEmail,userName}),
       });
       if (!res.ok) console.warn('notify-solicitud error:', await res.text());
     } catch(e){console.warn('notify-solicitud failed:',e);}
