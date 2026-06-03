@@ -17,6 +17,29 @@ function emptyGasto() {
   };
 }
 
+function ResumenTotales({ t, fmt }) {
+  if (!t) return null;
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:8}}>
+      <div style={{display:'flex',gap:16,background:'#f0f4f8',borderRadius:8,padding:'10px 14px',flexWrap:'wrap'}}>
+        <span style={{fontSize:13}}>Justificado: <strong>{fmt(t.justificado)}</strong></span>
+        <span style={{fontSize:13}}>Recibido: <strong style={{color:'#2e8b4e'}}>{fmt(t.valorRecibido)}</strong></span>
+        {t.noDeducible>0&&<span style={{fontSize:13}}>No Deducible: <strong style={{color:'#7a5500'}}>{fmt(t.noDeducible)}</strong></span>}
+      </div>
+      {(t.valorRecibido>0||t.justificado>0)&&(
+        <div style={{padding:'10px 14px',borderRadius:8,background:t.diferencia>=0?'#e8f5ee':'#fde8ec',border:`1px solid ${t.diferencia>=0?'#2e8b4e':'#c8264a'}`}}>
+          <div style={{fontSize:13,fontWeight:700,color:t.diferencia>=0?'#1a5c3a':'#7a1a1a'}}>
+            {t.diferencia>=0
+              ? `Usted debe depositar a la cuenta de Matilda el valor de ${fmt(t.diferencia)}`
+              : `Matilda debe acreditar a su cuenta el valor de ${fmt(Math.abs(t.diferencia))}`
+            }
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Liquidaciones({ presupuestos, userRole }) {
   const [liqs, setLiqs]       = useState([]);
   const [editing, setEditing] = useState(null);
@@ -456,28 +479,7 @@ export default function Liquidaciones({ presupuestos, userRole }) {
               </>
             )}
 
-            {(editing.gastos||[]).length>0 && (() => {
-              const t=totalesLiq(editing);
-              return (
-                <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                  <div style={{display:'flex',gap:16,background:'#f0f4f8',borderRadius:8,padding:'10px 14px',flexWrap:'wrap'}}>
-                    <span style={{fontSize:13}}>Justificado: <strong>{fmt(t.justificado)}</strong></span>
-                    <span style={{fontSize:13}}>Recibido: <strong style={{color:'#2e8b4e'}}>{fmt(t.valorRecibido)}</strong></span>
-                    {t.noDeducible>0&&<span style={{fontSize:13}}>No Deducible: <strong style={{color:'#7a5500'}}>{fmt(t.noDeducible)}</strong></span>}
-                  </div>
-                  {(t.valorRecibido>0||t.justificado>0)&&(
-                    <div style={{padding:'10px 14px',borderRadius:8,background:t.diferencia>=0?'#e8f5ee':'#fde8ec',border:`1px solid ${t.diferencia>=0?'#2e8b4e':'#c8264a'}`}}>
-                      <div style={{fontSize:13,fontWeight:700,color:t.diferencia>=0?'#1a5c3a':'#7a1a1a'}}>
-                        {t.diferencia>=0
-                          ? `Usted debe depositar a la cuenta de Matilda el valor de ${fmt(t.diferencia)}`
-                          : `Matilda debe acreditar a su cuenta el valor de ${fmt(Math.abs(t.diferencia))}`
-                        }
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            {(editing.gastos||[]).length>0 && <ResumenTotales t={totalesLiq(editing)} fmt={fmt}/>}
 
             <div style={{background:'#f0f7ff',borderRadius:8,padding:'10px 14px',border:'1px dashed #3dbfb8'}}>
               <Label>Comprobante de depósito (imagen)</Label>
