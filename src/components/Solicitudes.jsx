@@ -136,19 +136,7 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
     if (presupuesto_id_inicial && !solicitud) {
       loadPpto(presupuesto_id_inicial);
     } else if (solicitud?.presupuesto_id) {
-      if (solicitud.estado === 'borrador') {
-        // Borrador: reconstruir desde presupuesto con historial
-        loadPptoConItems(solicitud.presupuesto_id, solicitud.items || []);
-      } else {
-        // Bloqueada: usar directamente los ítems guardados
-        const pp = presupuestos.find(p=>p.id===solicitud.presupuesto_id);
-        if (pp) setPpto(pp);
-        setForm(prev => ({
-          ...prev,
-          items: (solicitud.items||[]).map(it=>({...it, seleccionado:true})),
-          _sols_previas: [],
-        }));
-      }
+      loadPptoConItems(solicitud.presupuesto_id, solicitud.items || []);
     }
   }, [solicitud?.id, presupuesto_id_inicial]);
 
@@ -161,22 +149,39 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
       .select('*').eq('presupuesto_id', id).order('created_at', { ascending: true });
     const solsPrevias = (solsData||[]).filter(s=>s.id!==solicitud?.id);
 
-    // Partir de los ítems del presupuesto y restaurar valores guardados
-    const items = (data.items||[]).filter(it=>!it._type).map(it=>{
-      const costoPpto = Number(it.costo_unit||0)*Number(it.cantidad||0)*Number(it.dias||1);
-      const guardado = itemsGuardados.find(g=>g.id===it.id);
-      const yaUsado = solsPrevias.filter(s=>['enviada','pagado'].includes(s.estado))
-        .flatMap(s=>s.items||[]).filter(si=>si.id===it.id)
-        .reduce((a,si)=>a+Number(si.valor_solicitado||0),0);
-      return {
-        id: it.id, item:it.item||'', subcategoria:it.subcategoria||'', categoria:it.categoria||'',
-        costo_presupuestado: costoPpto,
-        valor_solicitado: guardado?.valor_solicitado || 0,
-        notas: guardado?.notas || '',
-        seleccionado: !!guardado,
-        _saldo_inicial: costoPpto - yaUsado,
-      };
-    });
+    const esBloqueada = solicitud && solicitud.estado !== 'borrador';
+
+    let items;
+    if (esBloqueada && itemsGuardados.length > 0) {
+      // Para solicitudes bloqueadas: usar ítems guardados directamente pero agregar info de costo_presupuestado
+      items = itemsGuardados.map(it => {
+        const pptoItem = (data.items||[]).find(pi=>pi.id===it.id);
+        const costoPpto = pptoItem
+          ? Number(pptoItem.costo_unit||0)*Number(pptoItem.cantidad||0)*Number(pptoItem.dias||1)
+          : Number(it.costo_presupuestado||0);
+        const yaUsado = solsPrevias.filter(s=>['enviada','pagado'].includes(s.estado))
+          .flatMap(s=>s.items||[]).filter(si=>si.id===it.id)
+          .reduce((a,si)=>a+Number(si.valor_solicitado||0),0);
+        return { ...it, costo_presupuestado: costoPpto, seleccionado: true, _saldo_inicial: costoPpto - yaUsado };
+      });
+    } else {
+      // Para borradores: reconstruir desde presupuesto restaurando valores guardados
+      items = (data.items||[]).filter(it=>!it._type).map(it=>{
+        const costoPpto = Number(it.costo_unit||0)*Number(it.cantidad||0)*Number(it.dias||1);
+        const guardado = itemsGuardados.find(g=>g.id===it.id);
+        const yaUsado = solsPrevias.filter(s=>['enviada','pagado'].includes(s.estado))
+          .flatMap(s=>s.items||[]).filter(si=>si.id===it.id)
+          .reduce((a,si)=>a+Number(si.valor_solicitado||0),0);
+        return {
+          id: it.id, item:it.item||'', subcategoria:it.subcategoria||'', categoria:it.categoria||'',
+          costo_presupuestado: costoPpto,
+          valor_solicitado: guardado?.valor_solicitado || 0,
+          notas: guardado?.notas || '',
+          seleccionado: !!guardado,
+          _saldo_inicial: costoPpto - yaUsado,
+        };
+      });
+    }
 
     setForm(f=>({
       ...f, presupuesto_id:data.id, presupuesto_nombre:data.nombre||data.cliente,
