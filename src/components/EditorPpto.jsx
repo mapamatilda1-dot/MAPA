@@ -328,6 +328,7 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
       return {...prev,items:remaining};
     });
   }
+  function addItem(){const it=emptyItem(p);setP(prev=>({...prev,items:[...prev.items,it]}));setOpenItem(it.id);}
   function updItem(id,k,v){
     const nums=['costo_unit','costo_real_unit','precio_unit','oh_pct','bco_pct','bco_real_pct','cantidad','dias'];
     setP(prev=>({...prev,items:prev.items.map(it=>{
