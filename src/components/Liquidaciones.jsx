@@ -40,14 +40,25 @@ export default function Liquidaciones({ presupuestos, userRole }) {
   }
   function showToast(m){setToast(m);setTimeout(()=>setToast(''),2500);}
 
-  function setPpto(id){
-    const pp=presupuestos.find(p=>p.id===id);
-    const gastosPpto=(pp?.items||[]).filter(it=>it.es_liquidacion&&!it._type).map(it=>({
-      ...emptyGasto(),
-      concepto: it.item||'',
-      valor_asignado: it.precio_unit*(it.cantidad||1)*(it.dias||1),
-      nombre_proveedor: it.proveedor||'',
-    }));
+  async function setPpto(id) {
+    const pp = presupuestos.find(p=>p.id===id);
+
+    // Cargar solicitudes pagadas de este presupuesto
+    const { data: solsData } = await supabase.from('solicitudes')
+      .select('*').eq('presupuesto_id', id).eq('estado','pagado').order('created_at');
+
+    // Crear un gasto por cada ítem de cada solicitud pagada
+    const gastosSols = (solsData||[]).flatMap(sol =>
+      (sol.items||[]).map(it => ({
+        ...emptyGasto(),
+        concepto: it.item||'',
+        valor_asignado: Number(it.valor_solicitado||0),
+        notas: `Solicitud del ${sol.created_at?.slice(0,10)} · ${it.notas||''}`.trim(),
+        _solicitud_id: sol.id,
+        _solicitud_fecha: sol.created_at?.slice(0,10),
+      }))
+    );
+
     setEditing(prev=>({
       ...prev,
       presupuesto_id:     id,
@@ -57,7 +68,8 @@ export default function Liquidaciones({ presupuestos, userRole }) {
       lugar:              pp?.lugar||'',
       fecha_evento:       pp?.fecha_evento||'',
       dias_evento:        pp?.dias_evento||1,
-      gastos:             gastosPpto.length>0?gastosPpto:(prev.gastos||[]),
+      gastos:             gastosSols.length>0 ? gastosSols : [emptyGasto()],
+      _solicitudes_pagadas: solsData||[],
     }));
   }
 
@@ -324,7 +336,7 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                 <select style={S.select} value={editing.presupuesto_id||''} onChange={e=>setPpto(e.target.value)}>
                   <option value="">— Sin relacionar —</option>
                   {presupuestos
-                    .filter(p=>p.estado!=='facturado'&&(p.items||[]).some(it=>it.es_liquidacion&&!it._type))
+                    .filter(p=>['aprobado','pendiente_facturar','facturado'].includes(p.estado))
                     .map(p=><option key={p.id} value={p.id}>{p.nomenclatura||p.nombre||p.cliente}</option>)}
                 </select>
               </div>
@@ -354,10 +366,32 @@ export default function Liquidaciones({ presupuestos, userRole }) {
               <button style={{...S.btnPrimary,background:'#3dbfb8',fontSize:13}} onClick={addGasto}>+ Agregar gasto</button>
             </div>
 
-            {(editing.gastos||[]).map(g=>(
-              <div key={g.id} style={{border:'1px solid #dde6ef',borderRadius:8,padding:12}}>
+            {/* Mostrar info de solicitudes pagadas agrupadas */}
+            {(editing._solicitudes_pagadas||[]).length > 0 && (
+              <div style={{background:'#eef4fb',borderRadius:8,padding:'10px 14px',marginBottom:8}}>
+                <div style={{fontSize:12,fontWeight:700,color:'#0d3b5e',marginBottom:6}}>Solicitudes pagadas vinculadas:</div>
+                {(editing._solicitudes_pagadas||[]).map(sol=>{
+                  const totalSol=(sol.items||[]).reduce((a,it)=>a+Number(it.valor_solicitado||0),0);
+                  return (
+                    <div key={sol.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'#555',padding:'3px 0',borderBottom:'1px solid #dde6ef'}}>
+                      <span>📤 Solicitud {sol.created_at?.slice(0,10)} · {(sol.items||[]).length} ítem(s)</span>
+                      <strong style={{color:'#0d3b5e'}}>{fmt(totalSol)}</strong>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {(editing.gastos||[]).map((g,gi)=>(<div key={g.id}>
+              {/* Separador por solicitud */}
+              {g._solicitud_fecha && (gi===0 || (editing.gastos||[])[gi-1]?._solicitud_id!==g._solicitud_id) && (
+                <div style={{background:'#0d3b5e',color:'#fff',padding:'5px 10px',borderRadius:6,fontSize:11,fontWeight:700,marginBottom:4,marginTop:gi>0?12:0}}>
+                  📤 Solicitud del {g._solicitud_fecha}
+                </div>
+              )}
+              <div style={{border:'1px solid #dde6ef',borderRadius:8,padding:12}}>
                 <div style={{display:'grid',gridTemplateColumns:'2fr 2fr auto',gap:8,marginBottom:8,alignItems:'end'}}>
-                  <div><Label>Concepto</Label><input style={S.input} value={g.concepto} onChange={e=>updGasto(g.id,'concepto',e.target.value)}/></div>
+              <Label>Concepto</Label><input style={S.input} value={g.concepto} onChange={e=>updGasto(g.id,'concepto',e.target.value)}/></div>
                   <div>
                     <Label>Categoría</Label>
                     <select style={S.select} value={g.categoria||CATS_LIQUIDACION[0]} onChange={e=>updGasto(g.id,'categoria',e.target.value)}>

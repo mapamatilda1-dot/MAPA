@@ -107,21 +107,24 @@ export default function Calendario() {
       }}>
         <div style={{ fontSize:'clamp(10px,2vw,13px)', fontWeight:isToday?600:400, color:isToday?'#2563eb':'#333', marginBottom:2 }}>{day}</div>
         <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
-          {dayImpls.slice(0,1).map(i => (
-            <div key={'i'+i.id} style={{ fontSize:'clamp(8px,1.5vw,10px)', padding:'1px 3px', borderRadius:3, background:'#ede9fe', color:'#5b21b6', borderLeft:'2px solid #7c3aed', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-              🎯 {i.nombre}
-            </div>
-          ))}
-          {dayGcal.slice(0,1).map(e => (
-            <div key={'g'+e.id} style={{ fontSize:'clamp(8px,1.5vw,10px)', padding:'1px 3px', borderRadius:3, background:'#fce8f3', color:'#9d174d', borderLeft:'2px solid #db2777', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-              📅 {e.title}
-            </div>
-          ))}
-          {dayBriefs.slice(0,1).map(b => {
-            const c = getColor(b.estado);
-            return <div key={'b'+b.id} style={{ fontSize:'clamp(8px,1.5vw,10px)', padding:'1px 3px', borderRadius:3, background:c.bg, color:c.text, borderLeft:`2px solid ${c.border}`, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>📋 {b.nombre}</div>;
-          })}
-          {total > 1 && <div style={{ fontSize:'clamp(7px,1.2vw,9px)', color:'#888' }}>+{total-1} más</div>}
+          {(() => {
+            // Combinar todos los eventos y mostrar hasta 3
+            const allEvents = [
+              ...dayImpls.map(i => ({ key:'i'+i.id, label:'🎯 '+i.nombre, bg:'#ede9fe', color:'#5b21b6', border:'#7c3aed' })),
+              ...dayGcal.map(e => ({ key:'g'+e.id, label:'📅 '+e.title, bg:'#fce8f3', color:'#9d174d', border:'#db2777' })),
+              ...dayBriefs.map(b => { const c=getColor(b.estado); return { key:'b'+b.id, label:'📋 '+b.nombre, bg:c.bg, color:c.text, border:c.border }; }),
+            ];
+            const visible = allEvents.slice(0,3);
+            const resto = allEvents.length - 3;
+            return <>
+              {visible.map(ev => (
+                <div key={ev.key} style={{ fontSize:'clamp(8px,1.5vw,10px)', padding:'1px 3px', borderRadius:3, background:ev.bg, color:ev.color, borderLeft:`2px solid ${ev.border}`, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {ev.label}
+                </div>
+              ))}
+              {resto > 0 && <div style={{ fontSize:'clamp(7px,1.2vw,9px)', color:'#888', padding:'1px 3px' }}>+{resto} más</div>}
+            </>;
+          })()}
         </div>
       </div>
     );

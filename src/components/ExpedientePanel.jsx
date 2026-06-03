@@ -358,12 +358,12 @@ export default function ExpedientePanel({ briefId, onClose }) {
                 </Section>
               )}
 
-              {/* Versiones de presupuestos */}
-              {versiones.length > 0 && (
-                <Section icon="🗂️" title="Versiones de presupuestos" count={versiones.length}>
+              {/* Versiones de presupuestos — solo las guardadas con "Nueva versión" */}
+              {versiones.filter(v=>v.estado==='enviado_cliente').length > 0 && (
+                <Section icon="🗂️" title="Versiones enviadas al cliente" count={versiones.filter(v=>v.estado==='enviado_cliente').length}>
                   <div style={{ position:'relative', paddingLeft:16 }}>
                     <div style={{ position:'absolute', left:6, top:0, bottom:0, width:2, background:'#e8e8e8', borderRadius:2 }}/>
-                    {versiones.map((v, i) => {
+                    {versiones.filter(v=>v.estado==='enviado_cliente').map((v, i) => {
                       const ppto = presupuestos.find(p => p.id === v.presupuesto_id);
                       return (
                         <div key={v.id} style={{ position:'relative', marginBottom:12, paddingLeft:12 }}>
@@ -373,7 +373,6 @@ export default function ExpedientePanel({ briefId, onClose }) {
                           </div>
                           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                             <span style={{ fontSize:12, color:'#555' }}>{ppto?.nomenclatura || 'Presupuesto'}</span>
-                            <span style={{ background:'#eef4fb', color:'#0d3b5e', padding:'1px 6px', borderRadius:4, fontSize:11 }}>{v.estado}</span>
                             {v.pdf_url && (
                               <a href={v.pdf_url} target="_blank" rel="noreferrer"
                                 style={{ fontSize:11, color:'#c8264a', fontWeight:500, textDecoration:'none' }}>
