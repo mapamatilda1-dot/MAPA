@@ -45,22 +45,42 @@ function EstadoBadge({ estado }) {
 }
 
 // ── PDF de solicitud ──────────────────────────────────────────
-function buildPDFSolicitud(sol) {
+function buildPDFSolicitud(sol, solsAnteriores) {
   const items = sol.items || [];
+  const solsPrev = (solsAnteriores||[]).filter(s=>s.id!==sol.id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  const solsPrevEnv = solsPrev.filter(s=>['enviada','pagado'].includes(s.estado));
+
+  // Totales
   const totalSol = items.reduce((a,it)=>a+Number(it.valor_solicitado||0),0);
   const totalPpto = items.reduce((a,it)=>a+Number(it.costo_presupuestado||0),0);
-  const saldo = totalPpto - totalSol;
+  const totalYaSol = items.reduce((a,it)=>{
+    const prev = solsPrevEnv.flatMap(s=>s.items||[]).filter(si=>si.id===it.id).reduce((x,si)=>x+Number(si.valor_solicitado||0),0);
+    return a+prev;
+  },0);
+  const saldo = totalPpto - totalYaSol - totalSol;
   const estado = ESTADOS[sol.estado] || ESTADOS.borrador;
 
+  // Headers de solicitudes anteriores
+  const solHeaders = solsPrev.map(s=>({ id:s.id, label:`Sol. ${fmtDate(s.created_at?.slice(0,10))}`, estado:s.estado }));
+  const thPrev = solHeaders.map(s=>`<th style="padding:7px 8px;text-align:right;font-size:10px;color:${s.estado==='rechazada'?'#991b1b':s.estado==='pagado'?'#166534':'#1e40af'};white-space:nowrap;">${s.label}<br/><span style="font-size:9px;">${ESTADOS[s.estado]?.label||''}</span></th>`).join('');
+
   const itemsHtml = items.map((it,i) => {
-    const saldoIt = Number(it.costo_presupuestado||0) - Number(it.valor_solicitado||0);
+    const yaUsadoPrev = solsPrevEnv.flatMap(s=>s.items||[]).filter(si=>si.id===it.id).reduce((a,si)=>a+Number(si.valor_solicitado||0),0);
+    const saldoIt = Number(it.costo_presupuestado||0) - yaUsadoPrev - Number(it.valor_solicitado||0);
+    const tdPrev = solHeaders.map(s=>{
+      const sp = solsPrev.find(x=>x.id===s.id);
+      const val = (sp?.items||[]).find(si=>si.id===it.id)?.valor_solicitado;
+      const col = s.estado==='rechazada'?'#991b1b':s.estado==='pagado'?'#166534':'#1e40af';
+      return `<td style="padding:7px 8px;text-align:right;font-size:12px;font-weight:600;color:${col};background:${s.estado==='rechazada'?'#fff8f8':s.estado==='pagado'?'#f8fff8':'#f8fbff'};">${val!=null?fmt(val):'—'}</td>`;
+    }).join('');
     return `<tr style="background:${i%2?'#f8fafc':'#fff'};border-bottom:1px solid #f0f0f0;">
-      <td style="padding:7px 10px;font-size:11px;color:#666;">${it.subcategoria||'—'}</td>
-      <td style="padding:7px 10px;font-size:13px;font-weight:500;">${it.item||'—'}</td>
-      <td style="padding:7px 10px;text-align:right;font-size:12px;">${fmt(it.costo_presupuestado)}</td>
-      <td style="padding:7px 10px;text-align:right;font-size:13px;font-weight:700;color:#0d3b5e;">${fmt(it.valor_solicitado)}</td>
-      <td style="padding:7px 10px;text-align:right;font-weight:600;color:${saldoIt>=0?'#166534':'#991b1b'};">${fmt(saldoIt)}</td>
-      <td style="padding:7px 10px;font-size:11px;color:#888;">${it.notas||'—'}</td>
+      <td style="padding:7px 8px;font-size:11px;color:#666;">${it.subcategoria||'—'}</td>
+      <td style="padding:7px 8px;font-size:13px;font-weight:500;">${it.item||'—'}</td>
+      <td style="padding:7px 8px;text-align:right;font-size:12px;">${fmt(it.costo_presupuestado)}</td>
+      ${tdPrev}
+      <td style="padding:7px 8px;text-align:right;font-size:13px;font-weight:700;color:#0d3b5e;">${fmt(it.valor_solicitado)}</td>
+      <td style="padding:7px 8px;text-align:right;font-weight:600;color:${saldoIt>=0?'#166534':'#991b1b'};">${fmt(saldoIt)}</td>
+      <td style="padding:7px 8px;font-size:11px;color:#888;">${it.notas||'—'}</td>
     </tr>`;
   }).join('');
 
@@ -88,6 +108,7 @@ function buildPDFSolicitud(sol) {
         <th style="padding:8px 10px;text-align:left;font-size:10px;">Subcategoría</th>
         <th style="padding:8px 10px;text-align:left;font-size:10px;">Ítem</th>
         <th style="padding:8px 10px;text-align:right;font-size:10px;">Costo ppto.</th>
+        ${thPrev}
         <th style="padding:8px 10px;text-align:right;font-size:10px;">Valor solicitado</th>
         <th style="padding:8px 10px;text-align:right;font-size:10px;">Saldo</th>
         <th style="padding:8px 10px;text-align:left;font-size:10px;">Notas</th>
@@ -95,10 +116,11 @@ function buildPDFSolicitud(sol) {
       <tbody>${itemsHtml}</tbody>
     </table>
   </div>
-  <div style="margin:0 28px 16px;background:#0d3b5e;border-radius:10px;padding:14px 18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+  <div style="margin:0 28px 16px;background:#0d3b5e;border-radius:10px;padding:14px 18px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
     <div><div style="font-size:9px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-bottom:3px;">Costo presupuestado</div><div style="font-size:16px;font-weight:700;color:#fff;">${fmt(totalPpto)}</div></div>
-    <div><div style="font-size:9px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-bottom:3px;">Valor solicitado</div><div style="font-size:16px;font-weight:700;color:#3dbfb8;">${fmt(totalSol)}</div></div>
-    <div><div style="font-size:9px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-bottom:3px;">Saldo</div><div style="font-size:16px;font-weight:700;color:${saldo>=0?'#5dc98a':'#ff6b6b'};">${fmt(saldo)}</div></div>
+    <div><div style="font-size:9px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-bottom:3px;">Ya solicitado anterior</div><div style="font-size:16px;font-weight:700;color:#f0a500;">${fmt(totalYaSol)}</div></div>
+    <div><div style="font-size:9px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-bottom:3px;">Valor solicitado actual</div><div style="font-size:16px;font-weight:700;color:#3dbfb8;">${fmt(totalSol)}</div></div>
+    <div><div style="font-size:9px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-bottom:3px;">Saldo disponible</div><div style="font-size:16px;font-weight:700;color:${saldo>=0?'#5dc98a':'#ff6b6b'};">${fmt(saldo)}</div></div>
   </div>
   ${sol.notas?`<div style="margin:0 28px 16px;background:#f8fafc;border-left:3px solid #0d3b5e;padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;color:#555;">${sol.notas}</div>`:''}
   ${sol.motivo_rechazo?`<div style="margin:0 28px 16px;background:#fee2e2;border-left:3px solid #dc2626;padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;color:#991b1b;"><strong>Motivo de rechazo:</strong> ${sol.motivo_rechazo}</div>`:''}
@@ -475,7 +497,96 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
       {bloqueado && (
         <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
           <Btn variant="secondary" onClick={onCancel}>← Volver</Btn>
-          <Btn variant="secondary" onClick={()=>{const html=buildPDFSolicitud(form);const w=window.open('','_blank');w.document.write(html);w.document.close();}}>📄 PDF</Btn>
+          <Btn variant="secondary" onClick={()=>{const html=buildPDFSolicitud(form,[]);const w=window.open('','_blank');w.document.write(html);w.document.close();}}>📄 PDF</Btn>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Grupo de solicitudes por presupuesto ──────────────────────
+function GrupoPpto({ grupo, canCreate, canFinanciero, onEdit, onDelete, onPago, onRechazo, onPDF }) {
+  const [open, setOpen] = useState(true);
+  const totalGrupo = grupo.sols.reduce((a,s)=>(s.items||[]).reduce((x,it)=>x+Number(it.valor_solicitado||0),0)+a, 0);
+  const estadosGrupo = [...new Set(grupo.sols.map(s=>s.estado))];
+
+  return (
+    <div style={{border:'1px solid #e8e8e8',borderRadius:12,marginBottom:12,overflow:'hidden'}}>
+      {/* Header del grupo */}
+      <div onClick={()=>setOpen(o=>!o)} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',cursor:'pointer',background:'#f8fafc',userSelect:'none'}}>
+        <span style={{fontSize:16,color:'#0d3b5e'}}>{open?'▾':'▸'}</span>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:700,fontSize:14,color:'#0d3b5e'}}>{grupo.nombre}</div>
+          {grupo.cliente&&<div style={{fontSize:12,color:'#888'}}>🏢 {grupo.cliente}</div>}
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          {estadosGrupo.map(e=><EstadoBadge key={e} estado={e}/>)}
+          <span style={{fontSize:12,color:'#0d3b5e',fontWeight:600}}>{grupo.sols.length} solicitud(es)</span>
+          <span style={{fontSize:12,color:'#3dbfb8',fontWeight:600}}>{fmt(totalGrupo)} total</span>
+        </div>
+      </div>
+
+      {/* Solicitudes del grupo */}
+      {open && (
+        <div style={{padding:'8px 12px',display:'flex',flexDirection:'column',gap:8}}>
+          {grupo.sols.map(sol=>{
+            const e = ESTADOS[sol.estado]||ESTADOS.borrador;
+            const totalSol = (sol.items||[]).reduce((a,it)=>a+Number(it.valor_solicitado||0),0);
+            const bloqueado = sol.estado !== 'borrador';
+            return (
+              <div key={sol.id} style={{background:'#fff',border:`1px solid ${e.border}`,borderLeft:`4px solid ${e.color}`,borderRadius:'0 8px 8px 0',padding:'10px 14px'}}>
+                <div style={{display:'flex',alignItems:'flex-start',gap:8,justifyContent:'space-between'}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:3}}>
+                      <EstadoBadge estado={sol.estado}/>
+                      {sol.tiene_exceso&&<span title="Supera el presupuesto" style={{fontSize:14}}>⚠️</span>}
+                      <span style={{fontSize:11,color:'#aaa'}}>{fmtDateTime(sol.created_at)}</span>
+                      {sol.created_by_nombre&&<span style={{fontSize:12,color:'#777'}}>👤 {sol.created_by_nombre}</span>}
+                      <span style={{fontSize:12,color:'#0d3b5e',fontWeight:600}}>{fmt(totalSol)}</span>
+                      <span style={{fontSize:11,color:'#888'}}>{(sol.items||[]).length} ítem(s)</span>
+                    </div>
+                    {sol.motivo_rechazo&&<div style={{fontSize:12,color:'#991b1b',background:'#fee2e2',padding:'4px 8px',borderRadius:5,marginTop:4}}>✕ {sol.motivo_rechazo}</div>}
+                  </div>
+                  <div style={{display:'flex',gap:5,flexShrink:0,flexWrap:'wrap'}}>
+                    {sol.estado==='borrador'&&canCreate&&<Btn size="xs" variant="danger" onClick={()=>onDelete(sol)}>🗑</Btn>}
+                    {canFinanciero&&sol.estado==='enviada'&&<>
+                      <Btn size="xs" variant="green" onClick={()=>onPago(sol.id)}>✓ Pagado</Btn>
+                      <Btn size="xs" variant="danger" onClick={()=>onRechazo(sol)}>✕ Rechazar</Btn>
+                    </>}
+                    {!bloqueado&&canCreate&&<Btn size="xs" variant="secondary" onClick={()=>onEdit(sol)}>Editar</Btn>}
+                    {bloqueado&&<Btn size="xs" variant="secondary" onClick={()=>onEdit(sol)}>Ver</Btn>}
+                    <Btn size="xs" variant="secondary" onClick={()=>onPDF(sol)}>📄 PDF</Btn>
+                  </div>
+                </div>
+                {/* Detalle ítems expandible */}
+                {(sol.items||[]).length>0&&(
+                  <details style={{marginTop:8}}>
+                    <summary style={{fontSize:12,color:'#0d3b5e',cursor:'pointer',fontWeight:500}}>Ver ítems ({sol.items.length})</summary>
+                    <div style={{marginTop:6,overflowX:'auto'}}>
+                      <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                        <thead><tr style={{background:'#f0f4f8'}}>
+                          {['Subcategoría','Ítem','Costo ppto.','Solicitado','Notas'].map(h=>(
+                            <th key={h} style={{padding:'5px 8px',textAlign:'left',fontSize:11,color:'#666',fontWeight:700}}>{h}</th>
+                          ))}
+                        </tr></thead>
+                        <tbody>
+                          {sol.items.map(it=>(
+                            <tr key={it.id} style={{borderBottom:'1px solid #f0f0f0'}}>
+                              <td style={{padding:'5px 8px',color:'#888'}}>{it.subcategoria||'—'}</td>
+                              <td style={{padding:'5px 8px',fontWeight:500}}>{it.item||'—'}</td>
+                              <td style={{padding:'5px 8px',textAlign:'right'}}>{fmt(it.costo_presupuestado)}</td>
+                              <td style={{padding:'5px 8px',textAlign:'right',color:'#0d3b5e',fontWeight:600}}>{fmt(it.valor_solicitado)}</td>
+                              <td style={{padding:'5px 8px',color:'#888'}}>{it.notas||'—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -613,8 +724,23 @@ export default function Solicitudes({ userRole, userEmail, userName, presupuesto
         <div style={{textAlign:'center',padding:'3rem',color:'#aaa',fontSize:14}}>Sin solicitudes</div>
       )}
 
-      <div style={{display:'flex',flexDirection:'column',gap:8}}>
-        {filtered.map(sol=>{
+      {/* Agrupar por presupuesto */}
+      {(() => {
+        const grupos = {};
+        filtered.forEach(sol => {
+          const key = sol.presupuesto_id || 'sin-presupuesto';
+          if (!grupos[key]) grupos[key] = { nombre: sol.presupuesto_nombre||'Sin presupuesto', cliente: sol.cliente_nombre||'', sols:[] };
+          grupos[key].sols.push(sol);
+        });
+        return Object.entries(grupos).map(([pptoId, grupo]) => (
+          <GrupoPpto key={pptoId} grupo={grupo} canCreate={canCreate} canFinanciero={canFinanciero}
+            onEdit={sol=>setEditing(sol)} onDelete={async sol=>{if(!window.confirm('¿Eliminar?'))return;await supabase.from('solicitudes').delete().eq('id',sol.id);loadAll();showToast('Eliminada');}}
+            onPago={marcarPagado} onRechazo={sol=>{setRechazarModal(sol);setMotivoRechazo('');}}
+            onPDF={sol=>{const solsDelPpto=solicitudes.filter(s=>s.presupuesto_id===sol.presupuesto_id);const html=buildPDFSolicitud(sol,solsDelPpto);const w=window.open('','_blank');w.document.write(html);w.document.close();}}
+          />
+        ));
+      })()}
+      {false && filtered.map(sol=>{
           const e = ESTADOS[sol.estado]||ESTADOS.borrador;
           const totalSol = (sol.items||[]).reduce((a,it)=>a+Number(it.valor_solicitado||0),0);
           const totalPpto = (sol.items||[]).reduce((a,it)=>a+Number(it.costo_presupuestado||0),0);
@@ -664,7 +790,7 @@ export default function Solicitudes({ userRole, userEmail, userName, presupuesto
                   {!bloqueado && canCreate && <Btn size="xs" variant="secondary" onClick={()=>setEditing(sol)}>Editar</Btn>}
                   {bloqueado && <Btn size="xs" variant="secondary" onClick={()=>setEditing(sol)}>Ver</Btn>}
                   {/* PDF */}
-                  <Btn size="xs" variant="secondary" onClick={()=>{const html=buildPDFSolicitud(sol);const w=window.open('','_blank');w.document.write(html);w.document.close();}}>📄 PDF</Btn>
+                  <Btn size="xs" variant="secondary" onClick={()=>{const solsDelPpto=solicitudes.filter(s=>s.presupuesto_id===sol.presupuesto_id);const html=buildPDFSolicitud(sol,solsDelPpto);const w=window.open('','_blank');w.document.write(html);w.document.close();}}>📄 PDF</Btn>
                 </div>
               </div>
 
