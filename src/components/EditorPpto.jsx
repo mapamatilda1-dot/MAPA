@@ -700,13 +700,13 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                   <span style={{fontSize:11,color:'#8ab4d4'}}>{grupo.items.length} ítems</span>
                   {/* Renombrar subcategoría — siempre visible si tiene subcatId */}
                   {grupo.subcatId&&grupo.subcatId!=='__none__'&&(
-                    <button onClick={()=>{\
+                    <button onClick={()=>{
                       const nuevo=window.prompt('Nombre de la subcategoría:',grupo.subcat||'');
                       if(nuevo===null)return;
-                      setP(prev=>({...prev,items:prev.items.map(it=>\
-                        it.id===grupo.subcatId?{...it,subcategoria:nuevo.trim()}:\
-                        it.subcategoria===grupo.subcat&&it._type!=='subcat'?{...it,subcategoria:nuevo.trim()}:it\
-                      )}));\
+                      setP(prev=>({...prev,items:prev.items.map(it=>
+                        it.id===grupo.subcatId?{...it,subcategoria:nuevo.trim()}:
+                        it.subcategoria===grupo.subcat&&it._type!=='subcat'?{...it,subcategoria:nuevo.trim()}:it
+                      )}));
                     }} style={{background:'none',border:'1px solid #ffffff44',color:'#fff',padding:'2px 8px',borderRadius:4,cursor:'pointer',fontSize:11}}>✏️</button>
                   )}
                   {/* Agregar ítem a esta subcategoría */}
