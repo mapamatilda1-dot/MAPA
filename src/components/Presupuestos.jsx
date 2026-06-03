@@ -44,7 +44,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
       supabase.from('clientes').select('*').order('nombre'),
       supabase.from('config').select('*').single(),
       supabase.from('ejecutivos').select('*').order('nombre'),
-      supabase.from('briefs').select('id, nombre, cliente_nombre').order('nombre'),
+      supabase.from('briefs').select('id, nombre, cliente_nombre, fecha_entrega, fecha_evento, dias_evento, lugar, ciudad, pax, ejecutivo_nombre, ejecutivo_email').order('nombre'),
     ]);
     if (ppR.data)   setPptos(ppR.data);
     if (catR.data)  setCats(catR.data);
