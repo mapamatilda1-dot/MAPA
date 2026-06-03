@@ -4,7 +4,7 @@ const SMTP_HOST = Deno.env.get('SMTP_HOST')!;
 const SMTP_PORT = parseInt(Deno.env.get('SMTP_PORT') || '465');
 const SMTP_USER = Deno.env.get('SMTP_USER')!;
 const SMTP_PASS = Deno.env.get('SMTP_PASS')!;
-const APP_URL   = 'https://mapa-zeta.vercel.app';
+const APP_URL   = 'https://subtle-platypus-1041ce.netlify.app';
 const DESTINOS  = ['melanie@matilda.agency', 'mariajose@matilda.agency', 'taylor@matilda.agency', 'johanna@matilda.agency'];
 
 function fmt(n: number) {
@@ -53,8 +53,15 @@ async function sendEmail(to: string[], subject: string, html: string) {
 }
 
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
+  }
   try {
-    const { solicitud, userEmail, userName } = await req.json();
+    const text = await req.text();
+    if (!text || text.trim() === '') {
+      return new Response(JSON.stringify({ ok:false, error:'empty body' }), { status:400 });
+    }
+    const { solicitud, userEmail, userName } = JSON.parse(text);
     if (!solicitud) return new Response(JSON.stringify({ ok:false, error:'no solicitud' }), { status:400 });
 
     const items = solicitud.items || [];
