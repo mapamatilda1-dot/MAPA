@@ -658,14 +658,16 @@ export default function Solicitudes({ userRole, userEmail, userName, presupuesto
     } else {
       await supabase.from('solicitudes').update({...data,estado:'enviada'}).eq('id',data.id);
     }
-    // Enviar correo
+    // Enviar correo — limpiar campos internos antes de serializar
     try {
-      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-solicitud`,{
+      const { _sols_previas, _solicitudes_pagadas, ...solLimpia } = newSol;
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-solicitud`,{
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':`Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`},
-        body:JSON.stringify({solicitud:{...data,estado:'enviada'},userEmail,userName}),
+        body:JSON.stringify({solicitud:{...solLimpia,estado:'enviada'},userEmail,userName}),
       });
-    } catch(e){console.warn(e);}
+      if (!res.ok) console.warn('notify-solicitud error:', await res.text());
+    } catch(e){console.warn('notify-solicitud failed:',e);}
     showToast('✅ Solicitud enviada a Financiero');
     setEditing(null);
     if(onClearPptoInicial) onClearPptoInicial();
