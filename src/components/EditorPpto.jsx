@@ -167,13 +167,11 @@ function OpcionesAdicionales({ p, setP, bloqueado, fmt, fmtPct, calcItem, S, Lab
                             </td>
                             <td style={{ padding:'5px 4px', width:44 }}>
                               <label style={{cursor:'pointer',display:'block',textAlign:'center'}}>
-                                <input type="file" accept="image/*" style={{display:'none'}} onChange={async e=>{
+                                <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{
                                   const file=e.target.files[0]; if(!file)return;
-                                  const {supabase:sb}=await import('../lib/supabase');
-                                  const name=`opc_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g,'_')}`;
-                                  await sb.storage.from('proforma-images').upload(name,file,{upsert:true});
-                                  const {data}=sb.storage.from('proforma-images').getPublicUrl(name);
-                                  updItemOp(op.id,it.id,'imagen_url',data.publicUrl);
+                                  const reader=new FileReader();
+                                  reader.onload=ev=>updItemOp(op.id,it.id,'imagen_url',ev.target.result);
+                                  reader.readAsDataURL(file);
                                 }}/>
                                 {it.imagen_url
                                   ? <img src={it.imagen_url} alt="" style={{width:32,height:32,objectFit:'cover',borderRadius:4,border:'1px solid #ddd'}}/>
@@ -339,32 +337,10 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     // Nos quedamos en la página para seguir editando
   }
 
-  async function imgToBase64(url) {
-    if (!url) return '';
-    try {
-      const res = await fetch(url, { mode:'cors', cache:'no-cache' });
-      if (!res.ok) return url;
-      const blob = await res.blob();
-      return await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
-    } catch(e) {
-      // If CORS fails, return as-is and let browser handle it
-      console.warn('imgToBase64 failed:', e);
-      return url;
-    }
-  }
-
-  async function openPdfCliente(){
+  function openPdfCliente(){
     if(!p)return;
-    // Convertir imágenes de opciones adicionales a base64
-    const opcs = await Promise.all((p.opciones_adicionales||[]).map(async op => ({
-      ...op,
-      items: await Promise.all((op.items||[]).map(async it => ({
-        ...it,
-        imagen_url: it.imagen_url ? await imgToBase64(it.imagen_url) : '',
-      }))),
-    })));
-    const pConImagenes = { ...p, opciones_adicionales: opcs };
-    const html=generatePdfClienteHTML(pConImagenes,logoUrl);
+    // Las imágenes ya están en base64 (se guardan así al subirlas)
+    const html=generatePdfClienteHTML(p,logoUrl);
     const w=window.open('','_blank');w.document.write(html);w.document.close();
   }
 
