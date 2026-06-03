@@ -64,7 +64,7 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride) {
   const infoFields = [
     ['Cliente', ppto.cliente],
     ['Evento',  ppto.nombre],
-    ['Fecha',   fmtDate(ppto.fecha_evento)],
+    ['Fecha evento',   fmtDate(ppto.fecha_evento)],
     ['Lugar',   ppto.lugar],
     ['PAX',     ppto.personas ? ppto.personas + ' personas' : ''],
     ['Días',    ppto.dias_evento ? ppto.dias_evento + ' días' : ''],
@@ -215,7 +215,7 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
   const infoFields = [
     ['Cliente',   ppto.cliente],
     ['Evento',    ppto.nombre],
-    ['Fecha',     fmtDate(ppto.fecha_evento)],
+    ['Fecha evento',     fmtDate(ppto.fecha_evento)],
     ['Lugar',     ppto.lugar],
     ['PAX',       ppto.personas ? ppto.personas + ' personas' : ''],
     ['Días',      ppto.dias_evento ? ppto.dias_evento + ' días' : ''],
@@ -278,8 +278,8 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
   const t = totales;
   const rebateRow = ppto.apply_rebate ? `
     <tr style="background:#fff8e6;">
-      <td colspan="8" style="padding:6px 10px;font-size:11px;color:#7a5500;font-weight:600;">Rebate ${ppto.rebate_pct??0}% (nota de crédito — informativo)</td>
-      <td colspan="6" style="padding:6px 10px;text-align:right;color:#7a5500;font-weight:700;">${fmt(t.rebate)}</td>
+      <td colspan="8" style="padding:6px 10px;font-size:11px;color:#c8264a;font-weight:600;">Rebate ${ppto.rebate_pct??0}% — comisión al cliente (resta utilidad)</td>
+      <td colspan="6" style="padding:6px 10px;text-align:right;color:#c8264a;font-weight:700;">-${fmt(t.rebate)}</td>
     </tr>` : '';
 
   return `<!DOCTYPE html>

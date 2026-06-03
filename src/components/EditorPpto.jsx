@@ -439,7 +439,7 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
 
 <!-- INFO -->
 <table style="margin-bottom:16px;">
-  ${[['Código',p.nomenclatura],['Cliente',p.cliente],['Evento',p.nombre],['Fecha',p.fecha_evento],['Lugar',p.lugar],['PAX',p.personas||''],['Ejecutivo',p.ejecutivo_nombre||''],['Correo',p.ejecutivo_email||'']].map(([l,v])=>`
+  ${[['Código',p.nomenclatura],['Cliente',p.cliente],['Evento',p.nombre],['Fecha evento',p.fecha_evento],['Lugar',p.lugar],['PAX',p.personas||''],['Ejecutivo',p.ejecutivo_nombre||''],['Correo',p.ejecutivo_email||'']].map(([l,v])=>`
   <tr><td class="info-label">${l}</td><td class="info-val">${v||''}</td></tr>`).join('')}
 </table>
 
@@ -977,7 +977,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:12}}>
             <div style={S.metricCard}><div style={{fontSize:11,color:'#8aa0b8',marginBottom:4}}>Subtotal precio cliente</div><div style={{fontSize:16,fontWeight:700}}>{fmt(totales.subtotalPrecio)}</div></div>
             <div style={S.metricCard}><div style={{fontSize:11,color:'#8aa0b8',marginBottom:4}}>Fee agencia ({p.fee_agencia??0}%)</div><div style={{fontSize:16,fontWeight:700}}>{fmt(totales.feeAgencia)}</div></div>
-            <div style={{...S.metricCard,background:'#e0f7f6'}}><div style={{fontSize:11,color:'#0d6e69',marginBottom:4}}>Margen cotizado</div><div style={{fontSize:16,fontWeight:700,color:'#0d6e69'}}>{fmt(totales.margenTotal)} <span style={{fontSize:13}}>({fmtPct(totales.margenPct)})</span></div></div>
+            <div style={{...S.metricCard,background:'#e0f7f6'}}><div style={{fontSize:11,color:'#0d6e69',marginBottom:4}}>Margen (sin fee)</div><div style={{fontSize:16,fontWeight:700,color:totales.margenSinFee>=0?'#0d6e69':'#c8264a'}}>{fmt(totales.margenSinFee)} <span style={{fontSize:13}}>({fmtPct(totales.margenSinFeePct)})</span></div></div>
           </div>
 
           {/* Total principal — SIN rebate */}
@@ -1109,18 +1109,25 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
           )}
 
           {/* Check cerrado por producción */}
-          {canMarkCerradoProduccion(userRole) && ESTADOS_CIERRE.includes(p.estado) && p.ejecutado && (
-            <div style={{marginBottom:14,padding:'12px 16px',background: p.cerrado_produccion?'#e8f5ee':'#f8fafc',border:`1px solid ${p.cerrado_produccion?'#2e8b4e':'#dde6ef'}`,borderRadius:10,display:'flex',alignItems:'center',gap:12}}>
+          {canMarkCerradoProduccion(userRole) && ESTADOS_CIERRE.includes(p.estado) && (() => {
+            const itemsConCosto = (p.items||[]).filter(it=>!it._type);
+            const todosCostosReales = itemsConCosto.length > 0 && itemsConCosto.every(it=>Number(it.costo_real_unit||0)>0);
+            const puedecerrarse = p.ejecutado && todosCostosReales;
+            return (
+            <div style={{marginBottom:14,padding:'12px 16px',background:p.cerrado_produccion?'#e8f5ee':'#f8fafc',border:`1px solid ${p.cerrado_produccion?'#2e8b4e':'#dde6ef'}`,borderRadius:10,display:'flex',alignItems:'center',gap:12}}>
               <input type="checkbox" id="cerrado_prod" checked={!!p.cerrado_produccion}
+                disabled={!puedecerrarse && !p.cerrado_produccion}
                 onChange={e => setField('cerrado_produccion', e.target.checked)}
-                style={{width:18,height:18,cursor:'pointer',accentColor:'#2e8b4e'}}
-              />
-              <label htmlFor="cerrado_prod" style={{fontSize:13,fontWeight:600,cursor:'pointer',color: p.cerrado_produccion?'#2e8b4e':'#0d3b5e'}}>
-                {p.cerrado_produccion ? '✅ Cerrado por producción' : 'Cerrar por producción'}
+                style={{width:18,height:18,cursor:puedecerrarse?'pointer':'not-allowed',accentColor:'#2e8b4e'}}/>
+              <label htmlFor="cerrado_prod" style={{fontSize:13,fontWeight:600,cursor:puedecerrarse?'pointer':'default',color:p.cerrado_produccion?'#2e8b4e':puedecerrarse?'#0d3b5e':'#aaa'}}>
+                {p.cerrado_produccion ? '✅ Cerrado por producción' : 'Cerrado por producción'}
               </label>
-              {p.cerrado_produccion && <span style={{fontSize:11,color:'#2e8b4e',marginLeft:'auto'}}>Notificación enviada a Financiero</span>}
+              {!p.ejecutado && <span style={{fontSize:11,color:'#c8264a',marginLeft:'auto'}}>Requiere: marcar como Ejecutado</span>}
+              {p.ejecutado && !todosCostosReales && <span style={{fontSize:11,color:'#c8264a',marginLeft:'auto'}}>Requiere: completar todos los costos reales en los ítems</span>}
+              {p.cerrado_produccion && <span style={{fontSize:11,color:'#2e8b4e',marginLeft:'auto'}}>✓ Notificado a Financiero</span>}
             </div>
-          )}
+            );
+          })()}
 
           <div style={{display:'flex',gap:8,marginBottom:16}}>
             <button style={{...S.btnPrimary,opacity:previewMode==='cliente'?1:0.55}} onClick={()=>setPreviewMode('cliente')}>👤 Vista cliente</button>
@@ -1146,7 +1153,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                 </div>
                 <div style={{background:'#c8264a',height:3}}/>
                 <div style={{padding:'12px 20px',background:'#f8fafc',display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,borderBottom:'1px solid #dde6ef'}}>
-                  {[['Cliente',p.cliente],['Evento',p.nombre],['Fecha',p.fecha_evento],['Lugar',p.lugar],['PAX',p.personas?`${p.personas} pax`:''],['Días',p.dias_evento?`${p.dias_evento} días`:''],['Ejecutivo',p.ejecutivo_nombre],['Correo',p.ejecutivo_email]].filter(([,v])=>v).map(([l,v])=>(
+                  {[['Cliente',p.cliente],['Evento',p.nombre],['Fecha evento',p.fecha_evento],['Lugar',p.lugar],['PAX',p.personas?`${p.personas} pax`:''],['Días',p.dias_evento?`${p.dias_evento} días`:''],['Ejecutivo',p.ejecutivo_nombre],['Correo',p.ejecutivo_email]].filter(([,v])=>v).map(([l,v])=>(
                     <div key={l}><div style={{fontSize:8,color:'#3dbfb8',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>{l}</div><div style={{fontSize:12,fontWeight:700,color:'#0d3b5e'}}>{v}</div></div>
                   ))}
                 </div>

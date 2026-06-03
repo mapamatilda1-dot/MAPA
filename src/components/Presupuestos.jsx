@@ -145,7 +145,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
     const rows = [
       ['INFORME MATILDA EVENT DESIGNERS'],
       [`Período: ${exportPeriod.type === 'anio' ? exportPeriod.anio : `${exportPeriod.mes}/${exportPeriod.anio}`}`], [''],
-      ['Código','Cliente','Evento','Fecha','Estado','Ejecutado','PAX','Subtotal Precio','Fee','Subtotal s/IVA','IVA 15%','Total c/IVA','Subtotal Costo','Margen','% Margen'],
+      ['Código','Cliente','Evento','Fecha evento','Estado','Ejecutado','PAX','Subtotal Precio','Fee','Subtotal s/IVA','IVA 15%','Total c/IVA','Subtotal Costo','Margen','% Margen'],
       ...filtrados.map(p => { const t = calcPpto(p); return [p.nomenclatura, p.cliente, p.nombre, p.fecha_evento, ESTADOS_PPTO_LABELS[p.estado]||p.estado, p.ejecutado?'Sí':'No', p.personas, t.subtotalPrecio, t.feeAgencia, t.totalSinIva, t.iva15, t.totalConIva, t.subtotalCosto, t.margenTotal, t.margenPct.toFixed(1)+'%']; }),
       [''], ['TOTALES','','','','','','', filtrados.reduce((a,p)=>a+calcPpto(p).subtotalPrecio,0),'', filtrados.reduce((a,p)=>a+calcPpto(p).totalSinIva,0),'', filtrados.reduce((a,p)=>a+calcPpto(p).totalConIva,0), filtrados.reduce((a,p)=>a+calcPpto(p).subtotalCosto,0), filtrados.reduce((a,p)=>a+calcPpto(p).margenTotal,0),''],
     ];
@@ -335,7 +335,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
               <button onClick={() => setPopupPpto(null)} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#8aa0b8' }}>✕</button>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:14, fontSize:13 }}>
-              {[['Cliente',popupPpto.cliente],['Fecha',popupPpto.fecha_evento],['Lugar',popupPpto.lugar],['PAX',popupPpto.personas?popupPpto.personas+' pax':''],['Subtotal s/IVA',fmt(calcPpto(popupPpto).totalSinIva)],['Margen',fmt(calcPpto(popupPpto).margenTotal)]].filter(([,v])=>v).map(([l,v]) => (
+              {[['Cliente',popupPpto.cliente],['Fecha evento',popupPpto.fecha_evento],['Lugar',popupPpto.lugar],['PAX',popupPpto.personas?popupPpto.personas+' pax':''],['Subtotal s/IVA',fmt(calcPpto(popupPpto).totalSinIva)],['Margen',fmt(calcPpto(popupPpto).margenTotal)]].filter(([,v])=>v).map(([l,v]) => (
                 <div key={l} style={{ background:'#f4f8fc', borderRadius:6, padding:'8px 12px' }}>
                   <div style={{ fontSize:10, color:'#3dbfb8', fontWeight:700, letterSpacing:1, textTransform:'uppercase' }}>{l}</div>
                   <div style={{ fontSize:13, fontWeight:600, color:'#0d3b5e' }}>{v}</div>

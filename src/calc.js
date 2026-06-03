@@ -86,14 +86,16 @@ export function calcPpto(p) {
   const totalSinIva = r2(subtotalPrecio + feeAgencia);
   const iva15       = r2(totalSinIva * 0.15);
   const totalConIva = r2(totalSinIva + iva15);
-  const margenTotal = r2(totalSinIva - subtotalCosto);
-  const margenPct   = totalSinIva > 0 ? r2((margenTotal / totalSinIva) * 100) : 0;
+  const margenSinFee    = r2(subtotalPrecio - subtotalCosto);          // Margen principal (sin fee)
+  const margenSinFeePct = subtotalPrecio > 0 ? r2((margenSinFee / subtotalPrecio) * 100) : 0;
+  const margenTotal     = r2(totalSinIva - subtotalCosto);             // Margen incl. fee (solo PDF financiero)
+  const margenPct       = totalSinIva > 0 ? r2((margenTotal / totalSinIva) * 100) : 0;
   const margenRealTotal = r2(totalSinIva - subtotalCostoReal);
   const margenRealPct   = totalSinIva > 0 ? r2((margenRealTotal / totalSinIva) * 100) : 0;
 
   const rebate_pct = r2(p.rebate_pct ?? 0);
   const rebate     = p.apply_rebate ? r2(subtotalPrecio * (rebate_pct / 100)) : 0;
-  const utilidadConRebate    = r2(margenTotal + rebate);
+  const utilidadConRebate    = r2(margenTotal - rebate);   // Rebate resta utilidad
   const utilidadConRebatePct = totalSinIva > 0 ? r2((utilidadConRebate / totalSinIva) * 100) : 0;
 
   return {
@@ -101,6 +103,7 @@ export function calcPpto(p) {
     subtotalCostoReal, subtotalAhorro,
     subtotalPrecio, feeAgencia,
     totalSinIva, iva15, totalConIva,
+    margenSinFee, margenSinFeePct,
     margenTotal, margenPct,
     margenRealTotal, margenRealPct,
     rebate, utilidadConRebate, utilidadConRebatePct,
