@@ -276,18 +276,16 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     if (!br) return;
     setP(prev => ({
       ...prev,
-      brief_id:    briefId,
-      nombre:      prev.nombre      || br.nombre        || '',
-      cliente:     prev.cliente     || br.cliente_nombre || '',
-      fecha_evento: (!prev.fecha_evento || prev.fecha_evento === new Date().toISOString().slice(0,10))
-                    ? (br.fecha_evento || prev.fecha_evento)
-                    : prev.fecha_evento,
-      ciudad:      prev.ciudad !== 'Guayaquil' ? prev.ciudad : (br.ciudad || prev.ciudad),
-      lugar:       prev.lugar       || br.lugar          || '',
-      personas:    prev.personas    || br.pax            || 0,
-      dias_evento: prev.dias_evento || br.dias_evento    || 1,
-      ejecutivo_nombre: prev.ejecutivo_nombre || br.ejecutivo_nombre || '',
-      ejecutivo_email:  prev.ejecutivo_email  || br.ejecutivo_email  || '',
+      brief_id:         briefId,
+      nombre:           prev.nombre || br.nombre || '',
+      cliente:          prev.cliente || br.cliente_nombre || '',
+      fecha_evento:     br.fecha_evento || prev.fecha_evento || '',
+      ciudad:           br.ciudad || prev.ciudad || 'Guayaquil',
+      lugar:            br.lugar || prev.lugar || '',
+      personas:         br.pax || prev.personas || 0,
+      dias_evento:      br.dias_evento || prev.dias_evento || 1,
+      ejecutivo_nombre: br.ejecutivo_nombre || prev.ejecutivo_nombre || '',
+      ejecutivo_email:  br.ejecutivo_email  || prev.ejecutivo_email  || '',
       apply_rebate: (br.cliente_nombre||'').toUpperCase().includes('TESALIA'),
     }));
     showToast('Campos completados desde el proyecto ✓');
