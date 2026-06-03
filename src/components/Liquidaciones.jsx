@@ -366,30 +366,39 @@ export default function Liquidaciones({ presupuestos, userRole }) {
               <button style={{...S.btnPrimary,background:'#3dbfb8',fontSize:13}} onClick={addGasto}>+ Agregar gasto</button>
             </div>
 
-            {/* Mostrar info de solicitudes pagadas agrupadas */}
-            {(editing._solicitudes_pagadas||[]).length > 0 && (
-              <div style={{background:'#eef4fb',borderRadius:8,padding:'10px 14px',marginBottom:8}}>
-                <div style={{fontSize:12,fontWeight:700,color:'#0d3b5e',marginBottom:6}}>Solicitudes pagadas vinculadas:</div>
-                {(editing._solicitudes_pagadas||[]).map(sol=>{
-                  const totalSol=(sol.items||[]).reduce((a,it)=>a+Number(it.valor_solicitado||0),0);
+            {/* Gastos agrupados por solicitud pagada */}
+            {(editing._solicitudes_pagadas||[]).length > 0 ? (
+              <>
+                {(editing._solicitudes_pagadas||[]).map(sol => {
+                  const valorPagado = (sol.items||[]).reduce((a,it)=>a+Number(it.valor_solicitado||0),0);
+                  const gastosEsta = (editing.gastos||[]).filter(g=>g._solicitud_id===sol.id);
+                  const totalJust = gastosEsta.reduce((a,g)=>a+Number(g.total||0),0);
                   return (
-                    <div key={sol.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'#555',padding:'3px 0',borderBottom:'1px solid #dde6ef'}}>
-                      <span>📤 Solicitud {sol.created_at?.slice(0,10)} · {(sol.items||[]).length} ítem(s)</span>
-                      <strong style={{color:'#0d3b5e'}}>{fmt(totalSol)}</strong>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {(editing.gastos||[]).map((g,gi)=>(<div key={g.id}>
-              {/* Separador por solicitud */}
-              {g._solicitud_fecha && (gi===0 || (editing.gastos||[])[gi-1]?._solicitud_id!==g._solicitud_id) && (
-                <div style={{background:'#0d3b5e',color:'#fff',padding:'5px 10px',borderRadius:6,fontSize:11,fontWeight:700,marginBottom:4,marginTop:gi>0?12:0}}>
-                  📤 Solicitud del {g._solicitud_fecha}
-                </div>
-              )}
-              <div style={{border:'1px solid #dde6ef',borderRadius:8,padding:12}}>
+                    <div key={sol.id} style={{marginBottom:16}}>
+                      {/* Banda azul por solicitud */}
+                      <div style={{background:'#0d3b5e',color:'#fff',padding:'8px 14px',borderRadius:'8px 8px 0 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:10}}>
+                          <span style={{fontSize:13,fontWeight:700}}>📤 Solicitud del {sol.created_at?.slice(0,10)}</span>
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.7)'}}>{(sol.items||[]).length} ítem(s)</span>
+                        </div>
+                        <div style={{display:'flex',alignItems:'center',gap:12}}>
+                          <div style={{textAlign:'right'}}>
+                            <div style={{fontSize:9,color:'rgba(255,255,255,.6)',textTransform:'uppercase'}}>Valor pagado</div>
+                            <div style={{fontSize:14,fontWeight:700,color:'#3dbfb8'}}>{fmt(valorPagado)}</div>
+                          </div>
+                          <button style={{background:'rgba(255,255,255,.15)',border:'1px solid rgba(255,255,255,.3)',borderRadius:6,color:'#fff',padding:'4px 10px',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}
+                            onClick={()=>setEditing(prev=>({...prev,gastos:[...(prev.gastos||[]),{...emptyGasto(),_solicitud_id:sol.id,_solicitud_fecha:sol.created_at?.slice(0,10)}]}))}>
+                            + Agregar gasto
+                          </button>
+                        </div>
+                      </div>
+                      {/* Ítems de esta solicitud */}
+                      <div style={{border:'1px solid #dde6ef',borderTop:'none',borderRadius:'0 0 8px 8px',padding:8}}>
+                        {gastosEsta.length===0 && (
+                          <div style={{textAlign:'center',padding:'12px',color:'#aaa',fontSize:12}}>Sin gastos — agregá uno con el botón de arriba</div>
+                        )}
+                        {gastosEsta.map((g,gi)=>(
+                        <div key={g.id} style={{border:'1px solid #dde6ef',borderRadius:8,padding:12,marginBottom:8}}>
                 <div style={{display:'grid',gridTemplateColumns:'2fr 2fr auto',gap:8,marginBottom:8,alignItems:'end'}}>
               <Label>Concepto</Label><input style={S.input} value={g.concepto} onChange={e=>updGasto(g.id,'concepto',e.target.value)}/></div>
                   <div>
@@ -421,9 +430,32 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                   <div><Label>Nombre proveedor</Label><input style={S.input} value={g.nombre_proveedor||''} onChange={e=>updGasto(g.id,'nombre_proveedor',e.target.value)}/></div>
                   <div><Label># Factura</Label><input style={S.input} value={g.num_factura||''} onChange={e=>updGasto(g.id,'num_factura',e.target.value)}/></div>
                   <div><Label># Autorización</Label><input style={S.input} value={g.num_autorizacion||''} onChange={e=>updGasto(g.id,'num_autorizacion',e.target.value)}/></div>
-                </div>
-              </div>
-            ))}
+                        </div>
+                        </div>
+                        ))}
+                        {/* Subtotal por solicitud */}
+                        {gastosEsta.length > 0 && (
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',background:'#eef4fb',borderRadius:6,marginTop:4}}>
+                            <span style={{fontSize:12,color:'#0d3b5e',fontWeight:600}}>Subtotal justificado esta solicitud</span>
+                            <span style={{fontSize:14,fontWeight:700,color:totalJust>=valorPagado?'#2e8b4e':'#c8264a'}}>{fmt(totalJust)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Gastos sin solicitud */}
+                {(editing.gastos||[]).filter(g=>!g._solicitud_id).length > 0 && (
+                  <div style={{marginTop:8}}>
+                    <div style={{background:'#555',color:'#fff',padding:'6px 12px',borderRadius:'6px 6px 0 0',fontSize:12,fontWeight:700}}>Gastos adicionales</div>
+                    {(editing.gastos||[]).filter(g=>!g._solicitud_id).map(g=>(
+                      <div key={g.id} style={{border:'1px solid #dde6ef',borderRadius:8,padding:12,marginBottom:4}}>{g.concepto}</div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
 
             {(editing.gastos||[]).length>0&&(()=>{
               const t=totalesLiq(editing);
