@@ -171,8 +171,8 @@ function OpcionesAdicionales({ p, setP, bloqueado, fmt, fmtPct, calcItem, S, Lab
                                   const file=e.target.files[0]; if(!file)return;
                                   const {supabase:sb}=await import('../lib/supabase');
                                   const name=`opc_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g,'_')}`;
-                                  await sb.storage.from('presupuestos-img').upload(name,file,{upsert:true});
-                                  const {data}=sb.storage.from('presupuestos-img').getPublicUrl(name);
+                                  await sb.storage.from('proforma-images').upload(name,file,{upsert:true});
+                                  const {data}=sb.storage.from('proforma-images').getPublicUrl(name);
                                   updItemOp(op.id,it.id,'imagen_url',data.publicUrl);
                                 }}/>
                                 {it.imagen_url
@@ -340,11 +340,17 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
   }
 
   async function imgToBase64(url) {
+    if (!url) return '';
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { mode:'cors', cache:'no-cache' });
+      if (!res.ok) return url;
       const blob = await res.blob();
       return await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
-    } catch { return url; }
+    } catch(e) {
+      // If CORS fails, return as-is and let browser handle it
+      console.warn('imgToBase64 failed:', e);
+      return url;
+    }
   }
 
   async function openPdfCliente(){
