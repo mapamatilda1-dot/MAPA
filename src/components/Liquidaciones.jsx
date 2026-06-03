@@ -396,6 +396,7 @@ export default function Liquidaciones({ presupuestos, userRole }) {
 
             {/* Gastos agrupados por solicitud pagada */}
             {(editing._solicitudes_pagadas||[]).length > 0 && (
+              <div>
                 {(editing._solicitudes_pagadas||[]).map(sol => {
                   const valorPagado = (sol.items||[]).reduce((a,it)=>a+Number(it.valor_solicitado||0),0);
                   const gastosEsta = (editing.gastos||[]).filter(g=>g._solicitud_id===sol.id);
@@ -480,6 +481,7 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                     ))}
                   </div>
                 )}
+              </div>
             )}
 
             {(editing.gastos||[]).length>0 && <ResumenTotales t={totalesLiq(editing)} fmt={fmt}/>}
