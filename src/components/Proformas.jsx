@@ -102,7 +102,7 @@ function ItemCard({ item, onChange, onDelete, oh_pct }) {
 }
 
 // ── OpcionEditor ──────────────────────────────────────────────
-function OpcionEditor({ opcion, onChange, onDelete, oh_pct, fee_agencia, index }) {
+function OpcionEditor({ opcion, onChange, onDelete, oh_pct, fee_agencia, index, onAprobar }) {
   const t = calcOpcion(opcion, oh_pct, fee_agencia);
 
   function updItem(itemId, field, val) {
