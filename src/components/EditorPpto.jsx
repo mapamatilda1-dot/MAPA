@@ -339,9 +339,26 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     // Nos quedamos en la página para seguir editando
   }
 
-  function openPdfCliente(){
+  async function imgToBase64(url) {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      return await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+    } catch { return url; }
+  }
+
+  async function openPdfCliente(){
     if(!p)return;
-    const html=generatePdfClienteHTML(p,logoUrl);
+    // Convertir imágenes de opciones adicionales a base64
+    const opcs = await Promise.all((p.opciones_adicionales||[]).map(async op => ({
+      ...op,
+      items: await Promise.all((op.items||[]).map(async it => ({
+        ...it,
+        imagen_url: it.imagen_url ? await imgToBase64(it.imagen_url) : '',
+      }))),
+    })));
+    const pConImagenes = { ...p, opciones_adicionales: opcs };
+    const html=generatePdfClienteHTML(pConImagenes,logoUrl);
     const w=window.open('','_blank');w.document.write(html);w.document.close();
   }
 
