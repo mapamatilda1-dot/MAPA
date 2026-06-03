@@ -136,8 +136,19 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
     if (presupuesto_id_inicial && !solicitud) {
       loadPpto(presupuesto_id_inicial);
     } else if (solicitud?.presupuesto_id) {
-      // Si la solicitud ya tiene ítems guardados, restaurarlos junto con el historial
-      loadPptoConItems(solicitud.presupuesto_id, solicitud.items || []);
+      if (solicitud.estado === 'borrador') {
+        // Borrador: reconstruir desde presupuesto con historial
+        loadPptoConItems(solicitud.presupuesto_id, solicitud.items || []);
+      } else {
+        // Bloqueada: usar directamente los ítems guardados
+        const pp = presupuestos.find(p=>p.id===solicitud.presupuesto_id);
+        if (pp) setPpto(pp);
+        setForm(prev => ({
+          ...prev,
+          items: (solicitud.items||[]).map(it=>({...it, seleccionado:true})),
+          _sols_previas: [],
+        }));
+      }
     }
   }, [solicitud?.id, presupuesto_id_inicial]);
 
