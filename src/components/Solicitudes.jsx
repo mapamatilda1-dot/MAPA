@@ -227,20 +227,18 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
   }
 
   const seleccionados = form.items.filter(it=>it.seleccionado);
+  // Solicitudes anteriores — DEBE estar antes de los totales
+  const solsAnt = (form._sols_previas || solicitudesAnteriores||[]).filter(s=>s.id!==solicitud?.id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  const solsAntHeaders = solsAnt.map(s=>({ id:s.id, fecha:fmtDate(s.created_at?.slice(0,10)), estado:s.estado, label:`Sol. ${fmtDate(s.created_at?.slice(0,10))}` }));
   const totalSolicitado = seleccionados.reduce((a,it)=>a+Number(it.valor_solicitado||0),0);
   const totalPresupuestado = seleccionados.reduce((a,it)=>a+Number(it.costo_presupuestado||0),0);
-  // Ya solicitado anteriormente (enviado+pagado, sin rechazados) para los ítems seleccionados
   const totalYaSolicitado = seleccionados.reduce((a,it)=>{
-    const anterior = (solsAnt).filter(s=>['enviada','pagado'].includes(s.estado))
+    const anterior = solsAnt.filter(s=>['enviada','pagado'].includes(s.estado))
       .flatMap(s=>s.items||[]).filter(si=>si.id===it.id)
       .reduce((x,si)=>x+Number(si.valor_solicitado||0),0);
     return a+anterior;
   },0);
   const saldoFinal = totalPresupuestado - totalYaSolicitado - totalSolicitado;
-
-  // Solicitudes anteriores del mismo presupuesto (no la actual)
-  const solsAnt = (form._sols_previas || solicitudesAnteriores||[]).filter(s=>s.id!==solicitud?.id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
-  const solsAntHeaders = solsAnt.map(s=>({ id:s.id, fecha:fmtDate(s.created_at?.slice(0,10)), estado:s.estado, label:`Sol. ${fmtDate(s.created_at?.slice(0,10))}` }));
 
   // Calcular saldo disponible por ítem (solo enviadas y pagadas restan)
   function saldoDisponible(itemId, costoPresupuestado) {
