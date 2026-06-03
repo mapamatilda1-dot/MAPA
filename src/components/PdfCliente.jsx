@@ -1,6 +1,14 @@
 import { calcItem, calcPpto, fmt, fmtDate } from '../calc';
 import LOGO_BASE64 from '../logoBase64';
 
+// Convierte *palabra* en negrita y \n en salto de línea
+function renderDetalle(text) {
+  if (!text) return '';
+  return text
+    .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br/>');
+}
+
 function groupBySubcat(items) {
   const groups = [];
   let current = null;
@@ -43,7 +51,7 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride) {
       return `<tr style="border-bottom:1px solid #eef2f7;background:${i%2===1?'#fafcfe':'#fff'};">
         <td style="padding:8px 14px;">
           <div style="font-weight:700;color:#1a1a2e;font-size:12px;">${it.item || ''}</div>
-          ${it.detalle ? `<div style="font-size:11px;color:#6b7a99;margin-top:2px;">${it.detalle}</div>` : ''}
+          ${it.detalle ? `<div style="font-size:11px;color:#6b7a99;margin-top:2px;">${renderDetalle(it.detalle)}</div>` : ''}
           ${fotoCell}
         </td>
         <td style="padding:8px;text-align:center;color:#1a1a2e;">${c.cantidad}</td>
@@ -263,7 +271,7 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
       return `<tr style="border-bottom:1px solid #eef2f7;background:${bg};font-size:10px;">
         <td style="padding:6px 10px;">
           <div style="font-weight:700;color:#1a1a2e;">${it.item || ''}</div>
-          ${it.detalle ? `<div style="font-size:9px;color:#6b7a99;margin-top:1px;">${it.detalle}</div>` : ''}
+          ${it.detalle ? `<div style="font-size:9px;color:#6b7a99;margin-top:1px;">${renderDetalle(it.detalle)}</div>` : ''}
         </td>
         <td style="padding:6px 5px;text-align:center;">${c.cantidad}</td>
         <td style="padding:6px 5px;text-align:center;">${c.dias}</td>

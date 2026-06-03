@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { S, Label, Badge, Toast } from '../styles.jsx';
 import { calcItem, calcPpto, genNomenclatura, fmt, fmtPct } from '../calc';
@@ -291,7 +291,43 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     showToast('Campos completados desde el proyecto ✓');
   }
 
-  function addItem(){const it=emptyItem(p);setP(prev=>({...prev,items:[...prev.items,it]}));setOpenItem(it.id);}
+  const dragRef = useRef(null); // { type:'item'|'subcat', id, fromIndex }
+
+  function moveItem(dragId, targetId) {
+    // Move item with dragId before/after targetId in p.items
+    setP(prev => {
+      const items = [...prev.items];
+      const fromIdx = items.findIndex(it=>it.id===dragId);
+      const toIdx   = items.findIndex(it=>it.id===targetId);
+      if (fromIdx<0||toIdx<0||fromIdx===toIdx) return prev;
+      const [moved] = items.splice(fromIdx,1);
+      items.splice(toIdx,0,moved);
+      return {...prev,items};
+    });
+  }
+
+  function moveSubcat(dragSubcatId, targetSubcatId) {
+    // Move subcategory block (subcat header + its items) before target subcategory
+    setP(prev => {
+      const items = [...prev.items];
+      // Find blocks
+      const getBlock = (subcatId) => {
+        const start = items.findIndex(it=>it.id===subcatId&&it._type==='subcat');
+        if (start<0) return null;
+        let end = start+1;
+        while (end<items.length && items[end]._type!=='subcat') end++;
+        return { start, end, block: items.slice(start,end) };
+      };
+      const from = getBlock(dragSubcatId);
+      const to   = getBlock(targetSubcatId);
+      if (!from||!to) return prev;
+      // Remove from block, insert before to block
+      const remaining = items.filter((_,i)=>i<from.start||i>=from.end);
+      const toStartInRemaining = remaining.findIndex(it=>it.id===targetSubcatId&&it._type==='subcat');
+      remaining.splice(toStartInRemaining,0,...from.block);
+      return {...prev,items:remaining};
+    });
+  }
   function updItem(id,k,v){
     const nums=['costo_unit','costo_real_unit','precio_unit','oh_pct','bco_pct','bco_real_pct','cantidad','dias'];
     setP(prev=>({...prev,items:prev.items.map(it=>{
@@ -691,10 +727,16 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             );
 
             return grupos.map((grupo,gi)=>(
-              <div key={grupo.subcatId} style={{marginBottom:16}}>
+              <div key={grupo.subcatId} style={{marginBottom:16}}
+                onDragOver={e=>{e.preventDefault();}}
+                onDrop={e=>{e.preventDefault();if(dragRef.current?.type==='subcat'&&dragRef.current.id!==grupo.subcatId)moveSubcat(dragRef.current.id,grupo.subcatId);}}>
                 {/* Cabecera subcategoría */}
-                <div style={{display:'flex',alignItems:'center',gap:8,background:'#0d3b5e',borderRadius:'8px 8px 0 0',padding:'8px 14px'}}>
-                  <span style={{flex:1,color:'#fff',fontWeight:700,fontSize:14,letterSpacing:0.5}}>{grupo.subcat}</span>
+                <div style={{display:'flex',alignItems:'center',gap:8,background:'#0d3b5e',borderRadius:'8px 8px 0 0',padding:'8px 14px'}}
+                  draggable={!bloqueado}
+                  onDragStart={()=>{dragRef.current={type:'subcat',id:grupo.subcatId};}}
+                  onDragEnd={()=>{dragRef.current=null;}}>
+                  {!bloqueado&&<span title="Arrastrar subcategoría" style={{cursor:'grab',color:'rgba(255,255,255,.5)',fontSize:16,flexShrink:0}}>⠿</span>}
+                  <span style={{flex:1,color:'#fff',fontWeight:700,fontSize:14,letterSpacing:0.5}}>{grupo.subcat||<em style={{opacity:.6}}>Sin nombre</em>}</span>
                   <span style={{fontSize:11,color:'#8ab4d4'}}>{grupo.items.length} ítems</span>
                   {/* Renombrar subcategoría — siempre visible si tiene subcatId */}
                   {grupo.subcatId&&grupo.subcatId!=='__none__'&&(
@@ -744,9 +786,15 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                     const c=calcItem(it); const open=openItem===it.id;
                     const tieneReal=it.costo_real_unit!==null&&it.costo_real_unit!==undefined;
                     return(
-                      <div key={it.id} style={{borderBottom:ii<grupo.items.length-1?'1px solid #eef2f7':'none',background:c.hasWarning?'#fff8f8':'#fff'}}>
+                      <div key={it.id} style={{borderBottom:ii<grupo.items.length-1?'1px solid #eef2f7':'none',background:c.hasWarning?'#fff8f8':'#fff'}}
+                        draggable={!bloqueado}
+                        onDragStart={e=>{e.stopPropagation();dragRef.current={type:'item',id:it.id};}}
+                        onDragEnd={()=>{dragRef.current=null;}}
+                        onDragOver={e=>{e.preventDefault();e.stopPropagation();}}
+                        onDrop={e=>{e.preventDefault();e.stopPropagation();if(dragRef.current?.type==='item'&&dragRef.current.id!==it.id)moveItem(dragRef.current.id,it.id);}}>
                         {/* Cabecera ítem */}
                         <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 14px',cursor:'pointer',background:open?(c.hasWarning?'#fdeef1':'#eef4fb'):(c.hasWarning?'#fff8f8':'#fff')}} onClick={()=>setOpenItem(open?null:it.id)}>
+                          {!bloqueado&&<span title="Arrastrar ítem" style={{cursor:'grab',color:'#bbb',fontSize:14,flexShrink:0}} onClick={e=>e.stopPropagation()}>⠿</span>}
                           <span style={{fontSize:12,color:'#8aa0b8'}}>{open?'▲':'▼'}</span>
                           <span style={{flex:1,fontWeight:600,fontSize:14,color:c.hasWarning?'#c8264a':'#1a1a2e'}}>{it.item||<span style={{color:'#bbb'}}>Sin nombre</span>}</span>
                           {c.hasWarning&&<span style={{fontSize:11,color:'#c8264a',fontWeight:700}}>⚠️ Costo &gt; Precio</span>}
@@ -771,7 +819,10 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                                   {categorias.map(c=><option key={c.id}>{c.nombre}</option>)}
                                 </select>
                               </div>
-                              <div style={{gridColumn:'1/-1'}}><Label>Detalle</Label><textarea style={{...S.textarea,height:48}} value={it.detalle} onChange={e=>updItem(it.id,'detalle',e.target.value)}/></div>
+                              <div style={{gridColumn:'1/-1'}}>
+                                <Label>Detalle <span style={{fontSize:10,color:'#aaa',fontWeight:400}}>— usá *palabra* para negrita y Enter para nueva línea</span></Label>
+                                <textarea style={{...S.textarea,height:64}} value={it.detalle} onChange={e=>updItem(it.id,'detalle',e.target.value)}/>
+                              </div>
 
                               {/* COSTO PROVEEDOR */}
                               <div style={{gridColumn:'1/-1',background:'#f8fafc',borderRadius:8,padding:'10px 12px',border:'1px solid #dde6ef'}}>
