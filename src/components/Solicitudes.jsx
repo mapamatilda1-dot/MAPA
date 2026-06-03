@@ -131,15 +131,49 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
     });
   }
 
-  // Auto-cargar presupuesto inicial
+  // Auto-cargar presupuesto
   useEffect(() => {
     if (presupuesto_id_inicial && !solicitud) {
       loadPpto(presupuesto_id_inicial);
     } else if (solicitud?.presupuesto_id) {
-      const pp = presupuestos.find(p=>p.id===solicitud.presupuesto_id);
-      if (pp) setPpto(pp);
+      // Si la solicitud ya tiene ítems guardados, restaurarlos junto con el historial
+      loadPptoConItems(solicitud.presupuesto_id, solicitud.items || []);
     }
-  }, [presupuesto_id_inicial]);
+  }, [solicitud?.id, presupuesto_id_inicial]);
+
+  async function loadPptoConItems(id, itemsGuardados) {
+    const { data } = await supabase.from('presupuestos').select('*').eq('id', id).single();
+    if (!data) return;
+    setPpto(data);
+
+    const { data: solsData } = await supabase.from('solicitudes')
+      .select('*').eq('presupuesto_id', id).order('created_at', { ascending: true });
+    const solsPrevias = (solsData||[]).filter(s=>s.id!==solicitud?.id);
+
+    // Partir de los ítems del presupuesto y restaurar valores guardados
+    const items = (data.items||[]).filter(it=>!it._type).map(it=>{
+      const costoPpto = Number(it.costo_unit||0)*Number(it.cantidad||0)*Number(it.dias||1);
+      const guardado = itemsGuardados.find(g=>g.id===it.id);
+      const yaUsado = solsPrevias.filter(s=>['enviada','pagado'].includes(s.estado))
+        .flatMap(s=>s.items||[]).filter(si=>si.id===it.id)
+        .reduce((a,si)=>a+Number(si.valor_solicitado||0),0);
+      return {
+        id: it.id, item:it.item||'', subcategoria:it.subcategoria||'', categoria:it.categoria||'',
+        costo_presupuestado: costoPpto,
+        valor_solicitado: guardado?.valor_solicitado || 0,
+        notas: guardado?.notas || '',
+        seleccionado: !!guardado,
+        _saldo_inicial: costoPpto - yaUsado,
+      };
+    });
+
+    setForm(f=>({
+      ...f, presupuesto_id:data.id, presupuesto_nombre:data.nombre||data.cliente,
+      cliente_nombre:data.cliente, fecha_evento:data.fecha_evento,
+      lugar:data.lugar||'', dias_evento:data.dias_evento||1, items,
+      _sols_previas: solsPrevias,
+    }));
+  }
 
   async function loadPpto(id) {
     if (!id) { setPpto(null); setForm(f=>({...f,presupuesto_id:'',presupuesto_nombre:'',cliente_nombre:'',fecha_evento:null,lugar:'',items:[]})); return; }
@@ -299,7 +333,7 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
       {form.items.length > 0 && (
         <div style={{background:'#fff',border:'1px solid #e8e8e8',borderRadius:12,padding:'18px 20px',marginBottom:16}}>
           <div style={{fontSize:13,fontWeight:700,color:'#0d3b5e',marginBottom:4}}>Ítems del presupuesto</div>
-          <div style={{fontSize:12,color:'#888',marginBottom:14}}>Seleccioná los ítems y completá el valor a solicitar. El saldo disponible descuenta solicitudes anteriores enviadas.</div>
+          <div style={{fontSize:12,color:'#888',marginBottom:14}}>Marcá el checkbox del ítem para habilitarlo y poder ingresar el valor a solicitar.</div>
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
               <thead>
@@ -463,19 +497,22 @@ export default function Solicitudes({ userRole, userEmail, userName, presupuesto
   }
 
   async function saveSolicitud(data) {
+    let savedId = data.id;
     if (data.id) {
       const {error} = await supabase.from('solicitudes').update(data).eq('id',data.id);
       if(error){alert('Error: '+error.message);return;}
     } else {
       const {data:newSol,error} = await supabase.from('solicitudes').insert({...data,created_by:userEmail,created_by_nombre:userName}).select().single();
       if(error){alert('Error: '+error.message);return;}
-      if(newSol) setEditing(newSol);
-      showToast('Solicitud guardada ✓');
-      loadAll();
-      return;
+      savedId = newSol?.id;
     }
     showToast('Solicitud guardada ✓');
     loadAll();
+    // Recargar la solicitud completa para mantener el editor abierto con datos frescos
+    if (savedId) {
+      const {data:fresh} = await supabase.from('solicitudes').select('*').eq('id',savedId).single();
+      if (fresh) setEditing(fresh);
+    }
   }
 
   async function enviarSolicitud(data) {
@@ -589,6 +626,13 @@ export default function Solicitudes({ userRole, userEmail, userName, presupuesto
                   )}
                 </div>
                 <div style={{display:'flex',gap:6,flexShrink:0,flexWrap:'wrap',alignItems:'center'}}>
+                  {sol.estado==='borrador' && canCreate && (
+                    <Btn size="xs" variant="danger" onClick={async()=>{
+                      if(!window.confirm('¿Eliminar esta solicitud?'))return;
+                      await supabase.from('solicitudes').delete().eq('id',sol.id);
+                      loadAll(); showToast('Solicitud eliminada');
+                    }}>🗑</Btn>
+                  )}
                   {/* Botones Pagado/Rechazado para Financiero cuando está enviada */}
                   {canFinanciero && sol.estado==='enviada' && <>
                     <Btn size="xs" variant="green" onClick={()=>marcarPagado(sol.id)}>✓ Pagado</Btn>
