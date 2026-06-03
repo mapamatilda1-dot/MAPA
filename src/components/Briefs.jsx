@@ -83,7 +83,11 @@ function BriefForm({ clientes, ejecutivos, onSave, onCancel, initial = {}, isEdi
     const file = e.target.files[0];
     if (!file) return;
     setUploading(true);
-    const fileName = `${Date.now()}-${file.name}`;
+    const safeName = file.name
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quitar tildes
+      .replace(/ñ/gi, 'n').replace(/ü/gi, 'u')          // ñ → n
+      .replace(/[^a-zA-Z0-9._-]/g, '_');                // resto → _
+    const fileName = `${Date.now()}-${safeName}`;
     const { error } = await supabase.storage.from('project-files').upload(fileName, file);
     if (error) { alert('Error al subir: ' + error.message); setUploading(false); return; }
     const { data: urlData } = supabase.storage.from('project-files').getPublicUrl(fileName);

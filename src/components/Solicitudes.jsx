@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 
 // ── Helpers ───────────────────────────────────────────────────
 function fmt(n) {
-  return '$' + (Number(n)||0).toLocaleString('es-EC', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  return '$' + (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
 }
 function fmtDate(s) {
   if (!s) return '—';

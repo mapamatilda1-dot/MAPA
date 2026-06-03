@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import ExpedientePanel from './ExpedientePanel';
 
-function fmt(n) { return '$' + (Number(n)||0).toLocaleString('es-EC', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+function fmt(n) { return '$' + (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
 function fmtDate(s) { if (!s) return '—'; const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; }
 function uid() { return crypto.randomUUID(); }
 
@@ -343,7 +343,7 @@ function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, presupuest
 
 // ── PDF cliente ───────────────────────────────────────────────
 function buildPDFHtml(pf) {
-  function fmtN(n){return '$'+(Number(n)||0).toLocaleString('es-EC',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function fmtN(n){return '$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
   function fmtD(s){if(!s)return '—';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
 
   const opcionesHtml=(pf.opciones||[]).map((op,idx)=>{

@@ -44,6 +44,8 @@ export default function ExpedientePanel({ briefId, onClose }) {
   const [implementaciones, setImplementaciones] = useState([]);
   const [versiones, setVersiones]   = useState([]);
   const [cambiosBrief, setCambiosBrief] = useState([]);
+  const [proformas, setProformas]   = useState([]);
+  const [solicitudes, setSolicitudes] = useState([]);
   const [loading, setLoading]       = useState(true);
 
   useEffect(() => {
@@ -53,31 +55,36 @@ export default function ExpedientePanel({ briefId, onClose }) {
 
   async function loadAll() {
     setLoading(true);
-    const [brR, prR, ppR, implR, cambR] = await Promise.all([
+    const [brR, prR, ppR, implR, cambR, pfR] = await Promise.all([
       supabase.from('briefs').select('*').eq('id', briefId).single(),
       supabase.from('propuestas').select('*').eq('brief_id', briefId).order('created_at', { ascending: false }),
       supabase.from('presupuestos').select('*').eq('brief_id', briefId).order('created_at', { ascending: false }),
       supabase.from('implementaciones').select('*').eq('brief_id', briefId).order('fecha_evento'),
       supabase.from('cambios_brief').select('*').eq('brief_id', briefId).order('created_at', { ascending: true }),
+      supabase.from('proformas').select('*').eq('brief_id', briefId).order('created_at', { ascending: false }),
     ]);
     if (brR.data)   setBrief(brR.data);
     if (prR.data)   setPropuestas(prR.data);
     if (ppR.data)   setPresupuestos(ppR.data);
     if (implR.data) setImplementaciones(implR.data);
     if (cambR.data) setCambiosBrief(cambR.data);
+    if (pfR.data)   setProformas(pfR.data);
 
-    // Versiones de presupuestos vinculados
+    // Versiones, liquidaciones y solicitudes vinculadas a presupuestos
     if (ppR.data?.length) {
       const ppIds = ppR.data.map(p => p.id);
-      const [{ data: liqData }, { data: verData }] = await Promise.all([
+      const [{ data: liqData }, { data: verData }, { data: solData }] = await Promise.all([
         supabase.from('liquidaciones').select('*').in('presupuesto_id', ppIds),
         supabase.from('versiones_ppto').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: true }),
+        supabase.from('solicitudes').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: false }),
       ]);
       setLiquidaciones(liqData || []);
       setVersiones(verData || []);
+      setSolicitudes(solData || []);
     } else {
       setLiquidaciones([]);
       setVersiones([]);
+      setSolicitudes([]);
     }
     setLoading(false);
   }
@@ -267,7 +274,64 @@ export default function ExpedientePanel({ briefId, onClose }) {
                 }
               </Section>
 
-              {/* Historial de cambios del proyecto */}
+              {/* Proformas */}
+              {proformas.length > 0 && (
+                <Section icon="📋" title="Proformas" count={proformas.length}>
+                  {proformas.map(pf => {
+                    const totalOpciones = (pf.opciones||[]).length;
+                    const ESTADO_COLORS = {borrador:'#888',enviada:'#0d3b5e',aprobada:'#2e8b4e',cancelada:'#dc2626'};
+                    const color = ESTADO_COLORS[pf.estado]||'#888';
+                    return (
+                      <div key={pf.id} style={{padding:'8px 10px',borderRadius:8,border:'1px solid #e8e8e8',marginBottom:6,borderLeft:`3px solid ${color}`}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                          <div>
+                            <div style={{fontSize:13,fontWeight:600,color:'#0d3b5e'}}>{pf.nombre}</div>
+                            {pf.nomenclatura&&<div style={{fontSize:10,color:'#aaa',fontFamily:'monospace'}}>{pf.nomenclatura}</div>}
+                            <div style={{fontSize:11,color:'#888',marginTop:2}}>{totalOpciones} opción(es)</div>
+                          </div>
+                          <span style={{fontSize:11,padding:'2px 8px',borderRadius:999,background:color+'22',color,fontWeight:600}}>{pf.estado}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </Section>
+              )}
+
+              {/* Solicitudes */}
+              {solicitudes.length > 0 && (
+                <Section icon="📤" title="Solicitudes de valores" count={solicitudes.length}>
+                  {(() => {
+                    const ESTADOS = {borrador:{color:'#888',label:'Borrador'},enviada:{color:'#1e40af',label:'Enviada'},pagado:{color:'#166534',label:'Pagado'},rechazada:{color:'#991b1b',label:'Rechazada'}};
+                    // Agrupar por presupuesto
+                    const grupos = {};
+                    solicitudes.forEach(s=>{
+                      const key=s.presupuesto_id||'sin';
+                      if(!grupos[key])grupos[key]={nombre:s.presupuesto_nombre||'Sin presupuesto',sols:[]};
+                      grupos[key].sols.push(s);
+                    });
+                    return Object.entries(grupos).map(([pptoId,g])=>(
+                      <div key={pptoId} style={{marginBottom:10}}>
+                        <div style={{fontSize:12,fontWeight:700,color:'#0d3b5e',marginBottom:4,paddingBottom:4,borderBottom:'1px solid #f0f0f0'}}>{g.nombre}</div>
+                        {g.sols.map(s=>{
+                          const e=ESTADOS[s.estado]||ESTADOS.borrador;
+                          const total=(s.items||[]).reduce((a,it)=>a+Number(it.valor_solicitado||0),0);
+                          return(
+                            <div key={s.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 8px',borderRadius:6,background:'#f8fafc',marginBottom:4,borderLeft:`3px solid ${e.color}`}}>
+                              <div>
+                                <span style={{fontSize:11,padding:'1px 7px',borderRadius:999,background:e.color+'22',color:e.color,fontWeight:600,marginRight:6}}>{e.label}</span>
+                                {s.tiene_exceso&&<span style={{fontSize:12}} title="Supera presupuesto">⚠️</span>}
+                                <span style={{fontSize:11,color:'#888'}}>{new Date(s.created_at).toLocaleDateString('es-EC')}</span>
+                                {s.created_by_nombre&&<span style={{fontSize:11,color:'#888'}}> · {s.created_by_nombre}</span>}
+                              </div>
+                              <span style={{fontSize:13,fontWeight:700,color:'#0d3b5e'}}>${(total).toLocaleString('en-US',{minimumFractionDigits:2})}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
+                </Section>
+              )}
               {cambiosBrief.length > 0 && (
                 <Section icon="📝" title="Historial de cambios" count={cambiosBrief.length}>
                   <div style={{ position:'relative', paddingLeft:16 }}>
