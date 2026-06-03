@@ -820,10 +820,20 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                   showToast('📄 Versión guardada en el expediente ✓');
                 }}>📄 Nueva versión</button>
               )}
+              <button style={{...S.btnPrimary,background:'#7c3aed'}} onClick={()=>{
+                const nombre=window.prompt('Nombre del subpresupuesto (ej: Guayaquil, Quito):');
+                if(!nombre||!nombre.trim())return;
+                const subppto={
+                  id:crypto.randomUUID(), _type:'subppto',
+                  subpresupuesto:nombre.trim(), incluir_en_total:true,
+                  item:'', detalle:'', cantidad:0, dias:0, costo_unit:0, precio_unit:0,
+                  oh_pct:0, bco_pct:0, categoria:'', es_liquidacion:false,
+                };
+                setP(prev=>({...prev,items:[...prev.items,subppto]}));
+              }}>+ Subpresupuesto</button>
               <button style={{...S.btnPrimary,background:'#0d3b5e'}} onClick={()=>{
                 const nombre=window.prompt('Nombre de la subcategoría:');
                 if(!nombre||!nombre.trim())return;
-                // Insertar un marcador de subcategoría como ítem especial
                 const subcat={
                   id:crypto.randomUUID(), _type:'subcat',
                   subcategoria:nombre.trim(), item:'', detalle:'',
@@ -838,29 +848,57 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
 
           {/* Lista agrupada por subcategoría */}
           {(()=>{
-            // Construir grupos manteniendo orden de inserción
-            const grupos=[]; // [{subcat, items:[]}]
+            // Construir subpresupuestos → grupos → items (3 niveles)
+            const subpptos=[]; // [{id, nombre, incluir, grupos:[{subcat,subcatId,items:[]}]}]
+            let subpptoActual=null;
             let grupoActual=null;
+
             p.items.forEach(it=>{
-              if(it._type==='subcat'){
+              if(it._type==='subppto'){
+                subpptoActual={id:it.id, nombre:it.subpresupuesto, incluir:it.incluir_en_total!==false, grupos:[]};
+                subpptos.push(subpptoActual);
+                grupoActual=null;
+              } else if(it._type==='subcat'){
+                if(!subpptoActual){
+                  subpptoActual={id:'__root__', nombre:'', incluir:true, grupos:[]};
+                  subpptos.push(subpptoActual);
+                }
                 grupoActual={subcat:it.subcategoria, subcatId:it.id, items:[]};
-                grupos.push(grupoActual);
+                subpptoActual.grupos.push(grupoActual);
               } else {
+                if(!subpptoActual){
+                  subpptoActual={id:'__root__', nombre:'', incluir:true, grupos:[]};
+                  subpptos.push(subpptoActual);
+                }
                 if(!grupoActual){
                   grupoActual={subcat:'Sin subcategoría', subcatId:'__none__', items:[]};
-                  grupos.push(grupoActual);
+                  subpptoActual.grupos.push(grupoActual);
                 }
                 grupoActual.items.push(it);
               }
             });
 
-            if(grupos.length===0) return(
+            // For backwards compat - flatten to grupos if no subpptos
+            const grupos = subpptos.length===1 && subpptos[0].id==='__root__'
+              ? subpptos[0].grupos
+              : null;
+
+            // Total general (solo subpptos incluidos)
+            const totalGeneral = subpptos.filter(sp=>sp.incluir).reduce((acc,sp)=>
+              acc + sp.grupos.flatMap(g=>g.items).reduce((a,it)=>{
+                const c=calcItem(it); return a+c.precio;
+              },0), 0);
+
+            const haySubpptos = subpptos.some(sp=>sp.id!=='__root__');
+
+            if(p.items.filter(it=>!it._type).length===0) return(
               <div style={S.empty}>
-                Crea una subcategoría con "+ Subcategoría" y luego agrega ítems con "+ Ítem"
+                Agregá un subpresupuesto o subcategoría para empezar
               </div>
             );
 
-            return grupos.map((grupo,gi)=>(
+            // Render grupos (subcategorías) helper
+            const renderGrupos = (gruposArr, spId) => gruposArr.map((grupo,gi)=>(
               <div key={grupo.subcatId} style={{marginBottom:16}}
                 onDragOver={e=>{e.preventDefault();}}
                 onDrop={e=>{e.preventDefault();if(dragRef.current?.type==='subcat'&&dragRef.current.id!==grupo.subcatId)moveSubcat(dragRef.current.id,grupo.subcatId);}}>
@@ -1162,6 +1200,78 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                 </div>
               </div>
             ));
+
+            // Main render: subpresupuestos or flat grupos
+            return (
+              <div>
+                {haySubpptos ? subpptos.map(sp => {
+                  const spItems = sp.grupos.flatMap(g=>g.items);
+                  const spTotal = spItems.reduce((a,it)=>a+calcItem(it).precio,0);
+                  const spCosto = spItems.reduce((a,it)=>a+calcItem(it).totalCosto,0);
+                  return (
+                    <div key={sp.id} style={{marginBottom:20,border:`2px solid ${sp.incluir?'#7c3aed':'#ddd'}`,borderRadius:12,overflow:'hidden'}}>
+                      {/* Header subpresupuesto */}
+                      <div style={{background:sp.incluir?'#5b21b6':'#888',padding:'10px 16px',display:'flex',alignItems:'center',gap:12}}>
+                        <span style={{color:'#fff',fontWeight:700,fontSize:15,flex:1}}>📦 {sp.nombre}</span>
+                        {/* Checkbox incluir en total */}
+                        <label style={{display:'flex',alignItems:'center',gap:6,color:'rgba(255,255,255,.9)',fontSize:12,cursor:'pointer'}}>
+                          <input type="checkbox" checked={sp.incluir} onChange={e=>{
+                            setP(prev=>({...prev,items:prev.items.map(it=>it.id===sp.id?{...it,incluir_en_total:e.target.checked}:it)}));
+                          }} style={{accentColor:'#fff',width:14,height:14}}/>
+                          Incluir en total
+                        </label>
+                        {/* Duplicar subpresupuesto */}
+                        {!bloqueado&&<button onClick={()=>{
+                          const newNombre=window.prompt('Nombre del subpresupuesto duplicado:',sp.nombre+' (copia)');
+                          if(!newNombre?.trim())return;
+                          const newSpId=crypto.randomUUID();
+                          const newSpItem={id:newSpId,_type:'subppto',subpresupuesto:newNombre.trim(),incluir_en_total:true,item:'',detalle:'',cantidad:0,dias:0,costo_unit:0,precio_unit:0,oh_pct:0,bco_pct:0,categoria:'',es_liquidacion:false};
+                          // Clone all items of this subpresupuesto
+                          const spAllItems=p.items.slice(p.items.findIndex(it=>it.id===sp.id));
+                          const end=spAllItems.findIndex((it,i)=>i>0&&it._type==='subppto');
+                          const block=spAllItems.slice(0,end<0?spAllItems.length:end).map(it=>({...it,id:crypto.randomUUID()}));
+                          block[0]={...newSpItem};
+                          setP(prev=>({...prev,items:[...prev.items,...block]}));
+                        }} style={{background:'rgba(255,255,255,.15)',border:'1px solid rgba(255,255,255,.3)',color:'#fff',padding:'3px 10px',borderRadius:6,cursor:'pointer',fontSize:12,fontFamily:'inherit'}}>
+                          📋 Duplicar
+                        </button>}
+                        {/* Eliminar subpresupuesto */}
+                        {!bloqueado&&<button onClick={()=>{
+                          if(!window.confirm(`¿Eliminar subpresupuesto "${sp.nombre}" y todos sus ítems?`))return;
+                          const idx=p.items.findIndex(it=>it.id===sp.id);
+                          const rest=p.items.slice(idx+1);
+                          const endIdx=rest.findIndex(it=>it._type==='subppto');
+                          const idsToRemove=new Set([sp.id,...rest.slice(0,endIdx<0?rest.length:endIdx).map(it=>it.id)]);
+                          setP(prev=>({...prev,items:prev.items.filter(it=>!idsToRemove.has(it.id))}));
+                        }} style={{background:'rgba(220,38,38,.6)',border:'none',color:'#fff',padding:'3px 8px',borderRadius:6,cursor:'pointer',fontSize:12,fontFamily:'inherit'}}>✕</button>}
+                        <span style={{color:'rgba(255,255,255,.8)',fontSize:12,fontWeight:600}}>{fmt(spTotal)}</span>
+                      </div>
+                      {/* Grupos del subpresupuesto */}
+                      <div style={{padding:'8px 12px'}}>
+                        {renderGrupos(sp.grupos, sp.id)}
+                        {/* Totales del subpresupuesto */}
+                        {spItems.length>0&&<div style={{background:'#5b21b6',borderRadius:8,padding:'10px 14px',marginTop:8,display:'flex',gap:16,flexWrap:'wrap',justifyContent:'flex-end'}}>
+                          {[['Subtotal precio',fmt(spTotal)],['Total costo',fmt(spCosto)],['Margen',fmt(spTotal-spCosto)]].map(([l,v])=>(
+                            <div key={l} style={{textAlign:'right'}}>
+                              <div style={{fontSize:9,color:'rgba(255,255,255,.6)',textTransform:'uppercase',marginBottom:2}}>{l}</div>
+                              <div style={{fontSize:13,fontWeight:700,color:'#fff'}}>{v}</div>
+                            </div>
+                          ))}
+                        </div>}
+                      </div>
+                    </div>
+                  );
+                }) : renderGrupos(subpptos.flatMap(sp=>sp.grupos), '__root__')}
+
+                {/* Total general si hay subpresupuestos */}
+                {haySubpptos&&(
+                  <div style={{background:'#0d3b5e',borderRadius:10,padding:'12px 16px',marginTop:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <span style={{color:'rgba(255,255,255,.7)',fontSize:13}}>Total general (subpresupuestos incluidos)</span>
+                    <span style={{color:'#fff',fontSize:18,fontWeight:700}}>{fmt(totalGeneral)}</span>
+                  </div>
+                )}
+              </div>
+            );
           })()}
 
           {/* Botón global agregar subcategoría al final */}
