@@ -58,7 +58,7 @@ function OpcionesAdicionales({ p, setP, bloqueado, fmt, fmtPct, calcItem, S, Lab
     const items = (opciones.find(o=>o.id===opId)?.items||[]).concat({
       id:crypto.randomUUID(), item:'', detalle:'', cantidad:1, dias:1,
       precio_unit:0, costo_unit:0, oh_pct:Number(p.oh_pct||15), bco_pct:Number(p.bco_pct||5.5),
-      subcategoria:'', categoria:'',
+      subcategoria:'', categoria:'', razon_social:'', imagen_url:'',
     });
     updateOpcion(opId, { items });
   }
@@ -126,8 +126,8 @@ function OpcionesAdicionales({ p, setP, bloqueado, fmt, fmtPct, calcItem, S, Lab
                   <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
                     <thead>
                       <tr style={{ background:'#f0f4f8' }}>
-                        {['Ítem','Detalle','Cant.','Días','P.Unit','Total',''].map(h=>(
-                          <th key={h} style={{ padding:'6px 8px', textAlign:['Cant.','Días','P.Unit','Total'].includes(h)?'right':'left', fontSize:11, color:'#666', fontWeight:700 }}>{h}</th>
+                        {['Ítem','Detalle','Cant.','Días','C.Unit','P.Unit','Total','Razón social','Img',''].map(h=>(
+                          <th key={h} style={{ padding:'6px 8px', textAlign:['Cant.','Días','C.Unit','P.Unit','Total'].includes(h)?'right':'left', fontSize:11, color:'#666', fontWeight:700 }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -136,27 +136,50 @@ function OpcionesAdicionales({ p, setP, bloqueado, fmt, fmtPct, calcItem, S, Lab
                         const c = calcItem(it);
                         return (
                           <tr key={it.id} style={{ borderBottom:'1px solid #f0f0f0' }}>
-                            <td style={{ padding:'5px 8px' }}>
+                            <td style={{ padding:'5px 6px' }}>
                               <input value={it.item||''} onChange={e=>updItemOp(op.id,it.id,'item',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12}} placeholder="Nombre del ítem"/>
+                                style={{...S.input,padding:'3px 6px',fontSize:12}} placeholder="Nombre"/>
                             </td>
-                            <td style={{ padding:'5px 8px' }}>
+                            <td style={{ padding:'5px 6px' }}>
                               <input value={it.detalle||''} onChange={e=>updItemOp(op.id,it.id,'detalle',e.target.value)}
                                 style={{...S.input,padding:'3px 6px',fontSize:12}} placeholder="Detalle"/>
                             </td>
-                            <td style={{ padding:'5px 4px', width:60 }}>
-                              <input type="number" value={it.cantidad} onChange={e=>updItemOp(op.id,it.id,'cantidad',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right'}}/>
-                            </td>
                             <td style={{ padding:'5px 4px', width:55 }}>
-                              <input type="number" value={it.dias} onChange={e=>updItemOp(op.id,it.id,'dias',e.target.value)}
+                              <input type="number" value={it.cantidad} onWheel={e=>e.target.blur()} onChange={e=>updItemOp(op.id,it.id,'cantidad',e.target.value)}
                                 style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right'}}/>
                             </td>
-                            <td style={{ padding:'5px 4px', width:90 }}>
-                              <input type="number" step="0.01" value={it.precio_unit} onChange={e=>updItemOp(op.id,it.id,'precio_unit',e.target.value)}
+                            <td style={{ padding:'5px 4px', width:50 }}>
+                              <input type="number" value={it.dias} onWheel={e=>e.target.blur()} onChange={e=>updItemOp(op.id,it.id,'dias',e.target.value)}
                                 style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right'}}/>
                             </td>
-                            <td style={{ padding:'5px 8px', textAlign:'right', fontWeight:600, color:'#7c3aed' }}>{fmt(c.precio)}</td>
+                            <td style={{ padding:'5px 4px', width:85 }}>
+                              <input type="number" step="0.01" value={it.costo_unit||''} onWheel={e=>e.target.blur()} onChange={e=>updItemOp(op.id,it.id,'costo_unit',e.target.value)}
+                                style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right',background:'#fafafa'}} placeholder="0.00"/>
+                            </td>
+                            <td style={{ padding:'5px 4px', width:85 }}>
+                              <input type="number" step="0.01" value={it.precio_unit||''} onWheel={e=>e.target.blur()} onChange={e=>updItemOp(op.id,it.id,'precio_unit',e.target.value)}
+                                style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right'}} placeholder="0.00"/>
+                            </td>
+                            <td style={{ padding:'5px 8px', textAlign:'right', fontWeight:600, color:'#7c3aed', width:85 }}>{fmt(c.precio)}</td>
+                            <td style={{ padding:'5px 6px', width:120 }}>
+                              <input value={it.razon_social||''} onChange={e=>updItemOp(op.id,it.id,'razon_social',e.target.value)}
+                                style={{...S.input,padding:'3px 6px',fontSize:12}} placeholder="Proveedor"/>
+                            </td>
+                            <td style={{ padding:'5px 4px', width:44 }}>
+                              <label style={{cursor:'pointer',display:'block',textAlign:'center'}}>
+                                <input type="file" accept="image/*" style={{display:'none'}} onChange={async e=>{
+                                  const file=e.target.files[0]; if(!file)return;
+                                  const {supabase:sb}=await import('../lib/supabase');
+                                  const name=`opc_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g,'_')}`;
+                                  await sb.storage.from('presupuestos-img').upload(name,file,{upsert:true});
+                                  const {data}=sb.storage.from('presupuestos-img').getPublicUrl(name);
+                                  updItemOp(op.id,it.id,'imagen_url',data.publicUrl);
+                                }}/>
+                                {it.imagen_url
+                                  ? <img src={it.imagen_url} alt="" style={{width:32,height:32,objectFit:'cover',borderRadius:4,border:'1px solid #ddd'}}/>
+                                  : <span style={{fontSize:18,color:'#ccc'}}>📷</span>}
+                              </label>
+                            </td>
                             <td style={{ padding:'5px 4px', width:30 }}>
                               <button onClick={()=>updateOpcion(op.id,{items:(op.items||[]).filter(x=>x.id!==it.id)})}
                                 style={{background:'none',border:'none',color:'#dc2626',cursor:'pointer',fontSize:14}}>✕</button>

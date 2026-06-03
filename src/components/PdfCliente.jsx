@@ -155,37 +155,46 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride) {
     </div>
     <div style="border:1px solid #dde6ef;border-top:none;border-radius:0 0 8px 8px;padding:16px;">
       ${(ppto.opciones_adicionales||[]).map(op => {
-        const totalOp = (op.items||[]).reduce((a,it) => {
-          const qty = Number(it.cantidad||0); const dias = Number(it.dias||1); const pu = Number(it.precio_unit||0);
-          return a + qty*dias*pu;
-        }, 0);
+        const feeAgencia = ppto.fee_agencia || 0;
+        let subtotalOp = 0;
         const itemRows = (op.items||[]).map((it,i) => {
           const qty = Number(it.cantidad||0); const dias = Number(it.dias||1); const pu = Number(it.precio_unit||0);
           const total = qty*dias*pu;
+          subtotalOp += total;
           return `<tr style="background:${i%2?'#f8fafc':'#fff'};border-bottom:1px solid #f0f0f0;">
+            <td style="padding:7px 8px;text-align:center;">${it.imagen_url ? `<img src="${it.imagen_url}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;"/>` : '—'}</td>
             <td style="padding:7px 10px;font-size:12px;font-weight:500;">${it.item||''}</td>
             <td style="padding:7px 10px;font-size:11px;color:#666;">${it.detalle||''}</td>
             <td style="padding:7px 8px;text-align:center;font-size:12px;">${qty}</td>
             <td style="padding:7px 8px;text-align:center;font-size:12px;">${dias}</td>
             <td style="padding:7px 8px;text-align:right;font-size:12px;">$${pu.toFixed(2)}</td>
             <td style="padding:7px 8px;text-align:right;font-size:12px;font-weight:600;color:#5b21b6;">$${total.toFixed(2)}</td>
+            <td style="padding:7px 10px;font-size:11px;color:#888;">${it.razon_social||''}</td>
           </tr>`;
         }).join('');
+        const feeOp = subtotalOp * (feeAgencia/100);
+        const totalConFee = subtotalOp + feeOp;
         return `
         <div style="margin-bottom:16px;">
           <div style="background:#f5f3ff;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:700;color:#5b21b6;margin-bottom:6px;">${op.nombre}</div>
           <table style="width:100%;border-collapse:collapse;">
             <thead><tr style="background:#ede9fe;">
+              <th style="padding:6px 8px;text-align:center;font-size:10px;color:#5b21b6;">Img</th>
               <th style="padding:6px 10px;text-align:left;font-size:10px;color:#5b21b6;">Ítem</th>
               <th style="padding:6px 10px;text-align:left;font-size:10px;color:#5b21b6;">Detalle</th>
               <th style="padding:6px 8px;text-align:center;font-size:10px;color:#5b21b6;">Cant.</th>
               <th style="padding:6px 8px;text-align:center;font-size:10px;color:#5b21b6;">Días</th>
               <th style="padding:6px 8px;text-align:right;font-size:10px;color:#5b21b6;">P.Unit</th>
               <th style="padding:6px 8px;text-align:right;font-size:10px;color:#5b21b6;">Total</th>
+              <th style="padding:6px 10px;text-align:left;font-size:10px;color:#5b21b6;">Proveedor</th>
             </tr></thead>
             <tbody>${itemRows}</tbody>
           </table>
-          <div style="text-align:right;padding:6px 8px;font-size:13px;font-weight:700;color:#5b21b6;">Total opción: $${totalOp.toFixed(2)}</div>
+          <div style="display:flex;justify-content:flex-end;gap:16px;padding:8px 8px 4px;font-size:12px;">
+            <span>Subtotal: <strong style="color:#5b21b6;">$${subtotalOp.toFixed(2)}</strong></span>
+            ${feeAgencia>0?`<span>Fee ${feeAgencia}%: <strong style="color:#5b21b6;">$${feeOp.toFixed(2)}</strong></span>`:''}
+            <span style="font-size:13px;font-weight:700;color:#5b21b6;">Total c/fee: $${totalConFee.toFixed(2)}</span>
+          </div>
         </div>`;
       }).join('')}
     </div>
