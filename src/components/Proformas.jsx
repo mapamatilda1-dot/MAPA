@@ -74,11 +74,11 @@ function ItemCard({ item, onChange, onDelete, oh_pct }) {
         <div style={{padding:'12px 14px',background:'#fafcfe',borderTop:'1px solid #dde6ef',display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
           <div style={{gridColumn:'1/-1'}}><label style={lbl}>Nombre del ítem *</label><input style={inp} value={item.nombre||''} onChange={e=>onChange('nombre',e.target.value)}/></div>
           <div style={{gridColumn:'1/-1'}}><label style={lbl}>Detalle</label><textarea style={{...inp,minHeight:50,resize:'vertical'}} value={item.detalle||''} onChange={e=>onChange('detalle',e.target.value)}/></div>
-          <div><label style={lbl}>Cantidad</label><input type="number" style={inp} value={item.cantidad} onChange={e=>onChange('cantidad',Number(e.target.value))} min="0"/></div>
-          <div><label style={lbl}>Días</label><input type="number" style={inp} value={item.dias} onChange={e=>onChange('dias',Number(e.target.value))} min="1"/></div>
-          <div><label style={lbl}>Costo unitario ($)</label><input type="number" step="0.01" style={{...inp,background:'#fafafa'}} value={item.costo_unit||''} onChange={e=>onChange('costo_unit',Number(e.target.value))}/></div>
-          <div><label style={lbl}>BCO %</label><input type="number" step="0.1" style={{...inp,background:'#fafafa'}} value={item.bco_pct||''} onChange={e=>onChange('bco_pct',Number(e.target.value))} placeholder="0"/></div>
-          <div><label style={lbl}>Precio unitario ($)</label><input type="number" step="0.01" style={inp} value={item.precio_unit||''} onChange={e=>onChange('precio_unit',Number(e.target.value))}/></div>
+          <div><label style={lbl}>Cantidad</label><input type="number" style={inp} value={item.cantidad} onWheel={e=>e.target.blur()} onChange={e=>onChange('cantidad',Number(e.target.value))} min="0"/></div>
+          <div><label style={lbl}>Días</label><input type="number" style={inp} value={item.dias} onWheel={e=>e.target.blur()} onChange={e=>onChange('dias',Number(e.target.value))} min="1"/></div>
+          <div><label style={lbl}>Costo unitario ($)</label><input type="number" step="0.01" style={{...inp,background:'#fafafa'}} onWheel={e=>e.target.blur()} value={item.costo_unit||''} onChange={e=>onChange('costo_unit',Number(e.target.value))}/></div>
+          <div><label style={lbl}>BCO %</label><input type="number" step="0.1" style={{...inp,background:'#fafafa'}} onWheel={e=>e.target.blur()} value={item.bco_pct||''} onChange={e=>onChange('bco_pct',Number(e.target.value))} placeholder="0"/></div>
+          <div><label style={lbl}>Precio unitario ($)</label><input type="number" step="0.01" style={inp} onWheel={e=>e.target.blur()} value={item.precio_unit||''} onChange={e=>onChange('precio_unit',Number(e.target.value))}/></div>
           <div><label style={lbl}>Precio total</label><input readOnly style={{...inp,background:'#f0f0f0',fontWeight:600}} value={fmt(precioTotal)}/></div>
           <div><label style={lbl}>Razón social proveedor</label><input style={inp} value={item.proveedor||''} onChange={e=>onChange('proveedor',e.target.value)}/></div>
           <div><label style={lbl}>Info general</label><input style={inp} value={item.info||''} onChange={e=>onChange('info',e.target.value)}/></div>
@@ -146,6 +146,7 @@ function OpcionEditor({ opcion, onChange, onDelete, oh_pct, fee_agencia, index }
         <input value={opcion.nombre||''} onChange={e=>onChange({...opcion,nombre:e.target.value})}
           placeholder="Nombre de la opción (ej: Carpa Premium, Decoración Clásica...)"
           style={{...inp,background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',color:'#fff',flex:1,fontSize:13}}/>
+        {onAprobar && <Btn size="xs" variant="green" onClick={onAprobar}>✓ Aprobar opción</Btn>}
         <Btn size="xs" variant="danger" onClick={onDelete}>✕</Btn>
       </div>
 
@@ -207,7 +208,7 @@ function OpcionEditor({ opcion, onChange, onDelete, oh_pct, fee_agencia, index }
 }
 
 // ── ProformaEditor ────────────────────────────────────────────
-function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, onSave, onCancel }) {
+function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, presupuestosExistentes, onSave, onCancel, onCrearPresupuesto, onAgregarAPresupuesto }) {
   const [pf, setPf] = useState(() => initial || {
     nombre:'', cliente_id:'', cliente_nombre:'', ejecutivo_nombre:'', ejecutivo_email:'',
     brief_id:'', fecha_evento:'', ciudad:'Guayaquil', lugar:'', personas:0, dias_evento:1,
@@ -215,6 +216,7 @@ function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, onSave, on
     notas:'', estado:'borrador', opciones:[],
   });
   const [saving, setSaving] = useState(false);
+  const [aprobarModal, setAprobarModal] = useState(null); // opcion a aprobar
 
   function set(k,v) {
     setPf(prev => {
@@ -235,7 +237,9 @@ function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, onSave, on
 
   async function handleSave() {
     setSaving(true);
-    await onSave(pf);
+    const result = await onSave(pf);
+    // Si el servidor devuelve la proforma con id, actualizar el estado local
+    if (result?.id) setPf(result);
     setSaving(false);
   }
 
@@ -288,9 +292,9 @@ function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, onSave, on
           <div><label style={lbl}>Fecha del evento</label><input type="date" value={pf.fecha_evento||''} onChange={e=>set('fecha_evento',e.target.value||null)} style={inp}/></div>
           <div><label style={lbl}>Ciudad</label><input value={pf.ciudad||''} onChange={e=>set('ciudad',e.target.value)} style={inp}/></div>
           <div><label style={lbl}>Lugar / Venue</label><input value={pf.lugar||''} onChange={e=>set('lugar',e.target.value)} style={inp}/></div>
-          <div><label style={lbl}>PAX</label><input type="number" value={pf.personas||''} onChange={e=>set('personas',e.target.value)} style={inp} min="0"/></div>
-          <div><label style={lbl}>OH %</label><input type="number" value={pf.oh_pct||''} onChange={e=>set('oh_pct',Number(e.target.value))} style={inp} step="0.1"/></div>
-          <div><label style={lbl}>Fee agencia %</label><input type="number" value={pf.fee_agencia||''} onChange={e=>set('fee_agencia',Number(e.target.value))} style={inp} step="0.1"/></div>
+          <div><label style={lbl}>PAX</label><input type="number" value={pf.personas||''} onChange={e=>set('personas',e.target.value)} onWheel={e=>e.target.blur()} style={inp} min="0"/></div>
+          <div><label style={lbl}>OH %</label><input type="number" value={pf.oh_pct||''} onChange={e=>set('oh_pct',Number(e.target.value))} onWheel={e=>e.target.blur()} style={inp} step="0.1"/></div>
+          <div><label style={lbl}>Fee agencia %</label><input type="number" value={pf.fee_agencia||''} onChange={e=>set('fee_agencia',Number(e.target.value))} onWheel={e=>e.target.blur()} style={inp} step="0.1"/></div>
           <div style={{gridColumn:'1/-1'}}><label style={lbl}>Notas</label><textarea value={pf.notas||''} onChange={e=>set('notas',e.target.value)} style={{...inp,minHeight:60,resize:'vertical'}}/></div>
         </div>
       </div>
@@ -312,6 +316,7 @@ function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, onSave, on
           oh_pct={pf.oh_pct} fee_agencia={pf.fee_agencia}
           onChange={data=>updOpcion(op.id,data)}
           onDelete={()=>delOpcion(op.id)}
+          onAprobar={()=>setAprobarModal(op)}
         />
       ))}
 
@@ -320,6 +325,18 @@ function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, onSave, on
         <Btn variant="secondary" onClick={generatePDF}>📄 PDF cliente</Btn>
         <Btn onClick={handleSave} disabled={saving}>{saving?'Guardando...':'Guardar proforma'}</Btn>
       </div>
+
+      {/* Modal aprobar opción → crear presupuesto */}
+      {aprobarModal && (
+        <AprobarOpcionModal
+          opcion={aprobarModal}
+          proforma={pf}
+          presupuestosExistentes={presupuestosExistentes||[]}
+          onClose={()=>setAprobarModal(null)}
+          onCrearNuevo={(op,pf)=>onCrearPresupuesto&&onCrearPresupuesto(op,pf)}
+          onAgregarA={(op,pptoId)=>onAgregarAPresupuesto&&onAgregarAPresupuesto(op,pptoId)}
+        />
+      )}
     </div>
   );
 }
@@ -429,12 +446,72 @@ function buildPDFHtml(pf) {
   </div></body></html>`;
 }
 
+// ── Modal aprobar opción → crear/agregar presupuesto ─────────
+function AprobarOpcionModal({ opcion, proforma, presupuestosExistentes, onClose, onCrearNuevo, onAgregarA }) {
+  const [modo, setModo] = useState('nuevo'); // 'nuevo' | 'existente'
+  const [pptoSeleccionado, setPptoSeleccionado] = useState('');
+
+  const itemsOpcion = (opcion.items||[]).filter(it=>!it._type);
+  const total = itemsOpcion.reduce((a,it)=>a+Number(it.cantidad||0)*Number(it.dias||1)*Number(it.precio_unit||0),0);
+
+  // Filtrar presupuestos del mismo cliente
+  const pptosFiltrados = presupuestosExistentes.filter(p=>
+    !proforma.cliente_id || p.cliente_id===proforma.cliente_id || p.cliente===proforma.cliente_nombre
+  );
+
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:500,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:14,width:'100%',maxWidth:520,padding:24}}>
+        <div style={{fontSize:16,fontWeight:700,color:'#2e8b4e',marginBottom:4}}>✓ Aprobar opción</div>
+        <div style={{fontSize:13,color:'#666',marginBottom:16}}>
+          <strong>{opcion.nombre||`Opción`}</strong> · {itemsOpcion.length} ítem(s) · {fmt(total)} s/fee
+        </div>
+
+        <div style={{display:'flex',gap:8,marginBottom:16}}>
+          <button onClick={()=>setModo('nuevo')} style={{flex:1,padding:'10px',borderRadius:9,border:`2px solid ${modo==='nuevo'?'#0d3b5e':'#ddd'}`,background:modo==='nuevo'?'#eef4fb':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:modo==='nuevo'?700:400,color:modo==='nuevo'?'#0d3b5e':'#555'}}>
+            + Crear nuevo presupuesto
+          </button>
+          <button onClick={()=>setModo('existente')} style={{flex:1,padding:'10px',borderRadius:9,border:`2px solid ${modo==='existente'?'#0d3b5e':'#ddd'}`,background:modo==='existente'?'#eef4fb':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:modo==='existente'?700:400,color:modo==='existente'?'#0d3b5e':'#555'}}>
+            Agregar a presupuesto existente
+          </button>
+        </div>
+
+        {modo==='existente' && (
+          <div style={{marginBottom:16}}>
+            <label style={lbl}>Seleccioná el presupuesto</label>
+            <select value={pptoSeleccionado} onChange={e=>setPptoSeleccionado(e.target.value)} style={inp}>
+              <option value="">Elegí un presupuesto...</option>
+              {pptosFiltrados.map(p=><option key={p.id} value={p.id}>{p.nomenclatura?`${p.nomenclatura} — `:''}{p.nombre||p.cliente}</option>)}
+            </select>
+          </div>
+        )}
+
+        <div style={{background:'#f8fafc',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:12,color:'#555'}}>
+          Se crearán los ítems de esta opción en el presupuesto con los mismos valores de precio, costo, cantidad y días.
+        </div>
+
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+          <Btn variant="secondary" onClick={onClose}>Cancelar</Btn>
+          <Btn variant="green" onClick={()=>{
+            if(modo==='nuevo') onCrearNuevo(opcion, proforma);
+            else { if(!pptoSeleccionado){alert('Seleccioná un presupuesto');return;} onAgregarA(opcion, pptoSeleccionado); }
+            onClose();
+          }}>
+            {modo==='nuevo'?'Crear presupuesto':'Agregar al presupuesto'}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Componente principal ──────────────────────────────────────
 export default function Proformas({ userRole, userEmail }) {
   const [proformas, setProformas] = useState([]);
   const [clientes, setClientes]   = useState([]);
   const [ejecutivos, setEjecs]    = useState([]);
   const [briefs, setBriefs]       = useState([]);
+  const [presupuestosExistentes, setPresupuestosExistentes] = useState([]);
   const [cfg, setCfg]             = useState({oh_pct:15,bco_pct:5.5,fee_agencia:0});
   const [loading, setLoading]     = useState(true);
   const [editing, setEditing]     = useState(null);
@@ -460,57 +537,102 @@ export default function Proformas({ userRole, userEmail }) {
 
   async function loadAll(){
     setLoading(true);
-    const [pfR,clR,ejR,brR,cfgR]=await Promise.all([
+    const [pfR,clR,ejR,brR,cfgR,ppR]=await Promise.all([
       supabase.from('proformas').select('*').order('created_at',{ascending:false}),
       supabase.from('clientes').select('*').eq('activo',true).order('nombre'),
       supabase.from('ejecutivos').select('*').order('nombre'),
       supabase.from('briefs').select('id,nombre,cliente_id,cliente_nombre,fecha_evento,ciudad,lugar,pax,dias_evento').order('nombre'),
       supabase.from('config').select('*').single(),
+      supabase.from('presupuestos').select('id,nombre,cliente,cliente_id,nomenclatura,estado,items,oh_pct,bco_pct,fee_agencia').order('created_at',{ascending:false}),
     ]);
     setProformas(pfR.data||[]);
     setClientes(clR.data||[]);
     setEjecs(ejR.data||[]);
     setBriefs(brR.data||[]);
+    setPresupuestosExistentes(ppR.data||[]);
     if(cfgR.data)setCfg(cfgR.data);
     setLoading(false);
   }
 
   async function saveProforma(pf){
-    if(!pf.nombre.trim()){alert('El nombre es obligatorio');return;}
-    if(!pf.cliente_id){alert('Seleccioná un cliente');return;}
-    // Limpiar campos que pueden causar errores
-    // Excluir solo campos que no existen en la tabla
-    const pfClean={
-      ...pf,
-      brief_id:     pf.brief_id     || null,
-      cliente_id:   pf.cliente_id   || null,
-      fecha_evento: pf.fecha_evento  || null,
-    };
-    // Eliminar campos que pueden no existir en la tabla
+    if(!pf.nombre.trim()){alert('El nombre es obligatorio');return null;}
+    if(!pf.cliente_id){alert('Seleccioná un cliente');return null;}
+    const pfClean={...pf, brief_id:pf.brief_id||null, cliente_id:pf.cliente_id||null, fecha_evento:pf.fecha_evento||null};
     delete pfClean.items;
     if(pf.id){
       const {error}=await supabase.from('proformas').update(pfClean).eq('id',pf.id);
-      if(error){alert('Error: '+error.message);return;}
+      if(error){alert('Error: '+error.message);return null;}
       showToast('Proforma guardada ✓');
       loadAll();
+      return pfClean;
     } else {
       const {count}=await supabase.from('proformas').select('*',{count:'exact',head:true});
       const nom=`PF-${String((count||0)+1).padStart(3,'0')}-${pf.cliente_nombre?.slice(0,10).toUpperCase()}-${new Date().getFullYear()}`;
       const {data:newPf,error}=await supabase.from('proformas').insert({...pfClean,nomenclatura:nom,created_by:userEmail}).select().single();
-      if(error){alert('Error al guardar: '+error.message);return;}
+      if(error){alert('Error al guardar: '+error.message);return null;}
       showToast('Proforma guardada ✓');
       loadAll();
       if(newPf)setEditing(newPf);
+      return newPf;
     }
   }
 
-  if(loading)return<div style={{padding:'2rem',textAlign:'center',color:'#888'}}>Cargando...</div>;
+  function buildItemsFromOpcion(opcion, oh_pct, bco_pct) {
+    const result = [];
+    let currentSubcat = null;
+    (opcion.items||[]).forEach(it => {
+      if (it._type==='subcat') {
+        currentSubcat = it.subcategoria;
+        result.push({ id:crypto.randomUUID(), _type:'subcat', subcategoria:it.subcategoria, item:'', detalle:'', cantidad:0, dias:0, costo_unit:0, precio_unit:0, oh_pct:0, bco_pct:0, categoria:'' });
+      } else {
+        result.push({
+          id: crypto.randomUUID(), item:it.nombre||'', detalle:it.detalle||'',
+          subcategoria: currentSubcat||'', categoria: currentSubcat||'',
+          cantidad: Number(it.cantidad||0), dias: Number(it.dias||1),
+          precio_unit: Number(it.precio_unit||0), costo_unit: Number(it.costo_unit||0),
+          oh_pct: Number(oh_pct||15), bco_pct: Number(it.bco_pct||bco_pct||5.5),
+          proveedor: it.proveedor||'', info: it.info||'',
+          foto_referencia: it.imagen_url||null, costo_real_unit:null,
+        });
+      }
+    });
+    return result;
+  }
+
+  async function crearPresupuesto(opcion, pf) {
+    const items = buildItemsFromOpcion(opcion, pf.oh_pct, pf.bco_pct);
+    const payload = {
+      nombre: `${pf.nombre} — ${opcion.nombre||'Opción aprobada'}`,
+      cliente: pf.cliente_nombre, cliente_id: pf.cliente_id||null,
+      brief_id: pf.brief_id||null, fecha_evento: pf.fecha_evento||null,
+      ciudad: pf.ciudad, lugar: pf.lugar, personas: pf.personas, dias_evento: pf.dias_evento,
+      ejecutivo_nombre: pf.ejecutivo_nombre, ejecutivo_email: pf.ejecutivo_email,
+      oh_pct: pf.oh_pct, bco_pct: pf.bco_pct, fee_agencia: pf.fee_agencia,
+      estado: 'borrador', items, created_by: userEmail,
+    };
+    const { error } = await supabase.from('presupuestos').insert(payload);
+    if (error) { alert('Error al crear presupuesto: '+error.message); return; }
+    showToast('✅ Presupuesto creado en borrador');
+  }
+
+  async function agregarAPresupuesto(opcion, pptoId) {
+    const ppto = presupuestosExistentes.find(p=>p.id===pptoId);
+    if (!ppto) return;
+    const nuevosItems = buildItemsFromOpcion(opcion, ppto.oh_pct, ppto.bco_pct);
+    const itemsActuales = ppto.items||[];
+    const { error } = await supabase.from('presupuestos').update({ items:[...itemsActuales,...nuevosItems] }).eq('id',pptoId);
+    if (error) { alert('Error al agregar ítems: '+error.message); return; }
+    showToast('✅ Ítems agregados al presupuesto');
+  }
 
   if(editing!==null){
     return<ProformaEditor
       initial={editing==='new'?null:editing}
       clientes={clientes} ejecutivos={ejecutivos} briefs={briefs} cfg={cfg}
+      presupuestosExistentes={presupuestosExistentes}
       onSave={saveProforma} onCancel={()=>setEditing(null)}
+      onCrearPresupuesto={crearPresupuesto}
+      onAgregarAPresupuesto={agregarAPresupuesto}
     />;
   }
 
