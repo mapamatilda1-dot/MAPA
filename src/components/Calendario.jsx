@@ -54,6 +54,7 @@ export default function Calendario() {
         );
         const data = await res.json();
         if (data.ok) setGcalEvents(data.events || []);
+        else console.warn('Google Calendar error:', data.error || data);
       } catch (e) {
         console.warn('Google Calendar no disponible:', e);
       }

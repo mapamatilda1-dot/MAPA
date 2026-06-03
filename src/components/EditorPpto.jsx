@@ -274,19 +274,20 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     if (!briefId) { setP(prev=>({...prev, brief_id:''})); return; }
     const br = briefs.find(b => b.id === briefId);
     if (!br) return;
-    // Autocompletar campos del brief — manteniendo lo que el usuario ya tocó
     setP(prev => ({
       ...prev,
       brief_id:    briefId,
       nombre:      prev.nombre      || br.nombre        || '',
       cliente:     prev.cliente     || br.cliente_nombre || '',
-      fecha_evento:prev.fecha_evento !== new Date().toISOString().slice(0,10)
-                    ? prev.fecha_evento
-                    : (br.fecha_evento || prev.fecha_evento),
+      fecha_evento: (!prev.fecha_evento || prev.fecha_evento === new Date().toISOString().slice(0,10))
+                    ? (br.fecha_evento || prev.fecha_evento)
+                    : prev.fecha_evento,
       ciudad:      prev.ciudad !== 'Guayaquil' ? prev.ciudad : (br.ciudad || prev.ciudad),
       lugar:       prev.lugar       || br.lugar          || '',
       personas:    prev.personas    || br.pax            || 0,
       dias_evento: prev.dias_evento || br.dias_evento    || 1,
+      ejecutivo_nombre: prev.ejecutivo_nombre || br.ejecutivo_nombre || '',
+      ejecutivo_email:  prev.ejecutivo_email  || br.ejecutivo_email  || '',
       apply_rebate: (br.cliente_nombre||'').toUpperCase().includes('TESALIA'),
     }));
     showToast('Campos completados desde el proyecto ✓');
@@ -605,6 +606,14 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
               <label htmlFor="rebate" style={{fontSize:13,cursor:'pointer',color:'#0d3b5e'}}>Aplicar REBATE ({p.rebate_pct??0}%) — Solo Tesalia</label>
             </div>
             <div style={{gridColumn:'1/-1'}}><Label>Notas</Label><textarea style={{...S.textarea,height:72}} value={p.notas||''} onChange={e=>setField('notas',e.target.value)}/></div>
+            {p.estado==='facturado' && (
+              <div style={{gridColumn:'1/-1',background:'#e8f5ee',borderRadius:8,padding:'12px',border:'1px solid #2e8b4e'}}>
+                <div style={{fontSize:12,fontWeight:700,color:'#2e8b4e',marginBottom:8}}>🧾 Facturación</div>
+                <div><Label>Número de factura</Label>
+                  <input style={S.input} value={p.num_factura_cliente||''} onChange={e=>setField('num_factura_cliente',e.target.value)} placeholder="Ej: 001-001-000123456"/>
+                </div>
+              </div>
+            )}
             <div style={{gridColumn:'1/-1',background:'#eef4fb',borderRadius:8,padding:'12px',border:'1px solid #c8d8e8'}}>
               <div style={{fontSize:12,fontWeight:700,color:'#0d3b5e',marginBottom:10}}>👤 Ejecutivo de contacto</div>
               <div style={S.grid2}>
@@ -689,15 +698,15 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                 <div style={{display:'flex',alignItems:'center',gap:8,background:'#0d3b5e',borderRadius:'8px 8px 0 0',padding:'8px 14px'}}>
                   <span style={{flex:1,color:'#fff',fontWeight:700,fontSize:14,letterSpacing:0.5}}>{grupo.subcat}</span>
                   <span style={{fontSize:11,color:'#8ab4d4'}}>{grupo.items.length} ítems</span>
-                  {/* Renombrar subcategoría */}
-                  {grupo.subcatId!=='__none__'&&(
-                    <button onClick={()=>{
-                      const nuevo=window.prompt('Renombrar subcategoría:',grupo.subcat);
-                      if(!nuevo||!nuevo.trim())return;
-                      setP(prev=>({...prev,items:prev.items.map(it=>
-                        it.id===grupo.subcatId?{...it,subcategoria:nuevo.trim()}:
-                        it.subcategoria===grupo.subcat&&it._type!=='subcat'?{...it,subcategoria:nuevo.trim()}:it
-                      )}));
+                  {/* Renombrar subcategoría — siempre visible si tiene subcatId */}
+                  {grupo.subcatId&&grupo.subcatId!=='__none__'&&(
+                    <button onClick={()=>{\
+                      const nuevo=window.prompt('Nombre de la subcategoría:',grupo.subcat||'');
+                      if(nuevo===null)return;
+                      setP(prev=>({...prev,items:prev.items.map(it=>\
+                        it.id===grupo.subcatId?{...it,subcategoria:nuevo.trim()}:\
+                        it.subcategoria===grupo.subcat&&it._type!=='subcat'?{...it,subcategoria:nuevo.trim()}:it\
+                      )}));\
                     }} style={{background:'none',border:'1px solid #ffffff44',color:'#fff',padding:'2px 8px',borderRadius:4,cursor:'pointer',fontSize:11}}>✏️</button>
                   )}
                   {/* Agregar ítem a esta subcategoría */}

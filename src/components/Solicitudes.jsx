@@ -340,6 +340,7 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
       <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
         <button onClick={onCancel} style={{background:'none',border:'1px solid #ddd',borderRadius:8,padding:'6px 12px',cursor:'pointer',fontSize:13,fontFamily:'inherit'}}>← Volver</button>
         <h2 style={{fontSize:17,fontWeight:700,color:'#0d3b5e',flex:1}}>{solicitud?'Solicitud de valores':'Nueva solicitud de valores'}</h2>
+        {form.created_by_nombre && <span style={{fontSize:12,color:'#888'}}>👤 {form.created_by_nombre}</span>}
         {!bloqueado && <EstadoBadge estado="borrador"/>}
         {bloqueado && <EstadoBadge estado={form.estado}/>}
       </div>

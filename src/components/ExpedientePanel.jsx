@@ -374,10 +374,19 @@ export default function ExpedientePanel({ briefId, onClose }) {
                           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                             <span style={{ fontSize:12, color:'#555' }}>{ppto?.nomenclatura || 'Presupuesto'}</span>
                             {v.pdf_url && (
-                              <a href={v.pdf_url} target="_blank" rel="noreferrer"
-                                style={{ fontSize:11, color:'#c8264a', fontWeight:500, textDecoration:'none' }}>
+                              <button onClick={async()=>{
+                                try {
+                                  const res = await fetch(v.pdf_url);
+                                  const html = await res.text();
+                                  const w = window.open('','_blank');
+                                  w.document.write(html);
+                                  w.document.close();
+                                } catch(e) {
+                                  window.open(v.pdf_url,'_blank');
+                                }
+                              }} style={{fontSize:11,color:'#c8264a',fontWeight:500,background:'none',border:'none',cursor:'pointer',padding:0,fontFamily:'inherit'}}>
                                 📄 Ver PDF →
-                              </a>
+                              </button>
                             )}
                           </div>
                         </div>
