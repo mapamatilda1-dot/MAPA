@@ -337,8 +337,12 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     try { sessionStorage.setItem(SESSION_TAB, tab); } catch {}
   }, [tab]);
 
+  const pptoIdRef = useRef(null);
   useEffect(() => {
     const pptoId = ppto?.id || 'new';
+    // Only reset if the presupuesto ID actually changed (not just a re-render with same ppto)
+    if (pptoId === pptoIdRef.current) return;
+    pptoIdRef.current = pptoId;
     try {
       const draft   = JSON.parse(sessionStorage.getItem(SESSION_KEY));
       const savedTab = sessionStorage.getItem(SESSION_TAB) || 'info';
