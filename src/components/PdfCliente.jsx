@@ -361,7 +361,8 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
       const spFee = spPrecio * ((ppto.fee_agencia||0)/100);
       const spGrupos = groupBySubcat(sp.grupos.flatMap(g=>{const r=[];r.push({_type:'subcat',subcategoria:g.subcat});g.items.forEach(it=>r.push(it));return r;}));
       const spHeader = `<tr><td colspan="14" style="background:#5b21b6;color:#fff;padding:8px 10px;font-size:11px;font-weight:700;">📦 ${sp.nombre}</td></tr>`;
-      const spTotal = `<tr style="background:#f5f3ff;"><td colspan="6" style="padding:5px 10px;text-align:right;font-size:10px;color:#5b21b6;font-weight:600;">Subtotal ${sp.nombre}:</td><td style="padding:5px;text-align:right;font-weight:700;color:#1a3a5e;">${fmt(spPrecio)}</td><td style="padding:5px;text-align:right;font-weight:700;color:#1a6e3e;">${fmt(spPrecio-spCosto)}</td><td colspan="6" style="padding:5px;text-align:right;font-size:10px;color:#555;">${(ppto.fee_agencia||0)>0?`Fee: ${fmt(spFee)}`:''}</td></tr><tr><td colspan="14" style="padding:6px;"></td></tr>`;
+      const feeStr = (ppto.fee_agencia||0)>0 ? 'Fee: ' + fmt(spFee) : '';
+      const spTotal = `<tr style="background:#f5f3ff;"><td colspan="6" style="padding:5px 10px;text-align:right;font-size:10px;color:#5b21b6;font-weight:600;">Subtotal ${sp.nombre}:</td><td style="padding:5px;text-align:right;font-weight:700;color:#1a3a5e;">${fmt(spPrecio)}</td><td style="padding:5px;text-align:right;font-weight:700;color:#1a6e3e;">${fmt(spPrecio-spCosto)}</td><td colspan="6" style="padding:5px;text-align:right;font-size:10px;color:#555;">${feeStr}</td></tr><tr><td colspan="14" style="padding:6px;"></td></tr>`;
       return spHeader + renderFinItemRows(spGrupos) + spTotal;
     }).join('');
   } else {
