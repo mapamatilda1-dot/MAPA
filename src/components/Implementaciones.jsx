@@ -144,8 +144,10 @@ export default function Implementaciones({ userRole }) {
                 }
               }} style={inp}>
                 <option value="">Sin vincular</option>
-                {presupuestos.filter(p=>!form.cliente_id||p.cliente_id===form.cliente_id).map(p=>(
-                  <option key={p.id} value={p.id}>{p.nombre||p.cliente} {p.cliente?`— ${p.cliente}`:''}</option>
+                {presupuestos
+                  .filter(p => !form.cliente_id || !p.cliente_id || p.cliente_id === form.cliente_id)
+                  .map(p=>(
+                  <option key={p.id} value={p.id}>{p.nombre || p.cliente || 'Sin nombre'}{p.cliente ? ` — ${p.cliente}` : ''}</option>
                 ))}
               </select>
             </div>
