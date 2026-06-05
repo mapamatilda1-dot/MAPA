@@ -577,7 +577,7 @@ export function generateExcelFinancieroData(ppto) {
   rows.push(['Correo ejecutivo:', ppto.ejecutivo_email||'']);
   rows.push([]);
   rows.push([
-    'Subcategoría','Categoría','Ítem','Detalle','Cantidad','Días',
+    'Subpresupuesto','Subcategoría','Categoría','Ítem','Detalle','Cantidad','Días',
     'Costo Unit.','Costo Total',
     'Precio Unit.','Precio Total',
     'Proveedor','# Factura Proveedor',
@@ -586,12 +586,16 @@ export function generateExcelFinancieroData(ppto) {
     'OH%','OH $','BCO%','BCO $','Total Costo c/OH+BCO',
     'BCO Real %','Aprobado Financiero','Info'
   ]);
-  (ppto.items||[]).forEach(it=>{
-    if(it._type==='subcat')return; // skip markers
+
+  // Build rows with subpresupuesto support
+  let currentSubppto = '';
+  itemsFiltrados.forEach(it=>{
+    if(it._type==='subppto'){currentSubppto=it.subpresupuesto||'';return;}
+    if(it._type==='subcat')return;
     const c=calcItem(it);
     const tieneReal=it.costo_real_unit!==null&&it.costo_real_unit!==undefined;
     rows.push([
-      it.subcategoria||'', it.categoria||'', it.item||'', it.detalle||'',
+      currentSubppto, it.subcategoria||'', it.categoria||'', it.item||'', it.detalle||'',
       c.cantidad, c.dias,
       c.costoUnit, c.costoTotal,
       c.precioU, c.precio,

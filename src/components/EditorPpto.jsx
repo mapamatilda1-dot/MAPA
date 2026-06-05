@@ -524,8 +524,15 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
 
   function openPdfFinanciero(){
     if(!p)return;
-    const html=generatePdfFinancieroHTML(p,logoUrl);
-    const w=window.open('','_blank');w.document.write(html);w.document.close();
+    try {
+      const html=generatePdfFinancieroHTML(p,logoUrl);
+      const w=window.open('','_blank');
+      if(!w){alert('El navegador bloqueó la ventana emergente. Permitila para ver el PDF.');return;}
+      w.document.write(html);w.document.close();
+    } catch(e){
+      console.error('PDF financiero error:',e);
+      alert('Error generando PDF: '+e.message);
+    }
   }
   function downloadExcel(){
     if(!p)return;
