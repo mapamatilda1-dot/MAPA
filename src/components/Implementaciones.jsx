@@ -43,7 +43,7 @@ export default function Implementaciones({ userRole }) {
     const [{ data: im }, { data: cl }, { data: br }] = await Promise.all([
       supabase.from('implementaciones').select('*').order('fecha_evento'),
       supabase.from('clientes').select('id, nombre').eq('activo', true).order('nombre'),
-      supabase.from('presupuestos').select('id, nombre, cliente, cliente_id, fecha_evento, dias_evento, lugar, ciudad').order('created_at', {ascending:false}),
+      supabase.from('presupuestos').select('id, nombre, cliente, cliente_id, fecha_evento, dias_evento, lugar').order('created_at', {ascending:false}),
     ]);
     setImpls(im || []);
     setClientes(cl || []);
@@ -57,30 +57,39 @@ export default function Implementaciones({ userRole }) {
     if (!form.nombre.trim()) { alert('El nombre es obligatorio'); return; }
     if (!form.fecha_evento)  { alert('La fecha de inicio es obligatoria'); return; }
     setSaving(true);
-    const cl = clientes.find(c => c.id === form.cliente_id);
-    await supabase.from('implementaciones').insert({
-      ...form,
-      presupuesto_id: form.presupuesto_id || null,
+    const cl = clientes.find(cc => cc.id === form.cliente_id);
+    const payload = {
+      nombre:             form.nombre.trim(),
+      ciudad:             form.ciudad || '',
+      cliente_id:         form.cliente_id  || null,
+      cliente_nombre:     cl?.nombre || '',
+      presupuesto_id:     form.presupuesto_id || null,
       presupuesto_nombre: form.presupuesto_nombre || '',
-      cliente_id:  form.cliente_id  || null,
-      cliente_nombre: cl?.nombre || '',
-      fecha_evento_fin: form.fecha_evento_fin || form.fecha_evento,
-    });
+      fecha_evento:       form.fecha_evento,
+      fecha_evento_fin:   form.fecha_evento_fin || form.fecha_evento,
+      fecha_montaje:      form.fecha_montaje || null,
+    };
+    const { error } = await supabase.from('implementaciones').insert(payload);
+    if (error) { alert('Error al guardar: ' + error.message); setSaving(false); return; }
     setForm({ nombre:'', ciudad:'', cliente_id:'', presupuesto_id:'', presupuesto_nombre:'', fecha_evento:'', fecha_evento_fin:'', fecha_montaje:'' });
     setSaving(false);
     loadAll();
   }
-
   async function handleEdit(id) {
-    const cl = clientes.find(c => c.id === editForm.cliente_id);
-    await supabase.from('implementaciones').update({
-      ...editForm,
-      presupuesto_id: editForm.presupuesto_id || null,
+    const cl = clientes.find(cc => cc.id === editForm.cliente_id);
+    const payload = {
+      nombre:             editForm.nombre,
+      ciudad:             editForm.ciudad || '',
+      cliente_id:         editForm.cliente_id  || null,
+      cliente_nombre:     cl?.nombre || '',
+      presupuesto_id:     editForm.presupuesto_id || null,
       presupuesto_nombre: editForm.presupuesto_nombre || '',
-      cliente_id:  editForm.cliente_id  || null,
-      cliente_nombre: cl?.nombre || '',
-      fecha_evento_fin: editForm.fecha_evento_fin || editForm.fecha_evento,
-    }).eq('id', id);
+      fecha_evento:       editForm.fecha_evento,
+      fecha_evento_fin:   editForm.fecha_evento_fin || editForm.fecha_evento,
+      fecha_montaje:      editForm.fecha_montaje || null,
+    };
+    const { error } = await supabase.from('implementaciones').update(payload).eq('id', id);
+    if (error) { alert('Error al editar: ' + error.message); return; }
     setEditingId(null);
     loadAll();
   }
@@ -130,7 +139,7 @@ export default function Implementaciones({ userRole }) {
                     d.setDate(d.getDate() + Math.max(0, (pp.dias_evento||1) - 1));
                     setF('fecha_evento_fin', d.toISOString().slice(0,10));
                   }
-                  if (pp.ciudad) setF('ciudad', pp.ciudad);
+                  if (pp.lugar) setF('ciudad', pp.lugar);
                   if (pp.cliente_id && !form.cliente_id) setF('cliente_id', pp.cliente_id);
                 }
               }} style={inp}>
