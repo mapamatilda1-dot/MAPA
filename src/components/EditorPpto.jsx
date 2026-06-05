@@ -1579,7 +1579,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                 </div>
               </div>
             );
-            );\n          })()}
+          })()}
         </div>
       )}
       <Toast msg={toast}/>
