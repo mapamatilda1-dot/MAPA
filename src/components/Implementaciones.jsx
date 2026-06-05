@@ -28,12 +28,12 @@ const inp = { fontFamily:'inherit', fontSize:13, padding:'9px 12px', border:'1px
 export default function Implementaciones({ userRole }) {
   const [impls, setImpls]     = useState([]);
   const [clientes, setClientes] = useState([]);
-  const [briefs, setBriefs]   = useState([]);
+  const [presupuestos, setPresupuestos]   = useState([]);
   const [saving, setSaving]   = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm]   = useState({});
   const [expedienteId, setExpedienteId] = useState(null);
-  const [form, setForm] = useState({ nombre:'', ciudad:'', cliente_id:'', brief_id:'', fecha_evento:'', fecha_evento_fin:'', fecha_montaje:'' });
+  const [form, setForm] = useState({ nombre:'', ciudad:'', cliente_id:'', presupuesto_id:'', presupuesto_nombre:'', fecha_evento:'', fecha_evento_fin:'', fecha_montaje:'' });
 
   const canEdit = ['admin','produccion'].includes(userRole);
 
@@ -43,11 +43,11 @@ export default function Implementaciones({ userRole }) {
     const [{ data: im }, { data: cl }, { data: br }] = await Promise.all([
       supabase.from('implementaciones').select('*').order('fecha_evento'),
       supabase.from('clientes').select('id, nombre').eq('activo', true).order('nombre'),
-      supabase.from('briefs').select('id, nombre, cliente_id, fecha_evento, dias_evento, ciudad, lugar').order('nombre'),
+      supabase.from('presupuestos').select('id, nombre, cliente, cliente_id, fecha_evento, dias_evento, lugar, ciudad').order('created_at', {ascending:false}),
     ]);
     setImpls(im || []);
     setClientes(cl || []);
-    setBriefs(br || []);
+    setPresupuestos(br || []);
   }
 
   function setF(k, v) { setForm(f => ({ ...f, [k]: v })); }
@@ -60,10 +60,13 @@ export default function Implementaciones({ userRole }) {
     const cl = clientes.find(c => c.id === form.cliente_id);
     await supabase.from('implementaciones').insert({
       ...form,
+      presupuesto_id: form.presupuesto_id || null,
+      presupuesto_nombre: form.presupuesto_nombre || '',
+      cliente_id:  form.cliente_id  || null,
       cliente_nombre: cl?.nombre || '',
       fecha_evento_fin: form.fecha_evento_fin || form.fecha_evento,
     });
-    setForm({ nombre:'', ciudad:'', cliente_id:'', brief_id:'', fecha_evento:'', fecha_evento_fin:'', fecha_montaje:'' });
+    setForm({ nombre:'', ciudad:'', cliente_id:'', presupuesto_id:'', presupuesto_nombre:'', fecha_evento:'', fecha_evento_fin:'', fecha_montaje:'' });
     setSaving(false);
     loadAll();
   }
@@ -72,6 +75,9 @@ export default function Implementaciones({ userRole }) {
     const cl = clientes.find(c => c.id === editForm.cliente_id);
     await supabase.from('implementaciones').update({
       ...editForm,
+      presupuesto_id: editForm.presupuesto_id || null,
+      presupuesto_nombre: editForm.presupuesto_nombre || '',
+      cliente_id:  editForm.cliente_id  || null,
       cliente_nombre: cl?.nombre || '',
       fecha_evento_fin: editForm.fecha_evento_fin || editForm.fecha_evento,
     }).eq('id', id);
@@ -87,7 +93,7 @@ export default function Implementaciones({ userRole }) {
 
   function startEdit(impl) {
     setEditingId(impl.id);
-    setEditForm({ nombre:impl.nombre, ciudad:impl.ciudad||'', cliente_id:impl.cliente_id||'', brief_id:impl.brief_id||'', fecha_evento:impl.fecha_evento||'', fecha_evento_fin:impl.fecha_evento_fin||impl.fecha_evento||'', fecha_montaje:impl.fecha_montaje||'' });
+    setEditForm({ nombre:impl.nombre, ciudad:impl.ciudad||'', cliente_id:impl.cliente_id||'', presupuesto_id:impl.presupuesto_id||'', presupuesto_nombre:impl.presupuesto_nombre||'', fecha_evento:impl.fecha_evento||'', fecha_evento_fin:impl.fecha_evento_fin||impl.fecha_evento||'', fecha_montaje:impl.fecha_montaje||'' });
   }
 
   const sorted = [...impls].sort((a,b) => new Date(a.fecha_evento) - new Date(b.fecha_evento));
@@ -111,26 +117,27 @@ export default function Implementaciones({ userRole }) {
               </select>
             </div>
             <div>
-              <label style={lbl}>Vincular a proyecto</label>
-              <select value={form.brief_id} onChange={e=>{
-                const bid = e.target.value;
-                setF('brief_id', bid);
-                if (bid) {
-                  const br = briefs.find(b=>b.id===bid);
-                  if (br) {
-                    if (br.fecha_evento) {
-                      setF('fecha_evento', br.fecha_evento);
-                      // Calcular fecha fin: fecha_evento + (dias_evento - 1) días
-                      const d = new Date(br.fecha_evento + 'T12:00');
-                      d.setDate(d.getDate() + Math.max(0, (br.dias_evento||1) - 1));
-                      setF('fecha_evento_fin', d.toISOString().slice(0,10));
-                    }
-                    if (br.ciudad) setF('ciudad', br.ciudad);
+              <label style={lbl}>Vincular a presupuesto</label>
+              <select value={form.presupuesto_id} onChange={e=>{
+                const pid = e.target.value;
+                const pp = presupuestos.find(p=>p.id===pid);
+                setF('presupuesto_id', pid || '');
+                setF('presupuesto_nombre', pp?.nombre || pp?.cliente || '');
+                if (pp) {
+                  if (pp.fecha_evento) {
+                    setF('fecha_evento', pp.fecha_evento);
+                    const d = new Date(pp.fecha_evento + 'T12:00');
+                    d.setDate(d.getDate() + Math.max(0, (pp.dias_evento||1) - 1));
+                    setF('fecha_evento_fin', d.toISOString().slice(0,10));
                   }
+                  if (pp.ciudad) setF('ciudad', pp.ciudad);
+                  if (pp.cliente_id && !form.cliente_id) setF('cliente_id', pp.cliente_id);
                 }
               }} style={inp}>
                 <option value="">Sin vincular</option>
-                {briefs.filter(b=>!form.cliente_id||b.cliente_id===form.cliente_id).map(b=><option key={b.id} value={b.id}>{b.nombre}</option>)}
+                {presupuestos.filter(p=>!form.cliente_id||p.cliente_id===form.cliente_id).map(p=>(
+                  <option key={p.id} value={p.id}>{p.nombre||p.cliente} {p.cliente?`— ${p.cliente}`:''}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -215,7 +222,7 @@ export default function Implementaciones({ userRole }) {
                     {impl.ciudad && <span style={{ fontSize:12, color:'#777' }}>📍 {impl.ciudad}</span>}
                     {impl.fecha_montaje && <span style={{ fontSize:12, color:'#777' }}>🔧 Montaje: {fmtDate(impl.fecha_montaje)}</span>}
                     <span style={{ fontSize:12, color:'#777' }}>🎯 Evento: {fmtRange(impl.fecha_evento, impl.fecha_evento_fin)}</span>
-                    {impl.brief_id && <span style={{ fontSize:12, color:'#7c3aed', cursor:'pointer', fontWeight:500 }} onClick={()=>setExpedienteId(impl.brief_id)}>📁 Ver expediente</span>}
+                    {impl.presupuesto_id && <span style={{ fontSize:12, color:'#7c3aed', fontWeight:500 }}>📋 {impl.presupuesto_nombre||'Presupuesto vinculado'}</span>}
                   </div>
                 </div>
                 {canEdit && (
