@@ -495,8 +495,13 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
 
   function openPdfCliente(){
     if(!p)return;
-    // Las imágenes ya están en base64 (se guardan así al subirlas)
-    const html=generatePdfClienteHTML(p,logoUrl);
+    const tieneSubpptos = (p.items||[]).some(it=>it._type==='subppto');
+    let mostrarSeparados = true;
+    if (tieneSubpptos) {
+      const resp = window.confirm('¿Mostrar subpresupuestos separados con sus propios totales?\n\nAceptar = Separados\nCancelar = Unidos (un solo total)');
+      mostrarSeparados = resp;
+    }
+    const html=generatePdfClienteHTML(p,logoUrl,mostrarSeparados);
     const w=window.open('','_blank');w.document.write(html);w.document.close();
   }
 
@@ -903,11 +908,11 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                 onDragOver={e=>{e.preventDefault();}}
                 onDrop={e=>{e.preventDefault();if(dragRef.current?.type==='subcat'&&dragRef.current.id!==grupo.subcatId)moveSubcat(dragRef.current.id,grupo.subcatId);}}>
                 {/* Cabecera subcategoría */}
-                <div style={{display:'flex',alignItems:'center',gap:8,background:'#0d3b5e',borderRadius:'8px 8px 0 0',padding:'8px 14px'}}
-                  draggable={!bloqueado}
-                  onDragStart={()=>{dragRef.current={type:'subcat',id:grupo.subcatId};}}
-                  onDragEnd={()=>{dragRef.current=null;}}>
-                  {!bloqueado&&<span title="Arrastrar subcategoría" style={{cursor:'grab',color:'rgba(255,255,255,.5)',fontSize:16,flexShrink:0}}>⠿</span>}
+                <div style={{display:'flex',alignItems:'center',gap:8,background:'#0d3b5e',borderRadius:'8px 8px 0 0',padding:'8px 14px'}}>
+                  {!bloqueado&&<span title="Arrastrar subcategoría" draggable={true}
+                    onDragStart={e=>{e.stopPropagation();dragRef.current={type:'subcat',id:grupo.subcatId};}}
+                    onDragEnd={()=>{dragRef.current=null;}}
+                    style={{cursor:'grab',color:'rgba(255,255,255,.5)',fontSize:16,flexShrink:0}}>⠿</span>}
                   <span style={{flex:1,color:'#fff',fontWeight:700,fontSize:14,letterSpacing:0.5}}>{grupo.subcat||<em style={{opacity:.6}}>Sin nombre</em>}</span>
                   <span style={{fontSize:11,color:'#8ab4d4'}}>{grupo.items.length} ítems</span>
                   {/* Renombrar subcategoría — siempre visible si tiene subcatId */}
@@ -959,14 +964,14 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                     const tieneReal=it.costo_real_unit!==null&&it.costo_real_unit!==undefined;
                     return(
                       <div key={it.id} style={{borderBottom:ii<grupo.items.length-1?'1px solid #eef2f7':'none',background:c.hasWarning?'#fff8f8':'#fff'}}
-                        draggable={!bloqueado}
-                        onDragStart={e=>{e.stopPropagation();dragRef.current={type:'item',id:it.id};}}
-                        onDragEnd={()=>{dragRef.current=null;}}
                         onDragOver={e=>{e.preventDefault();e.stopPropagation();}}
                         onDrop={e=>{e.preventDefault();e.stopPropagation();if(dragRef.current?.type==='item'&&dragRef.current.id!==it.id)moveItem(dragRef.current.id,it.id);}}>
                         {/* Cabecera ítem */}
                         <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 14px',cursor:'pointer',background:open?(c.hasWarning?'#fdeef1':'#eef4fb'):(c.hasWarning?'#fff8f8':'#fff')}} onClick={()=>setOpenItem(open?null:it.id)}>
-                          {!bloqueado&&<span title="Arrastrar ítem" style={{cursor:'grab',color:'#bbb',fontSize:14,flexShrink:0}} onClick={e=>e.stopPropagation()}>⠿</span>}
+                          {!bloqueado&&<span title="Arrastrar ítem" draggable={true}
+                            onDragStart={e=>{e.stopPropagation();dragRef.current={type:'item',id:it.id};}}
+                            onDragEnd={()=>{dragRef.current=null;}}
+                            style={{cursor:'grab',color:'#bbb',fontSize:14,flexShrink:0}} onClick={e=>e.stopPropagation()}>⠿</span>}
                           <span style={{fontSize:12,color:'#8aa0b8'}}>{open?'▲':'▼'}</span>
                           <span style={{flex:1,fontWeight:600,fontSize:14,color:c.hasWarning?'#c8264a':'#1a1a2e'}}>{it.item||<span style={{color:'#bbb'}}>Sin nombre</span>}</span>
                           {c.hasWarning&&<span style={{fontSize:11,color:'#c8264a',fontWeight:700}}>⚠️ Costo &gt; Precio</span>}
@@ -1000,14 +1005,14 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                               <div style={{gridColumn:'1/-1',background:'#f8fafc',borderRadius:8,padding:'10px 12px',border:'1px solid #dde6ef'}}>
                                 <div style={{fontSize:12,fontWeight:700,color:'#5a7a9a',marginBottom:8}}>💼 Costo proveedor (cotizado)</div>
                                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
-                                  <div><Label>Costo unitario ($)</Label><input type="number" step="0.01" style={S.input} value={it.costo_unit??0} onChange={e=>updItem(it.id,'costo_unit',e.target.value)}/></div>
-                                  <div><Label>Cantidad</Label><input type="number" style={S.input} value={it.cantidad??1} onChange={e=>updItem(it.id,'cantidad',e.target.value)}/></div>
-                                  <div><Label>Días</Label><input type="number" style={S.input} value={it.dias??1} onChange={e=>updItem(it.id,'dias',e.target.value)}/></div>
+                                  <div><Label>Costo unitario ($)</Label><input type="number" step="0.01" style={S.input} value={it.costo_unit??0} onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'costo_unit',e.target.value)}/></div>
+                                  <div><Label>Cantidad</Label><input type="number" style={S.input} value={it.cantidad??1} onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'cantidad',e.target.value)}/></div>
+                                  <div><Label>Días</Label><input type="number" style={S.input} value={it.dias??1} onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'dias',e.target.value)}/></div>
                                   <div><Label>Total (unit×cant×días)</Label><input style={{...S.inputRO,fontWeight:700}} readOnly value={fmt(c.costoTotal)}/></div>
                                 </div>
                                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginTop:8}}>
-                                  <div><Label>OH %</Label><input type="number" step="0.1" style={S.input} value={it.oh_pct??0} onChange={e=>updItem(it.id,'oh_pct',e.target.value)}/></div>
-                                  <div><Label>BCO %</Label><input type="number" step="0.1" style={S.input} value={it.bco_pct??0} onChange={e=>updItem(it.id,'bco_pct',e.target.value)}/></div>
+                                  <div><Label>OH %</Label><input type="number" step="0.1" style={S.input} value={it.oh_pct??0} onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'oh_pct',e.target.value)}/></div>
+                                  <div><Label>BCO %</Label><input type="number" step="0.1" style={S.input} value={it.bco_pct??0} onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'bco_pct',e.target.value)}/></div>
                                   <div><Label>Total c/OH+BCO</Label><input style={{...S.inputRO,fontWeight:700,color:'#5a7a9a'}} readOnly value={fmt(c.totalCosto)}/></div>
                                 </div>
                               </div>
@@ -1070,7 +1075,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                               <div style={{gridColumn:'1/-1',background:'#eef4fb',borderRadius:8,padding:'10px 12px',border:'1px solid #c8d8e8'}}>
                                 <div style={{fontSize:12,fontWeight:700,color:'#0d3b5e',marginBottom:8}}>👤 Precio cliente</div>
                                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
-                                  <div><Label>Precio unitario ($)</Label><input type="number" step="0.01" style={S.input} value={it.precio_unit??0} disabled={it.costo_aprobado&&!canApproveCostoReal(userRole)} onChange={e=>updItem(it.id,'precio_unit',e.target.value)}/></div>
+                                  <div><Label>Precio unitario ($)</Label><input type="number" step="0.01" style={S.input} value={it.precio_unit??0} onWheel={e=>e.target.blur()} disabled={it.costo_aprobado&&!canApproveCostoReal(userRole)} onChange={e=>updItem(it.id,'precio_unit',e.target.value)}/></div>
                                   <div><Label>Cantidad</Label><input style={S.inputRO} readOnly value={it.cantidad??1}/></div>
                                   <div><Label>Días</Label><input style={S.inputRO} readOnly value={it.dias??1}/></div>
                                   <div><Label>Total (unit×cant×días)</Label><input style={{...S.inputRO,fontWeight:700,color:'#0d3b5e'}} readOnly value={fmt(c.precio)}/></div>
@@ -1103,7 +1108,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                                 {it.condicion_pago==='Crédito' && (
                                   <div style={{display:'grid',gridTemplateColumns:'1fr',gap:8}}>
                                     <div><Label>Días de crédito</Label>
-                                      <input type="number" min="0" style={S.input} value={it.dias_credito||''} placeholder="Ej: 30" onChange={e=>updItem(it.id,'dias_credito',e.target.value)}/>
+                                      <input type="number" min="0" style={S.input} value={it.dias_credito||''} placeholder="Ej: 30" onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'dias_credito',e.target.value)}/>
                                     </div>
                                   </div>
                                 )}
@@ -1115,13 +1120,13 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                                   return (
                                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
                                       <div><Label>% de abono</Label>
-                                        <input type="number" min="0" max="100" style={S.input} value={it.abono_pct||50} onChange={e=>updItem(it.id,'abono_pct',Number(e.target.value))}/>
+                                        <input type="number" min="0" max="100" style={S.input} value={it.abono_pct||50} onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'abono_pct',Number(e.target.value))}/>
                                       </div>
                                       <div><Label>Valor abono</Label>
                                         <input style={S.inputRO} readOnly value={fmt(valorAbono)}/>
                                       </div>
                                       <div><Label>Días crédito del saldo</Label>
-                                        <input type="number" min="0" style={S.input} value={it.dias_credito_saldo||''} placeholder="Ej: 30" onChange={e=>updItem(it.id,'dias_credito_saldo',e.target.value)}/>
+                                        <input type="number" min="0" style={S.input} value={it.dias_credito_saldo||''} placeholder="Ej: 30" onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'dias_credito_saldo',e.target.value)}/>
                                       </div>
                                       <div style={{gridColumn:'1/-1',fontSize:12,color:'#7a5500',background:'#fff8e6',borderRadius:6,padding:'6px 10px'}}>
                                         Saldo a recibir en {it.dias_credito_saldo||'—'} días: <strong>{fmt(saldo)}</strong>

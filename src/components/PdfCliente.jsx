@@ -16,7 +16,7 @@ function groupBySubcat(items) {
     if (it._type === 'subcat') {
       current = { subcat: it.subcategoria, items: [] };
       groups.push(current);
-    } else {
+    } else if (!it._type) {
       if (!current) { current = { subcat: 'Servicios', items: [] }; groups.push(current); }
       current.items.push(it);
     }
@@ -24,9 +24,36 @@ function groupBySubcat(items) {
   return groups;
 }
 
-export function generatePdfClienteHTML(ppto, logoUrlOverride) {
+function groupBySubppto(items) {
+  const subpptos = [];
+  let spActual = null;
+  let subcatActual = null;
+  items.forEach(it => {
+    if (it._type === 'subppto') {
+      spActual = { id:it.id, nombre:it.subpresupuesto, incluir:it.incluir_en_total!==false, grupos:[] };
+      subpptos.push(spActual);
+      subcatActual = null;
+    } else if (it._type === 'subcat') {
+      if (!spActual) { spActual = { id:'__root__', nombre:'', incluir:true, grupos:[] }; subpptos.push(spActual); }
+      subcatActual = { subcat:it.subcategoria, items:[] };
+      spActual.grupos.push(subcatActual);
+    } else {
+      if (!spActual) { spActual = { id:'__root__', nombre:'', incluir:true, grupos:[] }; subpptos.push(spActual); }
+      if (!subcatActual) { subcatActual = { subcat:'Servicios', items:[] }; spActual.grupos.push(subcatActual); }
+      subcatActual.items.push(it);
+    }
+  });
+  return subpptos;
+}
+
+const haySubpptos = (items) => items.some(it=>it._type==='subppto');
+
+export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=true) {
   const totales = calcPpto(ppto);
-  const groups  = groupBySubcat(ppto.items || []);
+  const items = ppto.items || [];
+  const tieneSubpptos = haySubpptos(items);
+  const groups  = groupBySubcat(items);
+  const subpptos = groupBySubppto(items);
   // Use uploaded logo from admin, or fall back to embedded logo
   const logoSrc = logoUrlOverride || LOGO_BASE64;
   const logoTag = `<img src="${logoSrc}" style="height:90px;object-fit:contain;background:transparent;" alt="Matilda Event Designers" />`;
@@ -41,27 +68,52 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride) {
       <th style="padding:7px 14px;text-align:right;color:#0d3b5e;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Total</th>
     </tr>`;
 
-  const itemRows = groups.map(({ subcat, items }) => {
-    const subcatRow = `<tr><td colspan="5" style="background:#0d3b5e;color:#fff;padding:6px 14px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">${subcat}</td></tr>`;
-    const rows = items.map((it, i) => {
-      const c = calcItem(it);
-      const fotoCell = it.foto_referencia
-        ? `<br><img src="${it.foto_referencia}" style="max-height:60px;max-width:100px;margin-top:4px;border-radius:3px;object-fit:cover;border:1px solid #dde6ef;" />`
-        : '';
-      return `<tr style="border-bottom:1px solid #eef2f7;background:${i%2===1?'#fafcfe':'#fff'};">
-        <td style="padding:8px 14px;">
-          <div style="font-weight:700;color:#1a1a2e;font-size:12px;">${it.item || ''}</div>
-          ${it.detalle ? `<div style="font-size:11px;color:#6b7a99;margin-top:2px;">${renderDetalle(it.detalle)}</div>` : ''}
-          ${fotoCell}
-        </td>
-        <td style="padding:8px;text-align:center;color:#1a1a2e;">${c.cantidad}</td>
-        <td style="padding:8px;text-align:center;color:#1a1a2e;">${c.dias}</td>
-        <td style="padding:8px;text-align:right;color:#1a1a2e;">${fmt(c.precioU)}</td>
-        <td style="padding:8px 14px;text-align:right;font-weight:700;color:#1a1a2e;">${fmt(c.precio)}</td>
-      </tr>`;
+  const renderItemRow = (it, i) => {
+    const c = calcItem(it);
+    const fotoCell = it.foto_referencia
+      ? `<br><img src="${it.foto_referencia}" style="max-height:60px;max-width:100px;margin-top:4px;border-radius:3px;object-fit:cover;border:1px solid #dde6ef;" />`
+      : '';
+    return `<tr style="border-bottom:1px solid #eef2f7;background:${i%2===1?'#fafcfe':'#fff'};">
+      <td style="padding:8px 14px;">
+        <div style="font-weight:700;color:#1a1a2e;font-size:12px;">${it.item || ''}</div>
+        ${it.detalle ? `<div style="font-size:11px;color:#6b7a99;margin-top:2px;">${renderDetalle(it.detalle)}</div>` : ''}
+        ${fotoCell}
+      </td>
+      <td style="padding:8px;text-align:center;color:#1a1a2e;">${c.cantidad}</td>
+      <td style="padding:8px;text-align:center;color:#1a1a2e;">${c.dias}</td>
+      <td style="padding:8px;text-align:right;color:#1a1a2e;">${fmt(c.precioU)}</td>
+      <td style="padding:8px 14px;text-align:right;font-weight:700;color:#1a1a2e;">${fmt(c.precio)}</td>
+    </tr>`;
+  };
+
+  let itemRows = '';
+  if (tieneSubpptos && mostrarSeparados) {
+    itemRows = subpptos.map(sp => {
+      const spItems = sp.grupos.flatMap(g=>g.items);
+      const spTotal = spItems.reduce((a,it)=>a+calcItem(it).precio,0);
+      const spFee = spTotal * ((ppto.fee_agencia||0)/100);
+      const spTotalConFee = spTotal + spFee;
+      const spIva = spTotalConFee * 0.15;
+      const spTotalFinal = spTotalConFee + spIva;
+      const spHeader = sp.nombre ? `<tr><td colspan="5" style="background:#5b21b6;color:#fff;padding:9px 14px;font-size:12px;font-weight:700;letter-spacing:0.5px;">📦 ${sp.nombre}${!sp.incluir?' (no incluido en total general)':''}</td></tr>` : '';
+      const spRows = sp.grupos.map(({subcat, items:gItems}) => {
+        const sr = `<tr><td colspan="5" style="background:#0d3b5e;color:#fff;padding:6px 14px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">${subcat}</td></tr>`;
+        return sr + gItems.map(renderItemRow).join('');
+      }).join('');
+      const spTotals = sp.nombre ? `
+        <tr style="background:#f5f3ff;"><td colspan="4" style="padding:6px 14px;text-align:right;font-size:11px;color:#5b21b6;font-weight:600;">Subtotal ${sp.nombre}:</td><td style="padding:6px 14px;text-align:right;font-weight:700;color:#5b21b6;">${fmt(spTotal)}</td></tr>
+        ${(ppto.fee_agencia||0)>0?`<tr style="background:#f5f3ff;"><td colspan="4" style="padding:4px 14px;text-align:right;font-size:11px;color:#555;">Fee agencia (${ppto.fee_agencia}%):</td><td style="padding:4px 14px;text-align:right;color:#555;">${fmt(spFee)}</td></tr>`:''}
+        <tr style="background:#f5f3ff;"><td colspan="4" style="padding:4px 14px;text-align:right;font-size:11px;color:#555;">IVA 15%:</td><td style="padding:4px 14px;text-align:right;color:#555;">${fmt(spIva)}</td></tr>
+        <tr style="background:#5b21b6;"><td colspan="4" style="padding:7px 14px;text-align:right;color:#fff;font-weight:700;font-size:13px;">TOTAL ${sp.nombre.toUpperCase()}:</td><td style="padding:7px 14px;text-align:right;font-weight:700;color:#fff;font-size:13px;">${fmt(spTotalFinal)}</td></tr>
+        <tr><td colspan="5" style="padding:10px;"></td></tr>` : '';
+      return spHeader + spRows + spTotals;
     }).join('');
-    return subcatRow + rows;
-  }).join('');
+  } else {
+    itemRows = groups.map(({ subcat, items:gItems }) => {
+      const subcatRow = `<tr><td colspan="5" style="background:#0d3b5e;color:#fff;padding:6px 14px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">${subcat}</td></tr>`;
+      return subcatRow + gItems.map(renderItemRow).join('');
+    }).join('');
+  }
 
   const feeRow = (ppto.fee_agencia ?? 0) > 0
     ? `<div style="display:flex;justify-content:space-between;padding:7px 16px;border-bottom:1px solid #dde6ef;">
