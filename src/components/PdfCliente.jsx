@@ -276,7 +276,21 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=t
 
 export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
   const totales = calcPpto(ppto);
-  const groups  = groupBySubcat(ppto.items || []);
+  const allItems = ppto.items || [];
+  const tieneSubpptos = haySubpptos(allItems);
+  const spData = groupBySubppto(allItems);
+  // Only included subpresupuestos
+  const itemsFiltrados = tieneSubpptos
+    ? spData.filter(sp=>sp.incluir).flatMap(sp => {
+        const r = [];
+        sp.grupos.forEach(g => {
+          r.push({_type:'subcat', subcategoria:`[${sp.nombre}] ${g.subcat}`});
+          g.items.forEach(it => r.push(it));
+        });
+        return r;
+      })
+    : allItems;
+  const groups  = groupBySubcat(itemsFiltrados);
   const logoSrc = logoUrlOverride || LOGO_BASE64;
   const logoTag = `<img src="${logoSrc}" style="height:80px;object-fit:contain;background:transparent;" alt="Matilda Event Designers" />`;
 
@@ -504,7 +518,20 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
 
 export function generateExcelFinancieroData(ppto) {
   // Import dynamically to avoid circular deps
-  const { calcItem, calcPpto } = require('../calc');
+  const { calcItem, calcPpto } = require('../calc')
+  const allItems = ppto.items || [];
+  const tieneSubpptos = haySubpptos(allItems);
+  const spData = groupBySubppto(allItems);
+  const itemsFiltrados = tieneSubpptos
+    ? spData.filter(sp=>sp.incluir).flatMap(sp => {
+        const r = [];
+        sp.grupos.forEach(g => {
+          r.push({_type:'subcat', subcategoria:`[${sp.nombre}] ${g.subcat}`});
+          g.items.forEach(it => r.push(it));
+        });
+        return r;
+      })
+    : allItems;
   const rows = [];
   rows.push(['PRESUPUESTO FINANCIERO - MATILDA EVENT DESIGNERS']);
   rows.push([]);

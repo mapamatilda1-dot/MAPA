@@ -1471,12 +1471,50 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
           </div>
           {!previewMode&&<div style={S.empty}>Selecciona una vista arriba para previsualizar</div>}
           {previewMode&&(()=>{
-            // Agrupar usando marcadores _type:'subcat'
-            const groups=[];let cur=null;
-            (p.items||[]).forEach(it=>{
-              if(it._type==='subcat'){cur={subcat:it.subcategoria,items:[]};groups.push(cur);}
-              else{if(!cur){cur={subcat:'Servicios',items:[]};groups.push(cur);}cur.items.push(it);}
+            // Agrupar con soporte de subpresupuestos
+            const allItems = p.items||[];
+            const tieneSubpptos = allItems.some(it=>it._type==='subppto');
+
+            // Build subpptos structure
+            const subpptos=[]; let spAct=null; let grAct=null;
+            allItems.forEach(it=>{
+              if(it._type==='subppto'){spAct={id:it.id,nombre:it.subpresupuesto,incluir:it.incluir_en_total!==false,grupos:[]};subpptos.push(spAct);grAct=null;}
+              else if(it._type==='subcat'){if(!spAct){spAct={id:'__r',nombre:'',incluir:true,grupos:[]};subpptos.push(spAct);}grAct={subcat:it.subcategoria,items:[]};spAct.grupos.push(grAct);}
+              else{if(!spAct){spAct={id:'__r',nombre:'',incluir:true,grupos:[]};subpptos.push(spAct);}if(!grAct){grAct={subcat:'Servicios',items:[]};spAct.grupos.push(grAct);}grAct.items.push(it);}
             });
+
+            // Only included subpptos
+            const subpptosIncluidos = tieneSubpptos ? subpptos.filter(sp=>sp.incluir) : subpptos;
+
+            const colSpan = previewMode==='financiero' ? 9 : 5;
+
+            const renderSubcatRows = (grupos) => grupos.map(({subcat,items})=>(
+              <>
+                <tr key={`h-${subcat}`}><td colSpan={colSpan} style={{padding:'5px 10px',background:'#0d3b5e',color:'#fff',fontSize:9,fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>{subcat}</td></tr>
+                {items.map((it,i)=>{const c=calcItem(it);return(
+                  <tr key={it.id} style={{borderBottom:'1px solid #eef2f7',background:i%2?'#fafcfe':'#fff'}}>
+                    <td style={{padding:'6px 10px'}}>
+                      <div style={{fontWeight:600,color:'#1a1a2e'}}>{it.item}</div>
+                      {it.detalle&&<div style={{fontSize:10,color:'#8aa0b8'}}>{it.detalle}</div>}
+                      {it.foto_referencia&&<img src={it.foto_referencia} alt="ref" style={{maxHeight:50,maxWidth:80,marginTop:3,borderRadius:3,objectFit:'cover'}}/>}
+                    </td>
+                    <td style={{padding:'6px',textAlign:'center'}}>{c.cantidad}</td>
+                    <td style={{padding:'6px',textAlign:'center'}}>{c.dias}</td>
+                    {previewMode==='financiero'&&<>
+                      <td style={{padding:'6px',textAlign:'right',color:'#c8264a'}}>{fmt(c.costoUnit)}</td>
+                      <td style={{padding:'6px',textAlign:'right',color:'#c8264a',fontWeight:600}}>{fmt(c.costoTotal)}</td>
+                    </>}
+                    <td style={{padding:'6px',textAlign:'right'}}>{fmt(c.precioU)}</td>
+                    <td style={{padding:'6px 10px',textAlign:'right',fontWeight:700}}>{fmt(c.precio)}</td>
+                    {previewMode==='financiero'&&<>
+                      <td style={{padding:'6px',fontSize:10,color:'#5a7a9a'}}>{it.proveedor}</td>
+                      <td style={{padding:'6px',fontSize:10,color:'#5a7a9a'}}>{it.num_factura_prov||''}</td>
+                    </>}
+                  </tr>
+                );})}
+              </>
+            ));
+
             return(
               <div style={{border:'1px solid #dde6ef',borderRadius:8,overflow:'hidden',fontSize:12}}>
                 <div style={{background:'#0d3b5e',padding:'12px 20px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -1489,7 +1527,6 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                     <div key={l}><div style={{fontSize:8,color:'#3dbfb8',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>{l}</div><div style={{fontSize:12,fontWeight:700,color:'#0d3b5e'}}>{v}</div></div>
                   ))}
                 </div>
-                {/* Una sola cabecera de tabla para todas las subcategorías */}
                 <div style={{padding:'12px 20px 0'}}>
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
                     <thead>
@@ -1510,30 +1547,14 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                       </tr>
                     </thead>
                     <tbody>
-                      {groups.map(({subcat,items})=>(
+                      {subpptosIncluidos.map(sp=>(
                         <>
-                          <tr key={`h-${subcat}`}><td colSpan={previewMode==='financiero'?9:5} style={{padding:'5px 10px',background:'#0d3b5e',color:'#fff',fontSize:9,fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>{subcat}</td></tr>
-                          {items.map((it,i)=>{const c=calcItem(it);return(
-                            <tr key={it.id} style={{borderBottom:'1px solid #eef2f7',background:i%2?'#fafcfe':'#fff'}}>
-                              <td style={{padding:'6px 10px'}}>
-                                <div style={{fontWeight:600,color:'#1a1a2e'}}>{it.item}</div>
-                                {it.detalle&&<div style={{fontSize:10,color:'#8aa0b8'}}>{it.detalle}</div>}
-                                {it.foto_referencia&&<img src={it.foto_referencia} alt="ref" style={{maxHeight:50,maxWidth:80,marginTop:3,borderRadius:3,objectFit:'cover'}}/>}
-                              </td>
-                              <td style={{padding:'6px',textAlign:'center'}}>{c.cantidad}</td>
-                              <td style={{padding:'6px',textAlign:'center'}}>{c.dias}</td>
-                              {previewMode==='financiero'&&<>
-                                <td style={{padding:'6px',textAlign:'right',color:'#c8264a'}}>{fmt(c.costoUnit)}</td>
-                                <td style={{padding:'6px',textAlign:'right',color:'#c8264a',fontWeight:600}}>{fmt(c.costoTotal)}</td>
-                              </>}
-                              <td style={{padding:'6px',textAlign:'right'}}>{fmt(c.precioU)}</td>
-                              <td style={{padding:'6px 10px',textAlign:'right',fontWeight:700}}>{fmt(c.precio)}</td>
-                              {previewMode==='financiero'&&<>
-                                <td style={{padding:'6px',fontSize:10,color:'#5a7a9a'}}>{it.proveedor}</td>
-                                <td style={{padding:'6px',fontSize:10,color:'#5a7a9a'}}>{it.num_factura_prov||''}</td>
-                              </>}
-                            </tr>
-                          );})}
+                          {sp.nombre&&<tr key={`sp-${sp.id}`}><td colSpan={colSpan} style={{padding:'7px 10px',background:'#5b21b6',color:'#fff',fontSize:10,fontWeight:700}}>📦 {sp.nombre}</td></tr>}
+                          {renderSubcatRows(sp.grupos)}
+                          {sp.nombre&&tieneSubpptos&&(()=>{
+                            const spTotal=sp.grupos.flatMap(g=>g.items).reduce((a,it)=>a+calcItem(it).precio,0);
+                            return <tr style={{background:'#f5f3ff'}}><td colSpan={colSpan-1} style={{padding:'5px 10px',textAlign:'right',fontSize:10,color:'#5b21b6',fontWeight:600}}>Subtotal {sp.nombre}:</td><td style={{padding:'5px 10px',textAlign:'right',fontWeight:700,color:'#5b21b6'}}>{fmt(spTotal)}</td></tr>;
+                          })()}
                         </>
                       ))}
                     </tbody>
@@ -1558,7 +1579,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                 </div>
               </div>
             );
-          })()}
+            );\n          })()}
         </div>
       )}
       <Toast msg={toast}/>
