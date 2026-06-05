@@ -375,26 +375,6 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
   } else {
     itemRows = renderFinItemRows(groups);
   }
-        <td style="padding:6px 5px;text-align:right;color:#0d3b5e;">${fmt(c.precioU)}</td>
-        <td style="padding:6px 5px;text-align:right;color:#0d3b5e;font-weight:600;">${fmt(c.precio)}</td>
-        <td style="padding:6px 5px;text-align:right;font-weight:600;color:${c.margen>=0?'#1a6e3e':'#8b1a1a'};">${fmt(c.margen)}<div style="font-size:8px;">(${c.margenPct.toFixed(1)}%)</div></td>
-        <td style="padding:6px 8px;font-size:9px;color:#5a7a9a;">${it.proveedor || ''}</td>
-        <td style="padding:6px 8px;font-size:9px;color:#5a7a9a;">${it.num_factura_prov || ''}</td>
-        <td style="padding:6px 5px;text-align:right;color:${tieneReal ? '#1a6e3e' : '#bbb'};">${tieneReal ? fmt(c.costoRealUnit) : '—'}</td>
-        <td style="padding:6px 5px;text-align:right;color:${tieneReal ? '#1a6e3e' : '#bbb'};">${tieneReal ? fmt(c.costoRealTotal) : '—'}</td>
-        <td style="padding:6px 5px;text-align:right;font-weight:${tieneReal?'700':'400'};color:${tieneReal?(c.ahorro>=0?'#1a6e3e':'#8b1a1a'):'#bbb'};">${tieneReal ? fmt(c.ahorro) : '—'}</td>
-        <td style="padding:6px 5px;text-align:right;font-weight:600;color:${tieneReal?(c.margenReal>=0?'#1a6e3e':'#8b1a1a'):'#bbb'};">${tieneReal ? fmt(c.margenReal)+'<div style="font-size:8px;">('+c.margenRealPct.toFixed(1)+'%)</div>' : '—'}</td>
-      </tr>`;
-    }).join('');
-    return subcatRow + rows;
-  }).join('');
-
-  const t = totales;
-  const rebateRow = ppto.apply_rebate ? `
-    <tr style="background:#fff8e6;">
-      <td colspan="8" style="padding:6px 10px;font-size:11px;color:#c8264a;font-weight:600;">Rebate ${ppto.rebate_pct??0}% — comisión al cliente (resta utilidad)</td>
-      <td colspan="6" style="padding:6px 10px;text-align:right;color:#c8264a;font-weight:700;">-${fmt(t.rebate)}</td>
-    </tr>` : '';
 
   return `<!DOCTYPE html>
 <html lang="es">
