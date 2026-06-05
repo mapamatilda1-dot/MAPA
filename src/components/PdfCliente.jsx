@@ -536,8 +536,6 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
 }
 
 export function generateExcelFinancieroData(ppto) {
-  // Import dynamically to avoid circular deps
-  const { calcItem, calcPpto } = require('../calc')
   const allItems = ppto.items || [];
   const tieneSubpptos = haySubpptos(allItems);
   const spData = groupBySubppto(allItems);
