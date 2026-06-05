@@ -288,8 +288,9 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
   const itemsFiltrados = tieneSubpptos
     ? spData.filter(sp=>sp.incluir).flatMap(sp => {
         const r = [];
+        r.push({_type:'subppto', subpresupuesto: sp.nombre});
         sp.grupos.forEach(g => {
-          r.push({_type:'subcat', subcategoria:`[${sp.nombre}] ${g.subcat}`});
+          r.push({_type:'subcat', subcategoria: g.subcat});
           g.items.forEach(it => r.push(it));
         });
         return r;
@@ -373,7 +374,6 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
     }).join('');
   } else {
     itemRows = renderFinItemRows(groups);
-  });
   }
         <td style="padding:6px 5px;text-align:right;color:#0d3b5e;">${fmt(c.precioU)}</td>
         <td style="padding:6px 5px;text-align:right;color:#0d3b5e;font-weight:600;">${fmt(c.precio)}</td>
@@ -557,8 +557,9 @@ export function generateExcelFinancieroData(ppto) {
   const itemsFiltrados = tieneSubpptos
     ? spData.filter(sp=>sp.incluir).flatMap(sp => {
         const r = [];
+        r.push({_type:'subppto', subpresupuesto: sp.nombre});
         sp.grupos.forEach(g => {
-          r.push({_type:'subcat', subcategoria:`[${sp.nombre}] ${g.subcat}`});
+          r.push({_type:'subcat', subcategoria: g.subcat});
           g.items.forEach(it => r.push(it));
         });
         return r;
