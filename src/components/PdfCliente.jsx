@@ -351,9 +351,16 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
         <td style="padding:6px 5px;text-align:center;">${c.dias}</td>
         <td style="padding:6px 5px;text-align:right;color:#8b1a1a;">${fmt(c.costoUnit)}</td>
         <td style="padding:6px 5px;text-align:right;color:#8b1a1a;font-weight:600;">${fmt(c.costoTotal)}</td>
-
-
-  let itemRows = '';
+        <td style="padding:6px 5px;text-align:right;color:#0d3b5e;">${fmt(c.precioU)}</td>
+        <td style="padding:6px 5px;text-align:right;color:#0d3b5e;font-weight:600;">${fmt(c.precio)}</td>
+        <td style="padding:6px 5px;text-align:right;font-weight:600;color:${(c.precio-c.costoTotal)>=0?'#1a6e3e':'#8b1a1a'};">${fmt(c.precio-c.costoTotal)}<div style="font-size:8px;">(${c.margenPct.toFixed(1)}%)</div></td>
+        <td style="padding:6px 8px;font-size:9px;color:#5a7a9a;">${it.proveedor||''}</td>
+        <td style="padding:6px 8px;font-size:9px;color:#5a7a9a;">${it.num_factura_prov||''}</td>
+        <td style="padding:6px 5px;text-align:right;color:#1a6e3e;">${tieneReal?fmt(c.costoRealUnit):'—'}</td>
+        <td style="padding:6px 5px;text-align:right;color:#1a6e3e;font-weight:600;">${tieneReal?fmt(c.costoRealTotal):'—'}</td>
+        <td style="padding:6px 5px;text-align:right;color:#1a6e3e;">${tieneReal?fmt(c.ahorro):'—'}</td>
+        <td style="padding:6px 5px;text-align:right;font-weight:600;color:${tieneReal?((c.precio-c.costoRealTotal)>=0?'#1a6e3e':'#8b1a1a'):'#888'};">${tieneReal?fmt(c.precio-c.costoRealTotal):'—'}</td>
+      </tr>`;
   if (tieneSubpptos && spVisibles) {
     itemRows = spVisibles.map(function(sp) {
       var spItems = sp.grupos.flatMap(function(g){return g.items;});
