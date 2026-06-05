@@ -354,24 +354,26 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
 
   let itemRows = '';
   if (tieneSubpptos && spVisibles) {
-    itemRows = spVisibles.map(sp => {
-      const spItems = sp.grupos.flatMap(g=>g.items);
-      const spPrecio = spItems.reduce((a,it)=>a+calcItem(it).precio,0);
-      const spCosto = spItems.reduce((a,it)=>a+calcItem(it).costoTotal,0);
-      const spFee = spPrecio * ((ppto.fee_agencia||0)/100);
-      const spGrupos = groupBySubcat(sp.grupos.flatMap(g=>{const r=[];r.push({_type:'subcat',subcategoria:g.subcat});g.items.forEach(it=>r.push(it));return r;}));
-      const spHeader = `<tr><td colspan="14" style="background:#5b21b6;color:#fff;padding:8px 10px;font-size:11px;font-weight:700;">📦 ${sp.nombre}</td></tr>`;
-      const feeStr = (ppto.fee_agencia||0)>0 ? 'Fee: ' + fmt(spFee) : '';
-      const spTotal = '<tr style="background:#f5f3ff;">'
-        + '<td colspan="6" style="padding:5px 10px;text-align:right;font-size:10px;color:#5b21b6;font-weight:600;">Subtotal ' + sp.nombre + ':</td>'
+    itemRows = spVisibles.map(function(sp) {
+      var spItems = sp.grupos.flatMap(function(g){return g.items;});
+      var spPrecio = spItems.reduce(function(a,it){return a+calcItem(it).precio;},0);
+      var spCosto = spItems.reduce(function(a,it){return a+calcItem(it).costoTotal;},0);
+      var spFee = spPrecio * ((ppto.fee_agencia||0)/100);
+      var spGrupos = groupBySubcat(sp.grupos.flatMap(function(g){var r=[];r.push({_type:'subcat',subcategoria:g.subcat});g.items.forEach(function(it){r.push(it);});return r;}));
+      var spNombre = sp.nombre || '';
+      var feeStr = (ppto.fee_agencia||0)>0 ? ('Fee: ' + fmt(spFee)) : '';
+      var spHeaderHtml = '<tr><td colspan="14" style="background:#5b21b6;color:#fff;padding:8px 10px;font-size:11px;font-weight:700;">' + spNombre + '</td></tr>';
+      var spTotalHtml = '<tr style="background:#f5f3ff;">'
+        + '<td colspan="6" style="padding:5px;text-align:right;font-size:10px;color:#5b21b6;font-weight:600;">Subtotal ' + spNombre + ':</td>'
         + '<td style="padding:5px;text-align:right;font-weight:700;color:#1a3a5e;">' + fmt(spPrecio) + '</td>'
         + '<td style="padding:5px;text-align:right;font-weight:700;color:#1a6e3e;">' + fmt(spPrecio-spCosto) + '</td>'
         + '<td colspan="6" style="padding:5px;text-align:right;font-size:10px;color:#555;">' + feeStr + '</td>'
-        + '</tr><tr><td colspan="14" style="padding:6px;"></td></tr>';
-      return spHeader + renderFinItemRows(spGrupos) + spTotal;
+        + '</tr>';
+      return spHeaderHtml + renderFinItemRows(spGrupos) + spTotalHtml;
     }).join('');
   } else {
     itemRows = renderFinItemRows(groups);
+  });
   }
         <td style="padding:6px 5px;text-align:right;color:#0d3b5e;">${fmt(c.precioU)}</td>
         <td style="padding:6px 5px;text-align:right;color:#0d3b5e;font-weight:600;">${fmt(c.precio)}</td>
