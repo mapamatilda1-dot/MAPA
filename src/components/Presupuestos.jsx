@@ -361,7 +361,14 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap' }}>
               {canDownloadPdfCliente(userRole) && <button style={S.btnPrimary} onClick={() => { const html=generatePdfClienteHTML(popupPpto,logoUrl); const w=window.open('','_blank'); w.document.write(html); w.document.close(); }}>📄 PDF cliente</button>}
-              {canDownloadPdfFinanciero(userRole) && <button style={{ ...S.btnSecondary, color:'#c8264a', borderColor:'#c8264a44' }} onClick={() => { const html=generatePdfFinancieroHTML(popupPpto,logoUrl); const w=window.open('','_blank'); w.document.write(html); w.document.close(); }}>📊 PDF financiero</button>}
+              {canDownloadPdfFinanciero(userRole) && <button style={{ ...S.btnSecondary, color:'#c8264a', borderColor:'#c8264a44' }} onClick={() => {
+                try {
+                  const html=generatePdfFinancieroHTML(popupPpto,logoUrl);
+                  const w=window.open('','_blank');
+                  if(!w){alert('Permitá ventanas emergentes para ver el PDF');return;}
+                  w.document.write(html);w.document.close();
+                } catch(e){alert('Error PDF: '+e.message);}
+              }}>📊 PDF financiero</button>}
               {['admin','produccion'].includes(userRole) && <button style={{ ...S.btnSecondary, color:'#0d3b5e' }} onClick={() => { const id=popupPpto.id; setPopupPpto(null); if(onNavigate) onNavigate('solicitudes', id); }}>📤 Nueva solicitud</button>}
               <button style={S.btnSecondary} onClick={() => { setEditing(popupPpto); setPopupPpto(null); }}>✏️ Editar</button>
               <button style={S.btnSm} onClick={() => { duplicatePpto(popupPpto); setPopupPpto(null); }}>📋 Duplicar</button>

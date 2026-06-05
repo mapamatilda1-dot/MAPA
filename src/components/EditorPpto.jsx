@@ -411,7 +411,45 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     showToast('Campos completados desde el proyecto ✓');
   }
 
-  const dragRef = useRef(null); // { type:'item'|'subcat', id, fromIndex }
+  const dragRef = useRef(null);
+  const [selectedItems, setSelectedItems] = useState(new Set());
+
+  function toggleSelectItem(id) {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function moverAOpcionAdicional() {
+    if (selectedItems.size === 0) return;
+    const nombre = window.prompt('Nombre de la opción adicional:', 'Opción adicional');
+    if (!nombre?.trim()) return;
+    const itemsSeleccionados = (p.items||[]).filter(it => selectedItems.has(it.id));
+    const nuevaOpcion = {
+      id: crypto.randomUUID(),
+      nombre: nombre.trim(),
+      items: itemsSeleccionados.map(it => ({
+        id: crypto.randomUUID(),
+        item: it.item || '',
+        detalle: it.detalle || '',
+        cantidad: it.cantidad || 1,
+        dias: it.dias || 1,
+        precio_unit: it.precio_unit || 0,
+        costo_unit: it.costo_unit || 0,
+        razon_social: it.proveedor || '',
+        imagen_url: it.foto_referencia || '',
+      })),
+    };
+    setP(prev => ({
+      ...prev,
+      items: prev.items.filter(it => !selectedItems.has(it.id)),
+      opciones_adicionales: [...(prev.opciones_adicionales||[]), nuevaOpcion],
+    }));
+    setSelectedItems(new Set());
+    showToast('✓ Ítems movidos a opciones adicionales');
+  } // { type:'item'|'subcat', id, fromIndex }
 
   function moveItem(dragId, targetId) {
     // Move item with dragId before/after targetId in p.items
@@ -833,8 +871,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                 }}>📄 Nueva versión</button>
               )}
               <button style={{...S.btnPrimary,background:'#7c3aed'}} onClick={()=>{
-                const nombre=window.prompt('Nombre del subpresupuesto (ej: Guayaquil, Quito):');
-                if(!nombre||!nombre.trim())return;
+                const nombre=window.prompt('Nombre del subpresupuesto (ej: Guayaquil, Quito):');                if(!nombre||!nombre.trim())return;
                 const subppto={
                   id:crypto.randomUUID(), _type:'subppto',
                   subpresupuesto:nombre.trim(), incluir_en_total:true,
@@ -855,6 +892,11 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                 setP(prev=>({...prev,items:[...prev.items,subcat]}));
               }}>+ Subcategoría</button>
               <button style={{...S.btnPrimary,background:'#c8264a'}} onClick={addItem}>+ Ítem</button>
+              {selectedItems.size > 0 && !bloqueado && (
+                <button style={{...S.btnPrimary,background:'#f0a500',color:'#fff'}} onClick={moverAOpcionAdicional}>
+                  ✦ Mover {selectedItems.size} ítem(s) a Opción adicional
+                </button>
+              )}
             </div>
           </div>
 
@@ -975,6 +1017,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                         onDrop={e=>{e.preventDefault();e.stopPropagation();if(dragRef.current?.type==='item'&&dragRef.current.id!==it.id)moveItem(dragRef.current.id,it.id);}}>
                         {/* Cabecera ítem */}
                         <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 14px',cursor:'pointer',background:open?(c.hasWarning?'#fdeef1':'#eef4fb'):(c.hasWarning?'#fff8f8':'#fff')}} onClick={()=>setOpenItem(open?null:it.id)}>
+                          {!bloqueado&&<input type="checkbox" checked={selectedItems.has(it.id)} onClick={e=>e.stopPropagation()} onChange={()=>toggleSelectItem(it.id)} style={{width:15,height:15,flexShrink:0,accentColor:'#f0a500'}}/>}
                           {!bloqueado&&<span title="Arrastrar ítem" draggable={true}
                             onDragStart={e=>{e.stopPropagation();dragRef.current={type:'item',id:it.id};}}
                             onDragEnd={()=>{dragRef.current=null;}}
