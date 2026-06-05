@@ -43,7 +43,7 @@ export default function Implementaciones({ userRole }) {
     const [{ data: im }, { data: cl }, { data: br }] = await Promise.all([
       supabase.from('implementaciones').select('*').order('fecha_evento'),
       supabase.from('clientes').select('id, nombre').eq('activo', true).order('nombre'),
-      supabase.from('briefs').select('id, nombre, cliente_id').order('nombre'),
+      supabase.from('briefs').select('id, nombre, cliente_id, fecha_evento, dias_evento, ciudad, lugar').order('nombre'),
     ]);
     setImpls(im || []);
     setClientes(cl || []);
@@ -112,7 +112,23 @@ export default function Implementaciones({ userRole }) {
             </div>
             <div>
               <label style={lbl}>Vincular a proyecto</label>
-              <select value={form.brief_id} onChange={e=>setF('brief_id',e.target.value)} style={inp}>
+              <select value={form.brief_id} onChange={e=>{
+                const bid = e.target.value;
+                setF('brief_id', bid);
+                if (bid) {
+                  const br = briefs.find(b=>b.id===bid);
+                  if (br) {
+                    if (br.fecha_evento) {
+                      setF('fecha_evento', br.fecha_evento);
+                      // Calcular fecha fin: fecha_evento + (dias_evento - 1) días
+                      const d = new Date(br.fecha_evento + 'T12:00');
+                      d.setDate(d.getDate() + Math.max(0, (br.dias_evento||1) - 1));
+                      setF('fecha_evento_fin', d.toISOString().slice(0,10));
+                    }
+                    if (br.ciudad) setF('ciudad', br.ciudad);
+                  }
+                }
+              }} style={inp}>
                 <option value="">Sin vincular</option>
                 {briefs.filter(b=>!form.cliente_id||b.cliente_id===form.cliente_id).map(b=><option key={b.id} value={b.id}>{b.nombre}</option>)}
               </select>
