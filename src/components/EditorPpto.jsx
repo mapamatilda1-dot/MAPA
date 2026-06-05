@@ -1309,6 +1309,39 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             <div style={{...S.metricCard,background:'#e0f7f6'}}><div style={{fontSize:11,color:'#0d6e69',marginBottom:4}}>Margen (sin fee)</div><div style={{fontSize:16,fontWeight:700,color:totales.margenSinFee>=0?'#0d6e69':'#c8264a'}}>{fmt(totales.margenSinFee)} <span style={{fontSize:13}}>({fmtPct(totales.margenSinFeePct)})</span></div></div>
           </div>
 
+          {/* Subtotales por subpresupuesto */}
+          {(p.items||[]).some(it=>it._type==='subppto') && (() => {
+            const spList=[]; let spA=null;
+            (p.items||[]).forEach(it=>{
+              if(it._type==='subppto'){spA={id:it.id,nombre:it.subpresupuesto,incluir:it.incluir_en_total!==false,items:[]};spList.push(spA);}
+              else if(!it._type&&spA) spA.items.push(it);
+            });
+            return (
+              <div style={{border:'1px solid #7c3aed33',borderRadius:10,overflow:'hidden',marginBottom:16}}>
+                <div style={{background:'#5b21b6',padding:'8px 16px',fontSize:12,fontWeight:700,color:'#fff'}}>Subtotales por subpresupuesto</div>
+                {spList.map(sp=>{
+                  const spPrecio=sp.items.reduce((a,it)=>a+calcItem(it).precio,0);
+                  const spCosto=sp.items.reduce((a,it)=>a+calcItem(it).costoTotal,0);
+                  const spFee=spPrecio*((p.fee_agencia||0)/100);
+                  return (
+                    <div key={sp.id} style={{padding:'10px 16px',borderBottom:'1px solid #e8e0f8',background:sp.incluir?'#faf8ff':'#f8f8f8',opacity:sp.incluir?1:0.5}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                        <span style={{fontWeight:700,color:'#5b21b6',fontSize:13}}>{sp.nombre}{!sp.incluir&&<span style={{fontSize:11,color:'#888',fontWeight:400}}> (excluido)</span>}</span>
+                        <span style={{fontSize:14,fontWeight:700,color:'#0d3b5e'}}>{fmt(spPrecio)}</span>
+                      </div>
+                      <div style={{display:'flex',gap:16,fontSize:11,color:'#777'}}>
+                        <span>Costo: <strong style={{color:'#c8264a'}}>{fmt(spCosto)}</strong></span>
+                        {(p.fee_agencia||0)>0&&<span>Fee: <strong>{fmt(spFee)}</strong></span>}
+                        <span>Total c/fee: <strong style={{color:'#0d3b5e'}}>{fmt(spPrecio+spFee)}</strong></span>
+                        <span>Margen: <strong style={{color:(spPrecio-spCosto)>=0?'#2e8b4e':'#c8264a'}}>{fmt(spPrecio-spCosto)}</strong></span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
           {/* Total principal — SIN rebate */}
           <div style={{border:'1px solid #dde6ef',borderRadius:10,overflow:'hidden',marginBottom:16}}>
             <div style={{display:'flex',justifyContent:'space-between',padding:'11px 20px',borderBottom:'1px solid #dde6ef',background:'#f0f4f8'}}>

@@ -87,8 +87,9 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=t
   };
 
   let itemRows = '';
+  const subpptosVisibles = tieneSubpptos ? subpptos.filter(sp=>sp.incluir) : subpptos;
   if (tieneSubpptos && mostrarSeparados) {
-    itemRows = subpptos.map(sp => {
+    itemRows = subpptosVisibles.map(sp => {
       const spItems = sp.grupos.flatMap(g=>g.items);
       const spTotal = spItems.reduce((a,it)=>a+calcItem(it).precio,0);
       const spFee = spTotal * ((ppto.fee_agencia||0)/100);
@@ -109,7 +110,11 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=t
       return spHeader + spRows + spTotals;
     }).join('');
   } else {
-    itemRows = groups.map(({ subcat, items:gItems }) => {
+    // Flatten only included subpptos
+    const groupsFiltrados = tieneSubpptos
+      ? groupBySubcat(subpptosVisibles.flatMap(sp=>{const r=[];sp.grupos.forEach(g=>{r.push({_type:'subcat',subcategoria:g.subcat});g.items.forEach(it=>r.push(it));});return r;}))
+      : groups;
+    itemRows = groupsFiltrados.map(({ subcat, items:gItems }) => {
       const subcatRow = `<tr><td colspan="5" style="background:#0d3b5e;color:#fff;padding:6px 14px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">${subcat}</td></tr>`;
       return subcatRow + gItems.map(renderItemRow).join('');
     }).join('');
@@ -328,7 +333,9 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
       <th style="padding:6px 5px;text-align:right;font-size:9px;text-transform:uppercase;color:#88ffaa;">Margen Real</th>
     </tr>`;
 
-  const itemRows = groups.map(({ subcat, items }) => {
+  const spVisibles = tieneSubpptos ? spData.filter(sp=>sp.incluir) : null;
+
+  const renderFinItemRows = (grupos) => grupos.map(({ subcat, items }) => {
     const subcatRow = `<tr><td colspan="14" style="background:#1a5078;color:#fff;padding:5px 10px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">${subcat}</td></tr>`;
     const rows = items.map((it, i) => {
       const c = calcItem(it);
@@ -343,6 +350,23 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
         <td style="padding:6px 5px;text-align:center;">${c.dias}</td>
         <td style="padding:6px 5px;text-align:right;color:#8b1a1a;">${fmt(c.costoUnit)}</td>
         <td style="padding:6px 5px;text-align:right;color:#8b1a1a;font-weight:600;">${fmt(c.costoTotal)}</td>
+
+
+  let itemRows = '';
+  if (tieneSubpptos && spVisibles) {
+    itemRows = spVisibles.map(sp => {
+      const spItems = sp.grupos.flatMap(g=>g.items);
+      const spPrecio = spItems.reduce((a,it)=>a+calcItem(it).precio,0);
+      const spCosto = spItems.reduce((a,it)=>a+calcItem(it).costoTotal,0);
+      const spFee = spPrecio * ((ppto.fee_agencia||0)/100);
+      const spGrupos = groupBySubcat(sp.grupos.flatMap(g=>{const r=[];r.push({_type:'subcat',subcategoria:g.subcat});g.items.forEach(it=>r.push(it));return r;}));
+      const spHeader = `<tr><td colspan="14" style="background:#5b21b6;color:#fff;padding:8px 10px;font-size:11px;font-weight:700;">📦 ${sp.nombre}</td></tr>`;
+      const spTotal = `<tr style="background:#f5f3ff;"><td colspan="6" style="padding:5px 10px;text-align:right;font-size:10px;color:#5b21b6;font-weight:600;">Subtotal ${sp.nombre}:</td><td style="padding:5px;text-align:right;font-weight:700;color:#1a3a5e;">${fmt(spPrecio)}</td><td style="padding:5px;text-align:right;font-weight:700;color:#1a6e3e;">${fmt(spPrecio-spCosto)}</td><td colspan="6" style="padding:5px;text-align:right;font-size:10px;color:#555;">${(ppto.fee_agencia||0)>0?`Fee: ${fmt(spFee)}`:''}</td></tr><tr><td colspan="14" style="padding:6px;"></td></tr>`;
+      return spHeader + renderFinItemRows(spGrupos) + spTotal;
+    }).join('');
+  } else {
+    itemRows = renderFinItemRows(groups);
+  }
         <td style="padding:6px 5px;text-align:right;color:#0d3b5e;">${fmt(c.precioU)}</td>
         <td style="padding:6px 5px;text-align:right;color:#0d3b5e;font-weight:600;">${fmt(c.precio)}</td>
         <td style="padding:6px 5px;text-align:right;font-weight:600;color:${c.margen>=0?'#1a6e3e':'#8b1a1a'};">${fmt(c.margen)}<div style="font-size:8px;">(${c.margenPct.toFixed(1)}%)</div></td>
