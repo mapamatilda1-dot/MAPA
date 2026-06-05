@@ -891,7 +891,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
 
             const haySubpptos = subpptos.some(sp=>sp.id!=='__root__');
 
-            if(p.items.filter(it=>!it._type).length===0) return(
+            if(p.items.length===0) return(
               <div style={S.empty}>
                 Agregá un subpresupuesto o subcategoría para empezar
               </div>
