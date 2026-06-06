@@ -370,6 +370,7 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
   }).join('');
 
   let itemRows = '';
+  if (tieneSubpptos && spVisibles) {
     itemRows = spVisibles.map(function(sp) {
       var spItems = sp.grupos.flatMap(function(g){return g.items;});
       var spPrecio = spItems.reduce(function(a,it){return a+calcItem(it).precio;},0);
