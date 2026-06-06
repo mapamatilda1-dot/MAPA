@@ -101,12 +101,16 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=t
         const sr = `<tr><td colspan="5" style="background:#0d3b5e;color:#fff;padding:6px 14px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">${subcat}</td></tr>`;
         return sr + gItems.map(renderItemRow).join('');
       }).join('');
-      const spTotals = sp.nombre ? `
-        <tr style="background:#f5f3ff;"><td colspan="4" style="padding:6px 14px;text-align:right;font-size:11px;color:#5b21b6;font-weight:600;">Subtotal ${sp.nombre}:</td><td style="padding:6px 14px;text-align:right;font-weight:700;color:#5b21b6;">${fmt(spTotal)}</td></tr>
-        ${(ppto.fee_agencia||0)>0?`<tr style="background:#f5f3ff;"><td colspan="4" style="padding:4px 14px;text-align:right;font-size:11px;color:#555;">Fee agencia (${ppto.fee_agencia}%):</td><td style="padding:4px 14px;text-align:right;color:#555;">${fmt(spFee)}</td></tr>`:''}
-        <tr style="background:#f5f3ff;"><td colspan="4" style="padding:4px 14px;text-align:right;font-size:11px;color:#555;">IVA 15%:</td><td style="padding:4px 14px;text-align:right;color:#555;">${fmt(spIva)}</td></tr>
-        <tr style="background:#5b21b6;"><td colspan="4" style="padding:7px 14px;text-align:right;color:#fff;font-weight:700;font-size:13px;">TOTAL ${sp.nombre.toUpperCase()}:</td><td style="padding:7px 14px;text-align:right;font-weight:700;color:#fff;font-size:13px;">${fmt(spTotalFinal)}</td></tr>
-        <tr><td colspan="5" style="padding:10px;"></td></tr>` : '';
+      const spFeeStr = (ppto.fee_agencia||0)>0
+        ? '<tr style="background:#f5f3ff;"><td colspan="4" style="padding:4px 14px;text-align:right;font-size:11px;color:#555;">Fee agencia (' + (ppto.fee_agencia) + '%):</td><td style="padding:4px 14px;text-align:right;color:#555;">' + fmt(spFee) + '</td></tr>'
+        : '';
+      const spTotals = sp.nombre ? (
+        '<tr style="background:#f5f3ff;"><td colspan="4" style="padding:6px 14px;text-align:right;font-size:11px;color:#5b21b6;font-weight:600;">Subtotal ' + sp.nombre + ':</td><td style="padding:6px 14px;text-align:right;font-weight:700;color:#5b21b6;">' + fmt(spTotal) + '</td></tr>'
+        + spFeeStr
+        + '<tr style="background:#f5f3ff;"><td colspan="4" style="padding:4px 14px;text-align:right;font-size:11px;color:#555;">IVA 15%:</td><td style="padding:4px 14px;text-align:right;color:#555;">' + fmt(spIva) + '</td></tr>'
+        + '<tr style="background:#5b21b6;"><td colspan="4" style="padding:7px 14px;text-align:right;color:#fff;font-weight:700;font-size:13px;">TOTAL ' + sp.nombre.toUpperCase() + ':</td><td style="padding:7px 14px;text-align:right;font-weight:700;color:#fff;font-size:13px;">' + fmt(spTotalFinal) + '</td></tr>'
+        + '<tr><td colspan="5" style="padding:10px;"></td></tr>'
+      ) : '';
       return spHeader + spRows + spTotals;
     }).join('');
   } else {
