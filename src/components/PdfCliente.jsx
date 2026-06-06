@@ -285,6 +285,7 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=t
 
 export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
   const totales = calcPpto(ppto);
+  const t = totales; // alias used in template
   const allItems = ppto.items || [];
   const tieneSubpptos = haySubpptos(allItems);
   const spData = groupBySubppto(allItems);
