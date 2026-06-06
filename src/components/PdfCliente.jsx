@@ -76,7 +76,7 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=t
     return `<tr style="border-bottom:1px solid #eef2f7;background:${i%2===1?'#fafcfe':'#fff'};">
       <td style="padding:8px 14px;">
         <div style="font-weight:700;color:#1a1a2e;font-size:12px;">${it.item || ''}</div>
-        ' + (it.detalle ? '<div style="font-size:11px;color:#6b7a99;margin-top:2px;">' + renderDetalle(it.detalle) + '</div>' : '') + '
+        ${it.detalle ? '<div style="font-size:11px;color:#6b7a99;margin-top:2px;">' + renderDetalle(it.detalle) + '</div>' : ''}
         ${fotoCell}
       </td>
       <td style="padding:8px;text-align:center;color:#1a1a2e;">${c.cantidad}</td>
@@ -232,7 +232,7 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=t
           subtotalOp += total;
           return `<tr style="background:${i%2?'#f8fafc':'#fff'};border-bottom:1px solid #f0f0f0;">
             <td style="padding:7px 10px;font-size:12px;font-weight:500;">
-              ' + (it.imagen_url ? '<img src="' + it.imagen_url + '" style="width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #eee;float:left;margin-right:8px;" />' : '') + (it.item||'') + '</td>
+              ${it.imagen_url ? '<img src="' + it.imagen_url + '" style="width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #eee;float:left;margin-right:8px;" />' : ''}${it.item||''}</td>
             <td style="padding:7px 10px;font-size:11px;color:#666;">${it.detalle||''}</td>
             <td style="padding:7px 8px;text-align:center;font-size:12px;">${qty}</td>
             <td style="padding:7px 8px;text-align:center;font-size:12px;">${dias}</td>
@@ -353,7 +353,7 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
       return `<tr style="border-bottom:1px solid #eef2f7;background:${bg};font-size:10px;">
         <td style="padding:6px 10px;">
           <div style="font-weight:700;color:#1a1a2e;">${it.item || ''}</div>
-          ' + (it.detalle ? '<div style="font-size:9px;color:#6b7a99;margin-top:1px;">' + renderDetalle(it.detalle) + '</div>' : '') + '
+          ${it.detalle ? '<div style="font-size:9px;color:#6b7a99;margin-top:1px;">' + renderDetalle(it.detalle) + '</div>' : ''}
         </td>
         <td style="padding:6px 5px;text-align:center;">${c.cantidad}</td>
         <td style="padding:6px 5px;text-align:center;">${c.dias}</td>

@@ -538,12 +538,18 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
   function openPdfCliente(){
     if(!p)return;
     const tieneSubpptos = (p.items||[]).some(it=>it._type==='subppto');
+    const tieneOpciones = (p.opciones_adicionales||[]).length > 0;
     let mostrarSeparados = true;
+    let mostrarOpciones = true;
     if (tieneSubpptos) {
       const resp = window.confirm('¿Mostrar subpresupuestos separados con sus propios totales?\n\nAceptar = Separados\nCancelar = Unidos (un solo total)');
       mostrarSeparados = resp;
     }
-    const html=generatePdfClienteHTML(p,logoUrl,mostrarSeparados);
+    if (tieneOpciones) {
+      mostrarOpciones = window.confirm('¿Incluir opciones adicionales en el PDF?\n\nAceptar = Sí, incluirlas\nCancelar = No, ocultar opciones adicionales');
+    }
+    const pParaPdf = mostrarOpciones ? p : {...p, opciones_adicionales:[]};
+    const html=generatePdfClienteHTML(pParaPdf,logoUrl,mostrarSeparados);
     const w=window.open('','_blank');w.document.write(html);w.document.close();
   }
 
