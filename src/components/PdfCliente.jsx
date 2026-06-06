@@ -286,6 +286,9 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=t
 export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
   const totales = calcPpto(ppto);
   const t = totales; // alias used in template
+  const rebateRow = ppto.apply_rebate
+    ? '<tr><td colspan="8" style="padding:6px 10px;font-size:11px;color:#c8264a;font-weight:600;">Rebate ' + (ppto.rebate_pct??0) + '% — comisión al cliente (resta utilidad)</td><td colspan="6" style="padding:6px 10px;text-align:right;color:#c8264a;font-weight:700;">-' + fmt(t.rebate) + '</td></tr>'
+    : '';
   const allItems = ppto.items || [];
   const tieneSubpptos = haySubpptos(allItems);
   const spData = groupBySubppto(allItems);
