@@ -260,7 +260,7 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=t
           </table>
           <div style="display:flex;justify-content:flex-end;gap:16px;padding:8px 8px 4px;font-size:12px;">
             <span>Subtotal: <strong style="color:#5b21b6;">$${subtotalOp.toFixed(2)}</strong></span>
-            ' + (feeAgencia>0 ? '<span>Fee ' + feeAgencia + '%: <strong style="color:#5b21b6;">$' + feeOp.toFixed(2) + '</strong></span>' : '') + '
+            ${feeAgencia>0 ? '<span>Fee ' + feeAgencia + '%: <strong style="color:#5b21b6;">$' + feeOp.toFixed(2) + '</strong></span>' : ''}
             <span style="font-size:13px;font-weight:700;color:#5b21b6;">Total c/fee: $${totalConFee.toFixed(2)}</span>
           </div>
         </div>`;

@@ -535,22 +535,27 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     // Nos quedamos en la página para seguir editando
   }
 
+  const [pdfModal, setPdfModal] = useState(null); // {tieneSubpptos, tieneOpciones}
+
   function openPdfCliente(){
     if(!p)return;
     const tieneSubpptos = (p.items||[]).some(it=>it._type==='subppto');
     const tieneOpciones = (p.opciones_adicionales||[]).length > 0;
-    let mostrarSeparados = true;
-    let mostrarOpciones = true;
-    if (tieneSubpptos) {
-      const resp = window.confirm('¿Mostrar subpresupuestos separados con sus propios totales?\n\nAceptar = Separados\nCancelar = Unidos (un solo total)');
-      mostrarSeparados = resp;
+    if (!tieneSubpptos && !tieneOpciones) {
+      const html=generatePdfClienteHTML(p,logoUrl,true);
+      const w=window.open('','_blank');w.document.write(html);w.document.close();
+      return;
     }
-    if (tieneOpciones) {
-      mostrarOpciones = window.confirm('¿Incluir opciones adicionales en el PDF?\n\nAceptar = Sí, incluirlas\nCancelar = No, ocultar opciones adicionales');
-    }
+    setPdfModal({tieneSubpptos, tieneOpciones, separados:true, opciones:true});
+  }
+
+  function generarPdfConOpciones(separados, mostrarOpciones) {
     const pParaPdf = mostrarOpciones ? p : {...p, opciones_adicionales:[]};
-    const html=generatePdfClienteHTML(pParaPdf,logoUrl,mostrarSeparados);
-    const w=window.open('','_blank');w.document.write(html);w.document.close();
+    const html=generatePdfClienteHTML(pParaPdf,logoUrl,separados);
+    const w=window.open('','_blank');
+    if(!w){alert('Permitá ventanas emergentes');return;}
+    w.document.write(html);w.document.close();
+    setPdfModal(null);
   }
 
   async function saveVersion(ppto, estado) {
@@ -1676,6 +1681,35 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
         </div>
       )}
       <Toast msg={toast}/>
+      {pdfModal && (
+        <div onClick={()=>setPdfModal(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:600,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:14,padding:24,width:'100%',maxWidth:440}}>
+            <div style={{fontSize:16,fontWeight:700,color:'#0d3b5e',marginBottom:16}}>📄 Opciones del PDF cliente</div>
+            {pdfModal.tieneSubpptos && (
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:13,fontWeight:600,color:'#0d3b5e',marginBottom:8}}>Subpresupuestos</div>
+                <div style={{display:'flex',gap:8}}>
+                  <button onClick={()=>setPdfModal(m=>({...m,separados:true}))} style={{flex:1,padding:'8px',borderRadius:8,border:`2px solid ${pdfModal.separados?'#0d3b5e':'#ddd'}`,background:pdfModal.separados?'#eef4fb':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:pdfModal.separados?700:400}}>Separados (c/totales)</button>
+                  <button onClick={()=>setPdfModal(m=>({...m,separados:false}))} style={{flex:1,padding:'8px',borderRadius:8,border:`2px solid ${!pdfModal.separados?'#0d3b5e':'#ddd'}`,background:!pdfModal.separados?'#eef4fb':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:!pdfModal.separados?700:400}}>Unidos (un total)</button>
+                </div>
+              </div>
+            )}
+            {pdfModal.tieneOpciones && (
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:13,fontWeight:600,color:'#0d3b5e',marginBottom:8}}>Opciones adicionales</div>
+                <div style={{display:'flex',gap:8}}>
+                  <button onClick={()=>setPdfModal(m=>({...m,opciones:true}))} style={{flex:1,padding:'8px',borderRadius:8,border:`2px solid ${pdfModal.opciones?'#7c3aed':'#ddd'}`,background:pdfModal.opciones?'#f5f3ff':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:pdfModal.opciones?700:400}}>✦ Incluir opciones</button>
+                  <button onClick={()=>setPdfModal(m=>({...m,opciones:false}))} style={{flex:1,padding:'8px',borderRadius:8,border:`2px solid ${!pdfModal.opciones?'#7c3aed':'#ddd'}`,background:!pdfModal.opciones?'#f5f3ff':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:!pdfModal.opciones?700:400}}>Sin opciones</button>
+                </div>
+              </div>
+            )}
+            <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:8}}>
+              <button onClick={()=>setPdfModal(null)} style={{padding:'8px 16px',borderRadius:8,border:'1px solid #ddd',background:'#fff',cursor:'pointer',fontFamily:'inherit'}}>Cancelar</button>
+              <button onClick={()=>generarPdfConOpciones(pdfModal.separados,pdfModal.opciones)} style={{padding:'8px 20px',borderRadius:8,border:'none',background:'#0d3b5e',color:'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>📄 Generar PDF</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
