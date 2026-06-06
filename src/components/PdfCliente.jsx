@@ -365,7 +365,11 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
         <td style="padding:6px 5px;text-align:right;color:#1a6e3e;">${tieneReal?fmt(c.ahorro):'—'}</td>
         <td style="padding:6px 5px;text-align:right;font-weight:600;color:${tieneReal?((c.precio-c.costoRealTotal)>=0?'#1a6e3e':'#8b1a1a'):'#888'};">${tieneReal?fmt(c.precio-c.costoRealTotal):'—'}</td>
       </tr>`;
-  if (tieneSubpptos && spVisibles) {
+    }).join('');
+    return subcatRow + rows;
+  }).join('');
+
+  let itemRows = '';
     itemRows = spVisibles.map(function(sp) {
       var spItems = sp.grupos.flatMap(function(g){return g.items;});
       var spPrecio = spItems.reduce(function(a,it){return a+calcItem(it).precio;},0);
