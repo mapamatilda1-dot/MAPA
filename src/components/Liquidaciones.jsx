@@ -593,6 +593,8 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                           <label style={{cursor:'pointer'}}><input type="file" accept=".xml" style={{display:'none'}} onChange={e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{const datos=parsearXMLFactura(ev.target.result);if(!datos){alert('XML inválido');return;}setEditing(prev=>({...prev,gastos:prev.gastos.map(gg=>gg.id===g.id?{...gg,...datos,tiene_xml:true}:gg)}));};reader.readAsText(file);}}/>
                             <span style={{padding:'5px 12px',background:'#0d3b5e',color:'#fff',borderRadius:6,fontSize:12,fontWeight:600}}>{g.num_factura?`✓ ${g.num_factura}`:'Seleccionar XML'}</span>
                           </label>
+                          {g.num_factura&&<span style={{fontSize:11,color:'#2e8b4e',fontWeight:600}}>✓ Auto-completado</span>}
+                          <button onClick={()=>updGasto(g.id,'tiene_xml',null)} style={{background:'none',border:'none',color:'#aaa',cursor:'pointer',fontSize:11,marginLeft:'auto'}}>cambiar</button>
                         </div>}
                         {g.tiene_xml===false&&<div style={{background:'#f5f3ff',borderRadius:8,padding:'8px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
                           <span style={{fontSize:12,color:'#7c3aed',fontWeight:700}}>🧾 Nota de venta</span>
@@ -600,8 +602,35 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                             <span style={{padding:'5px 12px',background:'#7c3aed',color:'#fff',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>{g.foto_nota?'✓ Foto':'Subir foto'}</span>
                           </label>
                           {g.foto_nota&&<img src={g.foto_nota} alt="" style={{height:36,borderRadius:4}}/>}
+                          <button onClick={()=>updGasto(g.id,'tiene_xml',null)} style={{background:'none',border:'none',color:'#aaa',cursor:'pointer',fontSize:11,marginLeft:'auto'}}>cambiar</button>
                         </div>}
-                        <div style={{fontSize:13,fontWeight:600}}>{g.concepto||'Sin concepto'}</div>
+                        <div style={{display:'grid',gridTemplateColumns:'2fr 2fr auto',gap:8,marginBottom:8,alignItems:'end'}}>
+                          <div><Label>Concepto</Label><input style={S.input} value={g.concepto} onChange={e=>updGasto(g.id,'concepto',e.target.value)}/></div>
+                          <div><Label>Categoría</Label>
+                            <select style={S.select} value={g.categoria||CATS_LIQUIDACION[0]} onChange={e=>updGasto(g.id,'categoria',e.target.value)}>
+                              {CATS_LIQUIDACION.map(c=><option key={c} value={c}>{c}</option>)}
+                            </select>
+                          </div>
+                          <button style={S.btnRed} onClick={()=>delGasto(g.id)}>🗑</button>
+                        </div>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8,marginBottom:8}}>
+                          <div><Label>Subtotal 0%</Label><input type="number" style={S.input} value={g.subtotal0} onWheel={e=>e.target.blur()} onChange={e=>updGasto(g.id,'subtotal0',e.target.value)}/></div>
+                          <div><Label>Subtotal con IVA</Label><input type="number" style={S.input} value={g.subtotal15} onWheel={e=>e.target.blur()} onChange={e=>updGasto(g.id,'subtotal15',e.target.value)}/></div>
+                          <div><Label>IVA %</Label>
+                            <select style={S.select} value={g.iva_pct??15} onChange={e=>updGasto(g.id,'iva_pct',Number(e.target.value))}>
+                              {IVA_OPCIONES.map(p=><option key={p} value={p}>{p}% {p===15?'(estándar)':p===0?'(exento)':''}</option>)}
+                            </select>
+                          </div>
+                          <div><Label>IVA (auto)</Label><div style={{...S.input,background:'#f0f4f8',color:'#0d3b5e',fontWeight:700}}>{fmt(Number(g.subtotal15||0)*((g.iva_pct??15)/100))}</div></div>
+                        </div>
+                        <div><Label>Total (auto)</Label><div style={{...S.input,background:'#eef4fb',color:'#0d3b5e',fontWeight:700,fontSize:15}}>{fmt(Number(g.subtotal0||0)+Number(g.subtotal15||0)+Number(g.subtotal15||0)*((g.iva_pct??15)/100))}</div></div>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr',gap:8,marginTop:8}}>
+                          <div><Label>Fecha factura</Label><input type="date" style={S.input} value={g.fecha_factura||''} onChange={e=>updGasto(g.id,'fecha_factura',e.target.value)}/></div>
+                          <div><Label>RUC proveedor</Label><input style={S.input} value={g.ruc_proveedor||''} onChange={e=>updGasto(g.id,'ruc_proveedor',e.target.value)}/></div>
+                          <div><Label>Nombre proveedor</Label><input style={S.input} value={g.nombre_proveedor||''} onChange={e=>updGasto(g.id,'nombre_proveedor',e.target.value)}/></div>
+                          <div><Label># Factura</Label><input style={S.input} value={g.num_factura||''} onChange={e=>updGasto(g.id,'num_factura',e.target.value)}/></div>
+                          <div><Label># Autorización</Label><input style={S.input} value={g.num_autorizacion||''} onChange={e=>updGasto(g.id,'num_autorizacion',e.target.value)}/></div>
+                        </div>
                       </div>
                     ))}
               </div>
