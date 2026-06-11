@@ -656,7 +656,15 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                   </div>
                 </div>
                 <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                  {!bloqueado&&<button style={S.btnSm} onClick={()=>setEditing({...liq})}>✏️ Editar</button>}
+                  {!bloqueado&&<button style={S.btnSm} onClick={async()=>{
+                    // Load solicitudes pagadas for this presupuesto
+                    let solsPagadas = [];
+                    if (liq.presupuesto_id) {
+                      const {data} = await supabase.from('solicitudes').select('*').eq('presupuesto_id',liq.presupuesto_id).eq('estado','pagado').order('created_at');
+                      solsPagadas = data||[];
+                    }
+                    setEditing({...liq, _solicitudes_pagadas: solsPagadas});
+                  }}>✏️ Editar</button>}
                   <button style={S.btnSm} onClick={()=>downloadLiqPdf(liq)}>📄 PDF</button>
                   <button style={S.btnSm} onClick={()=>downloadLiqCsv(liq)}>📊 CSV</button>
                   {userRole==='admin'&&<button style={S.btnRed} onClick={()=>deleteLiq(liq.id)}>🗑</button>}
