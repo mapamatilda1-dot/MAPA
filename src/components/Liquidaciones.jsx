@@ -604,8 +604,6 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                         <div style={{fontSize:13,fontWeight:600}}>{g.concepto||'Sin concepto'}</div>
                       </div>
                     ))}
-                  </div>
-                )}
               </div>
             )}
 
