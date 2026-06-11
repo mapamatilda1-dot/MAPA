@@ -575,10 +575,13 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                   );
                 })}
 
-                {/* Gastos sin solicitud */}
-                {(editing.gastos||[]).filter(g=>!g._solicitud_id).length > 0 && (
-                  <div style={{marginTop:8}}>
-                    <div style={{background:'#555',color:'#fff',padding:'6px 12px',borderRadius:'6px 6px 0 0',fontSize:12,fontWeight:700}}>Gastos adicionales</div>
+              </div>
+            )}
+
+            {/* Gastos sin solicitud — siempre visible */}
+            {(editing.gastos||[]).filter(g=>!g._solicitud_id).length > 0 && (
+              <div style={{marginTop:8}}>
+                <div style={{background:'#555',color:'#fff',padding:'6px 12px',borderRadius:'6px 6px 0 0',fontSize:12,fontWeight:700}}>Gastos adicionales</div>
                     {(editing.gastos||[]).filter(g=>!g._solicitud_id).map(g=>(
                       <div key={g.id} style={{border:'1px solid #dde6ef',borderRadius:8,padding:12,marginBottom:8}}>
                         {g.tiene_xml===null&&<div style={{display:'flex',gap:8,marginBottom:10}}>
