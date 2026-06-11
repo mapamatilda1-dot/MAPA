@@ -7,6 +7,60 @@ import { CATS_LIQUIDACION, canEditLiq, canChangeLiqToLiquidado } from '../roles'
 const r2 = n => Math.round((Number(n)||0) * 100) / 100;
 const IVA_OPCIONES = [0, 5, 8, 15];
 
+// Parser de XML de facturas SRI Ecuador
+function parsearXMLFactura(xmlText) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'text/xml');
+    const get = (tag) => doc.querySelector(tag)?.textContent?.trim() || '';
+    const getImpuesto = (codigoPct) => {
+      const nodos = doc.querySelectorAll('totalImpuesto');
+      for (const n of nodos) {
+        if (n.querySelector('codigoPorcentaje')?.textContent === String(codigoPct)) {
+          return {
+            base: parseFloat(n.querySelector('baseImponible')?.textContent || 0),
+            valor: parseFloat(n.querySelector('valor')?.textContent || 0),
+          };
+        }
+      }
+      return { base: 0, valor: 0 };
+    };
+
+    const estab = get('estab');
+    const ptoEmi = get('ptoEmi');
+    const secuencial = get('secuencial');
+    const numFactura = estab && ptoEmi && secuencial ? `${estab}-${ptoEmi}-${secuencial}` : '';
+
+    // Fecha: DD/MM/YYYY → YYYY-MM-DD
+    const fechaRaw = get('fechaEmision');
+    let fecha = '';
+    if (fechaRaw) {
+      const parts = fechaRaw.split('/');
+      if (parts.length === 3) fecha = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+    }
+
+    const imp0  = getImpuesto('0');   // IVA 0%
+    const imp15 = getImpuesto('4');   // IVA 15% (código porcentaje 4 en SRI)
+    const imp12 = getImpuesto('2');   // IVA 12% legacy
+
+    return {
+      ruc_proveedor:    get('ruc'),
+      nombre_proveedor: get('razonSocial'),
+      num_factura:      numFactura,
+      num_autorizacion: get('claveAcceso') || get('numeroAutorizacion'),
+      fecha_factura:    fecha,
+      subtotal0:        imp0.base,
+      subtotal15:       imp15.base || imp12.base,
+      iva:              imp15.valor || imp12.valor,
+      total:            parseFloat(get('importeTotal') || 0),
+      iva_pct:          imp15.base > 0 ? 15 : (imp12.base > 0 ? 12 : 0),
+    };
+  } catch(e) {
+    console.error('Error parseando XML:', e);
+    return null;
+  }
+}
+
 function emptyGasto() {
   return {
     id: crypto.randomUUID(),
@@ -14,6 +68,8 @@ function emptyGasto() {
     subtotal15: 0, subtotal0: 0, iva_pct: 15, iva: 0, total: 0,
     ruc_proveedor: '', nombre_proveedor: '', num_factura: '', num_autorizacion: '', fecha_factura: '',
     valor_asignado: 0, valor_justificado: 0, notas: '',
+    tiene_xml: null, // null=no elegido, true=tiene XML, false=sin XML (nota de venta)
+    foto_nota: '', // base64 de foto de nota de venta
   };
 }
 
@@ -427,6 +483,53 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                         )}
                         {gastosEsta.map((g,gi)=>(
                         <div key={g.id} style={{border:'1px solid #dde6ef',borderRadius:8,padding:12,marginBottom:8}}>
+                          {/* Selector tipo comprobante */}
+                          {g.tiene_xml === null && (
+                            <div style={{display:'flex',gap:8,marginBottom:10}}>
+                              <button onClick={()=>updGasto(g.id,'tiene_xml',true)} style={{flex:1,padding:'7px 10px',borderRadius:8,border:'2px solid #0d3b5e',background:'#eef4fb',cursor:'pointer',fontFamily:'inherit',fontWeight:600,fontSize:12}}>📄 XML (factura electrónica)</button>
+                              <button onClick={()=>updGasto(g.id,'tiene_xml',false)} style={{flex:1,padding:'7px 10px',borderRadius:8,border:'2px solid #7c3aed',background:'#f5f3ff',cursor:'pointer',fontFamily:'inherit',fontWeight:600,fontSize:12}}>🧾 Sin XML (nota de venta)</button>
+                            </div>
+                          )}
+                          {g.tiene_xml === true && (
+                            <div style={{background:'#eef4fb',borderRadius:8,padding:'8px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                              <span style={{fontSize:12,color:'#0d3b5e',fontWeight:700}}>📄 Factura XML SRI</span>
+                              <label style={{cursor:'pointer'}}>
+                                <input type="file" accept=".xml" style={{display:'none'}} onChange={e=>{
+                                  const file=e.target.files[0]; if(!file) return;
+                                  const reader=new FileReader();
+                                  reader.onload=ev=>{
+                                    const datos=parsearXMLFactura(ev.target.result);
+                                    if(!datos){alert('No se pudo leer el XML. Verificá que sea una factura electrónica del SRI.');return;}
+                                    setEditing(prev=>({...prev,gastos:prev.gastos.map(gg=>gg.id===g.id?{...gg,...datos,tiene_xml:true,concepto:gg.concepto||datos.nombre_proveedor}:gg)}));
+                                  };
+                                  reader.readAsText(file);
+                                }}/>
+                                <span style={{padding:'5px 12px',background:'#0d3b5e',color:'#fff',borderRadius:6,fontSize:12,fontWeight:600}}>
+                                  {g.num_factura?`✓ ${g.num_factura}`:'Seleccionar XML'}
+                                </span>
+                              </label>
+                              {g.num_factura&&<span style={{fontSize:11,color:'#2e8b4e',fontWeight:600}}>✓ Datos auto-completados</span>}
+                              <button onClick={()=>updGasto(g.id,'tiene_xml',null)} style={{background:'none',border:'none',color:'#aaa',cursor:'pointer',fontSize:11,marginLeft:'auto'}}>cambiar tipo</button>
+                            </div>
+                          )}
+                          {g.tiene_xml === false && (
+                            <div style={{background:'#f5f3ff',borderRadius:8,padding:'8px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                              <span style={{fontSize:12,color:'#7c3aed',fontWeight:700}}>🧾 Nota de venta / Manual</span>
+                              <label style={{cursor:'pointer'}}>
+                                <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{
+                                  const file=e.target.files[0]; if(!file) return;
+                                  const reader=new FileReader();
+                                  reader.onload=ev=>updGasto(g.id,'foto_nota',ev.target.result);
+                                  reader.readAsDataURL(file);
+                                }}/>
+                                <span style={{padding:'5px 12px',background:'#7c3aed',color:'#fff',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>
+                                  {g.foto_nota?'✓ Foto cargada':'Subir foto'}
+                                </span>
+                              </label>
+                              {g.foto_nota&&<img src={g.foto_nota} alt="nota" style={{height:36,borderRadius:4,border:'1px solid #ddd'}}/>}
+                              <button onClick={()=>updGasto(g.id,'tiene_xml',null)} style={{background:'none',border:'none',color:'#aaa',cursor:'pointer',fontSize:11,marginLeft:'auto'}}>cambiar tipo</button>
+                            </div>
+                          )}
                           <div style={{display:'grid',gridTemplateColumns:'2fr 2fr auto',gap:8,marginBottom:8,alignItems:'end'}}>
                             <div><Label>Concepto</Label><input style={S.input} value={g.concepto} onChange={e=>updGasto(g.id,'concepto',e.target.value)}/></div>
                             <div><Label>Categoría</Label>
@@ -477,7 +580,26 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                   <div style={{marginTop:8}}>
                     <div style={{background:'#555',color:'#fff',padding:'6px 12px',borderRadius:'6px 6px 0 0',fontSize:12,fontWeight:700}}>Gastos adicionales</div>
                     {(editing.gastos||[]).filter(g=>!g._solicitud_id).map(g=>(
-                      <div key={g.id} style={{border:'1px solid #dde6ef',borderRadius:8,padding:12,marginBottom:4}}>{g.concepto}</div>
+                      <div key={g.id} style={{border:'1px solid #dde6ef',borderRadius:8,padding:12,marginBottom:8}}>
+                        {g.tiene_xml===null&&<div style={{display:'flex',gap:8,marginBottom:10}}>
+                          <button onClick={()=>updGasto(g.id,'tiene_xml',true)} style={{flex:1,padding:'7px',borderRadius:8,border:'2px solid #0d3b5e',background:'#eef4fb',cursor:'pointer',fontFamily:'inherit',fontWeight:600,fontSize:12}}>📄 XML</button>
+                          <button onClick={()=>updGasto(g.id,'tiene_xml',false)} style={{flex:1,padding:'7px',borderRadius:8,border:'2px solid #7c3aed',background:'#f5f3ff',cursor:'pointer',fontFamily:'inherit',fontWeight:600,fontSize:12}}>🧾 Sin XML</button>
+                        </div>}
+                        {g.tiene_xml===true&&<div style={{background:'#eef4fb',borderRadius:8,padding:'8px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
+                          <span style={{fontSize:12,color:'#0d3b5e',fontWeight:700}}>📄 XML SRI</span>
+                          <label style={{cursor:'pointer'}}><input type="file" accept=".xml" style={{display:'none'}} onChange={e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{const datos=parsearXMLFactura(ev.target.result);if(!datos){alert('XML inválido');return;}setEditing(prev=>({...prev,gastos:prev.gastos.map(gg=>gg.id===g.id?{...gg,...datos,tiene_xml:true}:gg)}));};reader.readAsText(file);}}/>
+                            <span style={{padding:'5px 12px',background:'#0d3b5e',color:'#fff',borderRadius:6,fontSize:12,fontWeight:600}}>{g.num_factura?`✓ ${g.num_factura}`:'Seleccionar XML'}</span>
+                          </label>
+                        </div>}
+                        {g.tiene_xml===false&&<div style={{background:'#f5f3ff',borderRadius:8,padding:'8px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
+                          <span style={{fontSize:12,color:'#7c3aed',fontWeight:700}}>🧾 Nota de venta</span>
+                          <label style={{cursor:'pointer'}}><input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>updGasto(g.id,'foto_nota',ev.target.result);reader.readAsDataURL(file);}}/>
+                            <span style={{padding:'5px 12px',background:'#7c3aed',color:'#fff',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>{g.foto_nota?'✓ Foto':'Subir foto'}</span>
+                          </label>
+                          {g.foto_nota&&<img src={g.foto_nota} alt="" style={{height:36,borderRadius:4}}/>}
+                        </div>}
+                        <div style={{fontSize:13,fontWeight:600}}>{g.concepto||'Sin concepto'}</div>
+                      </div>
                     ))}
                   </div>
                 )}
