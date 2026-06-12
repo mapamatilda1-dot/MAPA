@@ -242,71 +242,81 @@ function OpcionesAdicionales({ p, setP, bloqueado, fmt, fmtPct, calcItem, S, Lab
             {/* Ítems de la opción */}
             {isOpen && (
               <div style={{ padding:'12px 14px', borderTop:'1px solid #e8e8e8' }}>
-                <div style={{ overflowX:'auto' }}>
-                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-                    <thead>
-                      <tr style={{ background:'#f0f4f8' }}>
-                        {['Ítem','Detalle','Cant.','Días','C.Unit','P.Unit','Total','Razón social','Img',''].map(h=>(
-                          <th key={h} style={{ padding:'6px 8px', textAlign:['Cant.','Días','C.Unit','P.Unit','Total'].includes(h)?'right':'left', fontSize:11, color:'#666', fontWeight:700 }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
+                <div>
                       {(op.items||[]).map(it => {
                         const c = calcItem(it);
                         return (
-                          <tr key={it.id} style={{ borderBottom:'1px solid #f0f0f0' }}>
-                            <td style={{ padding:'5px 6px' }}>
-                              <input value={it.item||''} onChange={e=>updItemOp(op.id,it.id,'item',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12}} placeholder="Nombre"/>
-                            </td>
-                            <td style={{ padding:'5px 6px' }}>
-                              <input value={it.detalle||''} onChange={e=>updItemOp(op.id,it.id,'detalle',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12}} placeholder="Detalle"/>
-                            </td>
-                            <td style={{ padding:'5px 4px', width:55 }}>
-                              <input type="number" value={it.cantidad} onWheel={e=>e.target.blur()} onChange={e=>updItemOp(op.id,it.id,'cantidad',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right'}}/>
-                            </td>
-                            <td style={{ padding:'5px 4px', width:50 }}>
-                              <input type="number" value={it.dias} onWheel={e=>e.target.blur()} onChange={e=>updItemOp(op.id,it.id,'dias',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right'}}/>
-                            </td>
-                            <td style={{ padding:'5px 4px', width:85 }}>
-                              <input type="number" step="0.01" value={it.costo_unit||''} onWheel={e=>e.target.blur()} onChange={e=>updItemOp(op.id,it.id,'costo_unit',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right',background:'#fafafa'}} placeholder="0.00"/>
-                            </td>
-                            <td style={{ padding:'5px 4px', width:85 }}>
-                              <input type="number" step="0.01" value={it.precio_unit||''} onWheel={e=>e.target.blur()} onChange={e=>updItemOp(op.id,it.id,'precio_unit',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12,textAlign:'right'}} placeholder="0.00"/>
-                            </td>
-                            <td style={{ padding:'5px 8px', textAlign:'right', fontWeight:600, color:'#7c3aed', width:85 }}>{fmt(c.precio)}</td>
-                            <td style={{ padding:'5px 6px', width:120 }}>
-                              <input value={it.razon_social||''} onChange={e=>updItemOp(op.id,it.id,'razon_social',e.target.value)}
-                                style={{...S.input,padding:'3px 6px',fontSize:12}} placeholder="Proveedor"/>
-                            </td>
-                            <td style={{ padding:'5px 4px', width:44 }}>
-                              <label style={{cursor:'pointer',display:'block',textAlign:'center'}}>
-                                <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{
-                                  const file=e.target.files[0]; if(!file)return;
-                                  const reader=new FileReader();
-                                  reader.onload=ev=>updItemOp(op.id,it.id,'imagen_url',ev.target.result);
-                                  reader.readAsDataURL(file);
-                                }}/>
-                                {it.imagen_url
-                                  ? <img src={it.imagen_url} alt="" style={{width:32,height:32,objectFit:'cover',borderRadius:4,border:'1px solid #ddd'}}/>
-                                  : <span style={{fontSize:18,color:'#ccc'}}>📷</span>}
-                              </label>
-                            </td>
-                            <td style={{ padding:'5px 4px', width:30 }}>
+                          <div key={it.id} style={{border:'1px solid #e8e0f8',borderRadius:8,padding:10,marginBottom:8,background:'#fafafa'}}>
+                            {/* Header ítem */}
+                            <div style={{display:'grid',gridTemplateColumns:'2fr 2fr auto',gap:8,marginBottom:8}}>
+                              <div><label style={{fontSize:10,color:'#888',fontWeight:700,textTransform:'uppercase',letterSpacing:1}}>Ítem</label>
+                                <input value={it.item||''} onChange={e=>updItemOp(op.id,it.id,'item',e.target.value)}
+                                  style={{...S.input,marginTop:2}} placeholder="Nombre del ítem"/></div>
+                              <div><label style={{fontSize:10,color:'#888',fontWeight:700,textTransform:'uppercase',letterSpacing:1}}>Detalle</label>
+                                <textarea value={it.detalle||''} onChange={e=>updItemOp(op.id,it.id,'detalle',e.target.value)}
+                                  style={{...S.textarea,height:38,marginTop:2,fontSize:12}} placeholder="usá *palabra* para negrita"/></div>
                               <button onClick={()=>updateOpcion(op.id,{items:(op.items||[]).filter(x=>x.id!==it.id)})}
-                                style={{background:'none',border:'none',color:'#dc2626',cursor:'pointer',fontSize:14}}>✕</button>
-                            </td>
-                          </tr>
+                                style={{background:'#fee2e2',border:'none',color:'#dc2626',cursor:'pointer',borderRadius:6,padding:'4px 8px',alignSelf:'end'}}>✕</button>
+                            </div>
+                            {/* COSTO */}
+                            <div style={{background:'#fff7ed',borderRadius:8,padding:'8px 10px',border:'2px solid #fb923c',marginBottom:8}}>
+                              <div style={{fontSize:11,fontWeight:700,color:'#c2410c',marginBottom:6}}>💼 Costo proveedor</div>
+                              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8}}>
+                                <div><label style={{fontSize:10,color:'#c2410c',fontWeight:600}}>Costo unit. ($)</label>
+                                  <input type="number" step="0.01" value={it.costo_unit||''} onWheel={e=>e.target.blur()} onChange={e=>updItemOp(op.id,it.id,'costo_unit',e.target.value)}
+                                    style={{...S.input,marginTop:2}} placeholder="0.00"/></div>
+                                <div><label style={{fontSize:10,color:'#c2410c',fontWeight:600}}>Cantidad</label>
+                                  <input type="number" value={it.cantidad||1} onWheel={e=>e.target.blur()} onChange={e=>updItemOp(op.id,it.id,'cantidad',e.target.value)}
+                                    style={{...S.input,marginTop:2}}/></div>
+                                <div><label style={{fontSize:10,color:'#c2410c',fontWeight:600}}>Días</label>
+                                  <input type="number" value={it.dias||1} onWheel={e=>e.target.blur()} onChange={e=>updItemOp(op.id,it.id,'dias',e.target.value)}
+                                    style={{...S.input,marginTop:2}}/></div>
+                                <div><label style={{fontSize:10,color:'#c2410c',fontWeight:600}}>Total costo</label>
+                                  <div style={{...S.input,marginTop:2,fontWeight:700,color:'#c2410c',background:'#fff3e0'}}>{fmt(Number(it.costo_unit||0)*Number(it.cantidad||1)*Number(it.dias||1))}</div></div>
+                              </div>
+                            </div>
+                            {/* PRECIO */}
+                            <div style={{background:'#ecfdf5',borderRadius:8,padding:'8px 10px',border:'2px solid #10b981',marginBottom:8}}>
+                              <div style={{fontSize:11,fontWeight:700,color:'#065f46',marginBottom:6}}>👤 Precio cliente</div>
+                              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8}}>
+                                <div><label style={{fontSize:10,color:'#065f46',fontWeight:600}}>Precio unit. ($)</label>
+                                  <input type="number" step="0.01" value={it.precio_unit||''} onWheel={e=>e.target.blur()} onChange={e=>updItemOp(op.id,it.id,'precio_unit',e.target.value)}
+                                    style={{...S.input,marginTop:2}} placeholder="0.00"/></div>
+                                <div><label style={{fontSize:10,color:'#065f46',fontWeight:600}}>Cantidad</label>
+                                  <div style={{...S.input,marginTop:2,background:'#f0fdf4',color:'#888'}}>{it.cantidad||1}</div></div>
+                                <div><label style={{fontSize:10,color:'#065f46',fontWeight:600}}>Días</label>
+                                  <div style={{...S.input,marginTop:2,background:'#f0fdf4',color:'#888'}}>{it.dias||1}</div></div>
+                                <div><label style={{fontSize:10,color:'#065f46',fontWeight:600}}>Total precio</label>
+                                  <div style={{...S.input,marginTop:2,fontWeight:700,color:'#065f46',background:'#d1fae5'}}>{fmt(c.precio)}</div></div>
+                              </div>
+                            </div>
+                            {/* Margen + extras */}
+                            <div style={{display:'flex',alignItems:'center',gap:16,padding:'5px 8px',background:c.margen>=0?'#edf7ed':'#fdeef1',borderRadius:6,marginBottom:8}}>
+                              <span style={{fontSize:12,color:'#555'}}>Margen:</span>
+                              <span style={{fontSize:13,fontWeight:700,color:c.margen>=0?'#2e8b4e':'#c8264a'}}>{fmt(c.margen)} ({fmtPct(c.margenPct)})</span>
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                              <div><label style={{fontSize:10,color:'#888',fontWeight:600,textTransform:'uppercase'}}>Razón social</label>
+                                <input value={it.razon_social||''} onChange={e=>updItemOp(op.id,it.id,'razon_social',e.target.value)}
+                                  style={{...S.input,marginTop:2}} placeholder="Proveedor"/></div>
+                              <div><label style={{fontSize:10,color:'#888',fontWeight:600,textTransform:'uppercase'}}>Imagen referencia</label>
+                                <label style={{cursor:'pointer',display:'flex',alignItems:'center',gap:6,marginTop:2}}>
+                                  <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{
+                                    const file=e.target.files[0]; if(!file)return;
+                                    const reader=new FileReader();
+                                    reader.onload=ev=>updItemOp(op.id,it.id,'imagen_url',ev.target.result);
+                                    reader.readAsDataURL(file);
+                                  }}/>
+                                  {it.imagen_url
+                                    ? <img src={it.imagen_url} alt="" style={{width:36,height:36,objectFit:'cover',borderRadius:4,border:'1px solid #ddd'}}/>
+                                    : <span style={{...S.input,fontSize:12,marginTop:0,cursor:'pointer',textAlign:'center'}}>📷 Subir foto</span>}
+                                </label>
+                              </div>
+                            </div>
+                          </div>
                         );
                       })}
-                    </tbody>
-                  </table>
+                  </div>
                 </div>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8 }}>
                   <button onClick={()=>addItemToOp(op.id)} style={{...S.btnSm,background:'#7c3aed',color:'#fff',border:'none',fontSize:12}}>+ Ítem</button>
@@ -1067,8 +1077,8 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                               </div>
 
                               {/* COSTO PROVEEDOR */}
-                              <div style={{gridColumn:'1/-1',background:'#f8fafc',borderRadius:8,padding:'10px 12px',border:'1px solid #dde6ef'}}>
-                                <div style={{fontSize:12,fontWeight:700,color:'#5a7a9a',marginBottom:8}}>💼 Costo proveedor (cotizado)</div>
+                              <div style={{gridColumn:'1/-1',background:'#fff7ed',borderRadius:8,padding:'10px 12px',border:'2px solid #fb923c'}}>
+                                <div style={{fontSize:12,fontWeight:700,color:'#c2410c',marginBottom:8}}>💼 Costo proveedor (cotizado)</div>
                                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
                                   <div><Label>Costo unitario ($)</Label><input type="number" step="0.01" style={S.input} value={it.costo_unit??0} onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'costo_unit',e.target.value)}/></div>
                                   <div><Label>Cantidad</Label><input type="number" style={S.input} value={it.cantidad??1} onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'cantidad',e.target.value)}/></div>
@@ -1078,7 +1088,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginTop:8}}>
                                   <div><Label>OH %</Label><input type="number" step="0.1" style={S.input} value={it.oh_pct??0} onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'oh_pct',e.target.value)}/></div>
                                   <div><Label>BCO %</Label><input type="number" step="0.1" style={S.input} value={it.bco_pct??0} onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'bco_pct',e.target.value)}/></div>
-                                  <div><Label>Total c/OH+BCO</Label><input style={{...S.inputRO,fontWeight:700,color:'#5a7a9a'}} readOnly value={fmt(c.totalCosto)}/></div>
+                                  <div><Label>Total c/OH+BCO</Label><input style={{...S.inputRO,fontWeight:700,color:'#c2410c'}} readOnly value={fmt(c.totalCosto)}/></div>
                                 </div>
                               </div>
 
@@ -1137,13 +1147,13 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                               )}
 
                               {/* PRECIO CLIENTE */}
-                              <div style={{gridColumn:'1/-1',background:'#eef4fb',borderRadius:8,padding:'10px 12px',border:'1px solid #c8d8e8'}}>
-                                <div style={{fontSize:12,fontWeight:700,color:'#0d3b5e',marginBottom:8}}>👤 Precio cliente</div>
+                              <div style={{gridColumn:'1/-1',background:'#ecfdf5',borderRadius:8,padding:'10px 12px',border:'2px solid #10b981'}}>
+                                <div style={{fontSize:12,fontWeight:700,color:'#065f46',marginBottom:8}}>👤 Precio cliente</div>
                                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
                                   <div><Label>Precio unitario ($)</Label><input type="number" step="0.01" style={S.input} value={it.precio_unit??0} onWheel={e=>e.target.blur()} disabled={it.costo_aprobado&&!canApproveCostoReal(userRole)} onChange={e=>updItem(it.id,'precio_unit',e.target.value)}/></div>
                                   <div><Label>Cantidad</Label><input style={S.inputRO} readOnly value={it.cantidad??1}/></div>
                                   <div><Label>Días</Label><input style={S.inputRO} readOnly value={it.dias??1}/></div>
-                                  <div><Label>Total (unit×cant×días)</Label><input style={{...S.inputRO,fontWeight:700,color:'#0d3b5e'}} readOnly value={fmt(c.precio)}/></div>
+                                  <div><Label>Total (unit×cant×días)</Label><input style={{...S.inputRO,fontWeight:700,color:'#065f46'}} readOnly value={fmt(c.precio)}/></div>
                                 </div>
                               </div>
 
@@ -1655,8 +1665,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                           })()}
                         </>
                       ))}
-                    </tbody>
-                  </table>
+                  </div>
                 </div>
                 <div style={{padding:'8px 20px 16px',display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginTop:8}}>
                   {previewMode==='financiero'&&(
