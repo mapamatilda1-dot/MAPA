@@ -317,7 +317,6 @@ function OpcionesAdicionales({ p, setP, bloqueado, fmt, fmtPct, calcItem, S, Lab
                         );
                       })}
                   </div>
-                </div>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8 }}>
                   <button onClick={()=>addItemToOp(op.id)} style={{...S.btnSm,background:'#7c3aed',color:'#fff',border:'none',fontSize:12}}>+ Ítem</button>
                   <span style={{ fontSize:13, fontWeight:600, color:'#7c3aed' }}>Total: {fmt(totalOp)}</span>
