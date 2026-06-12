@@ -1664,7 +1664,8 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                           })()}
                         </>
                       ))}
-                  </div>
+                    </tbody>
+                  </table>
                 </div>
                 <div style={{padding:'8px 20px 16px',display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginTop:8}}>
                   {previewMode==='financiero'&&(
@@ -1697,8 +1698,8 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
               <div style={{marginBottom:16}}>
                 <div style={{fontSize:13,fontWeight:600,color:'#0d3b5e',marginBottom:8}}>Subpresupuestos</div>
                 <div style={{display:'flex',gap:8}}>
-                  <button onClick={()=>setPdfModal(m=>({...m,separados:true}))} style={{flex:1,padding:'8px',borderRadius:8,border:`2px solid ${pdfModal.separados?'#0d3b5e':'#ddd'}`,background:pdfModal.separados?'#eef4fb':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:pdfModal.separados?700:400}}>Separados (c/totales)</button>
-                  <button onClick={()=>setPdfModal(m=>({...m,separados:false}))} style={{flex:1,padding:'8px',borderRadius:8,border:`2px solid ${!pdfModal.separados?'#0d3b5e':'#ddd'}`,background:!pdfModal.separados?'#eef4fb':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:!pdfModal.separados?700:400}}>Unidos (un total)</button>
+                  <button onClick={()=>setPdfModal(m=>({...m,separados:true}))} style={{flex:1,padding:'8px',borderRadius:8,border:'2px solid '+(pdfModal.separados?'#0d3b5e':'#ddd'),background:pdfModal.separados?'#eef4fb':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:pdfModal.separados?700:400}}>Separados (c/totales)</button>
+                  <button onClick={()=>setPdfModal(m=>({...m,separados:false}))} style={{flex:1,padding:'8px',borderRadius:8,border:'2px solid '+(!pdfModal.separados?'#0d3b5e':'#ddd'),background:!pdfModal.separados?'#eef4fb':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:!pdfModal.separados?700:400}}>Unidos (un total)</button>
                 </div>
               </div>
             )}
@@ -1706,8 +1707,8 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
               <div style={{marginBottom:16}}>
                 <div style={{fontSize:13,fontWeight:600,color:'#0d3b5e',marginBottom:8}}>Opciones adicionales</div>
                 <div style={{display:'flex',gap:8}}>
-                  <button onClick={()=>setPdfModal(m=>({...m,opciones:true}))} style={{flex:1,padding:'8px',borderRadius:8,border:`2px solid ${pdfModal.opciones?'#7c3aed':'#ddd'}`,background:pdfModal.opciones?'#f5f3ff':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:pdfModal.opciones?700:400}}>✦ Incluir opciones</button>
-                  <button onClick={()=>setPdfModal(m=>({...m,opciones:false}))} style={{flex:1,padding:'8px',borderRadius:8,border:`2px solid ${!pdfModal.opciones?'#7c3aed':'#ddd'}`,background:!pdfModal.opciones?'#f5f3ff':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:!pdfModal.opciones?700:400}}>Sin opciones</button>
+                  <button onClick={()=>setPdfModal(m=>({...m,opciones:true}))} style={{flex:1,padding:'8px',borderRadius:8,border:'2px solid '+(pdfModal.opciones?'#7c3aed':'#ddd'),background:pdfModal.opciones?'#f5f3ff':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:pdfModal.opciones?700:400}}>✦ Incluir opciones</button>
+                  <button onClick={()=>setPdfModal(m=>({...m,opciones:false}))} style={{flex:1,padding:'8px',borderRadius:8,border:'2px solid '+(!pdfModal.opciones?'#7c3aed':'#ddd'),background:!pdfModal.opciones?'#f5f3ff':'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:!pdfModal.opciones?700:400}}>Sin opciones</button>
                 </div>
               </div>
             )}
