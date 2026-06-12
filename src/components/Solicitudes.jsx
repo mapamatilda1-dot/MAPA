@@ -160,7 +160,7 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
     } else if (solicitud?.presupuesto_id) {
       loadPptoConItems(solicitud.presupuesto_id, solicitud.items || []);
     }
-  }, [solicitud?.id, presupuesto_id_inicial]);
+  }, [solicitud?.id, solicitud?.updated_at, presupuesto_id_inicial]);
 
   async function loadPptoConItems(id, itemsGuardados) {
     const { data } = await supabase.from('presupuestos').select('*').eq('id', id).single();

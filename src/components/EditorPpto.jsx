@@ -1054,7 +1054,9 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                           {it.categoria&&<span style={{fontSize:11,background:'#e8f0f8',color:'#0d3b5e',padding:'2px 7px',borderRadius:4,fontWeight:600}}>{it.categoria}</span>}
                           {tieneReal&&<span style={{fontSize:11,background:'#edf7ed',color:'#2e8b4e',padding:'2px 7px',borderRadius:4,fontWeight:600,border:'1px solid #2e8b4e44'}}>Ahorro: {fmt(c.ahorro)}</span>}
                           <span style={{fontSize:12,color:'#8aa0b8'}}>Costo: <strong>{fmt(c.costoTotal)}</strong></span>
-                          <span style={{fontSize:12,color:'#0d3b5e',fontWeight:600}}>Precio: <strong>{fmt(c.precio)}</strong></span>
+                          <span style={{fontSize:12,color:'#065f46',fontWeight:600}}>Subtotal: <strong>{fmt(c.precio)}</strong></span>
+                          {(p.fee_agencia||0)>0&&<span style={{fontSize:11,color:'#5b21b6',fontWeight:600}}>+Fee: <strong>{fmt(c.precio*(p.fee_agencia/100))}</strong></span>}
+                          {(p.fee_agencia||0)>0&&<span style={{fontSize:12,color:'#0d3b5e',fontWeight:700}}>= {fmt(c.precio*(1+(p.fee_agencia/100)))}</span>}
                           <span style={{fontSize:11,color:c.margen>=0?'#2e8b4e':'#c8264a',fontWeight:600}}>{fmtPct(c.margenPct)}</span>
                           {!bloqueado&&<button style={{...S.btnRed,padding:'3px 7px'}} onClick={e=>{e.stopPropagation();delItem(it.id);}}>🗑</button>}
 
@@ -1149,7 +1151,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                               <div style={{gridColumn:'1/-1',background:'#ecfdf5',borderRadius:8,padding:'10px 12px',border:'2px solid #10b981'}}>
                                 <div style={{fontSize:12,fontWeight:700,color:'#065f46',marginBottom:8}}>👤 Precio cliente</div>
                                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
-                                  <div><Label>Precio unitario ($)</Label><input type="number" step="0.01" style={S.input} value={it.precio_unit??0} onWheel={e=>e.target.blur()} disabled={it.costo_aprobado&&!canApproveCostoReal(userRole)} onChange={e=>updItem(it.id,'precio_unit',e.target.value)}/></div>
+                                  <div><Label>Precio unitario ($)</Label><input type="number" step="0.01" style={{...S.input,background:(['aprobado','pendiente_facturar','facturado'].includes(p.estado))?'#f0f4f8':''}} value={it.precio_unit??0} onWheel={e=>e.target.blur()} disabled={(it.costo_aprobado&&!canApproveCostoReal(userRole))||['aprobado','pendiente_facturar','facturado'].includes(p.estado)} onChange={e=>updItem(it.id,'precio_unit',e.target.value)}/></div>
                                   <div><Label>Cantidad</Label><input style={S.inputRO} readOnly value={it.cantidad??1}/></div>
                                   <div><Label>Días</Label><input style={S.inputRO} readOnly value={it.dias??1}/></div>
                                   <div><Label>Total (unit×cant×días)</Label><input style={{...S.inputRO,fontWeight:700,color:'#065f46'}} readOnly value={fmt(c.precio)}/></div>

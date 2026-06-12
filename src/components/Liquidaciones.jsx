@@ -180,23 +180,45 @@ export default function Liquidaciones({ presupuestos, userRole }) {
 
   async function save(){
     if(!editing.responsable){showToast('Ingresa el responsable');return;}
-    // Validate estado change permission
     if(editing.estado==='liquidado'&&!canChangeLiqToLiquidado(userRole)){
       showToast('⚠️ Solo Financiero o Admin pueden marcar como Liquidado');return;
     }
     setSaving(true);
-    let error;
+    let error, savedId = editing.id;
     if(editing.id){({error}=await supabase.from('liquidaciones').update(editing).eq('id',editing.id));}
-    else{let data2;({data:data2,error}=await supabase.from('liquidaciones').insert(editing).select().single());if(data2)setEditing(prev=>({...prev,id:data2.id}));}
+    else{let data2;({data:data2,error}=await supabase.from('liquidaciones').insert(editing).select().single());if(data2){savedId=data2.id;setEditing(prev=>({...prev,id:data2.id}));}}
     setSaving(false);
     if(error){showToast('Error: '+error.message);return;}
-    showToast('Guardado ✓');
-    // Quedarse en la página para seguir editando
-    if (!editing.id && data?.id) setEditing(prev => ({ ...prev, id: data.id }));
+
+    // Actualizar costos reales en el presupuesto por nombre de concepto
+    if (editing.presupuesto_id && (editing.gastos||[]).length > 0) {
+      const {data:ppto} = await supabase.from('presupuestos').select('items').eq('id',editing.presupuesto_id).single();
+      if (ppto?.items) {
+        const totalesPorConcepto = {};
+        (editing.gastos||[]).forEach(g => {
+          const key = (g.concepto||'').toLowerCase().trim();
+          if (key) totalesPorConcepto[key] = (totalesPorConcepto[key]||0) + Number(g.total||0);
+        });
+        const itemsActualizados = ppto.items.map(it => {
+          const key = (it.item||'').toLowerCase().trim();
+          if (totalesPorConcepto[key] !== undefined) {
+            const cant = Number(it.cantidad||1);
+            const dias = Number(it.dias||1);
+            const total = totalesPorConcepto[key];
+            const costoRealUnit = cant > 0 && dias > 0 ? total / (cant * dias) : total;
+            return {...it, costo_real_unit: costoRealUnit};
+          }
+          return it;
+        });
+        await supabase.from('presupuestos').update({items:itemsActualizados}).eq('id',editing.presupuesto_id);
+      }
+    }
+
+    showToast('Guardado ✓ — costos reales actualizados');
     fetchAll();
   }
 
-  async function deleteLiq(id){
+    async function deleteLiq(id){
     if(!window.confirm('¿Eliminar liquidación?'))return;
     await supabase.from('liquidaciones').delete().eq('id',id);
     fetchAll();
