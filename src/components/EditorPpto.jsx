@@ -885,7 +885,8 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
           {/* Toolbar */}
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
             <span style={{fontSize:13,color:'#5a7a9a'}}>
-              {p.items.length} ítems · Precio total: <strong style={{color:'#0d3b5e'}}>{fmt(totales.subtotalPrecio)}</strong>
+              {p.items.length} ítems · Subtotal: <strong style={{color:'#065f46'}}>{fmt(totales.subtotalPrecio)}</strong>
+              {(p.fee_agencia||0)>0&&<span> · Fee {p.fee_agencia}%: <strong style={{color:'#5b21b6'}}>{fmt(totales.feeAgencia)}</strong> · Total c/fee: <strong style={{color:'#0d3b5e'}}>{fmt(totales.totalSinIva)}</strong></span>}
             </span>
             <div style={{display:'flex',gap:8}}>
               {p.estado==='enviado_cliente' && p.id && (
@@ -1054,9 +1055,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                           {it.categoria&&<span style={{fontSize:11,background:'#e8f0f8',color:'#0d3b5e',padding:'2px 7px',borderRadius:4,fontWeight:600}}>{it.categoria}</span>}
                           {tieneReal&&<span style={{fontSize:11,background:'#edf7ed',color:'#2e8b4e',padding:'2px 7px',borderRadius:4,fontWeight:600,border:'1px solid #2e8b4e44'}}>Ahorro: {fmt(c.ahorro)}</span>}
                           <span style={{fontSize:12,color:'#8aa0b8'}}>Costo: <strong>{fmt(c.costoTotal)}</strong></span>
-                          <span style={{fontSize:12,color:'#065f46',fontWeight:600}}>Subtotal: <strong>{fmt(c.precio)}</strong></span>
-                          {(p.fee_agencia||0)>0&&<span style={{fontSize:11,color:'#5b21b6',fontWeight:600}}>+Fee: <strong>{fmt(c.precio*(p.fee_agencia/100))}</strong></span>}
-                          {(p.fee_agencia||0)>0&&<span style={{fontSize:12,color:'#0d3b5e',fontWeight:700}}>= {fmt(c.precio*(1+(p.fee_agencia/100)))}</span>}
+                          <span style={{fontSize:12,color:'#065f46',fontWeight:600}}>Precio: <strong>{fmt(c.precio)}</strong></span>
                           <span style={{fontSize:11,color:c.margen>=0?'#2e8b4e':'#c8264a',fontWeight:600}}>{fmtPct(c.margenPct)}</span>
                           {!bloqueado&&<button style={{...S.btnRed,padding:'3px 7px'}} onClick={e=>{e.stopPropagation();delItem(it.id);}}>🗑</button>}
 
