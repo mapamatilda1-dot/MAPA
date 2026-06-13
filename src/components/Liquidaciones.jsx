@@ -185,8 +185,10 @@ export default function Liquidaciones({ presupuestos, userRole }) {
     }
     setSaving(true);
     let error, savedId = editing.id;
-    if(editing.id){({error}=await supabase.from('liquidaciones').update(editing).eq('id',editing.id));}
-    else{let data2;({data:data2,error}=await supabase.from('liquidaciones').insert(editing).select().single());if(data2){savedId=data2.id;setEditing(prev=>({...prev,id:data2.id}));}}
+    // Excluir campos internos que no son columnas de DB
+    const { _solicitudes_pagadas, ...editingClean } = editing;
+    if(editingClean.id){({error}=await supabase.from('liquidaciones').update(editingClean).eq('id',editingClean.id));}
+    else{let data2;({data:data2,error}=await supabase.from('liquidaciones').insert(editingClean).select().single());if(data2){savedId=data2.id;setEditing(prev=>({...prev,id:data2.id}));}}
     setSaving(false);
     if(error){showToast('Error: '+error.message);return;}
 
