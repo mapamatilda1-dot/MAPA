@@ -13,6 +13,7 @@ import AdminPanel from './components/AdminPanel';
 import Proformas from './components/Proformas';
 import Solicitudes from './components/Solicitudes';
 import Dashboard from './components/Dashboard';
+import Notificaciones from './components/Notificaciones';
 
 // Placeholders — se reemplazarán en las fases siguientes
 const Placeholder = ({ nombre }) => (
@@ -25,6 +26,7 @@ const Placeholder = ({ nombre }) => (
 
 // Tab labels y orden visual
 const TAB_CONFIG = {
+  notificaciones:   { label: 'Notificaciones', icon: '🔔' },
   crm:              { label: 'CRM',            icon: '◎' },
   briefs:           { label: 'Proyectos',       icon: '◇' },
   propuestas:       { label: 'Propuestas',      icon: '◈' },
@@ -59,8 +61,13 @@ export default function App() {
   useEffect(() => {
     if (!session) { setActiveTab(null); return; }
     const role = session.user?.user_metadata?.role || 'produccion';
+    const userEmail = session.user?.email || '';
     const tabs = getNavTabs(role);
-    setActiveTab(role === 'admin' ? 'calendario' : (tabs[0] || 'briefs'));
+    if (userEmail === 'mariajose@matilda.agency') {
+      setActiveTab('notificaciones');
+    } else {
+      setActiveTab(role === 'admin' ? 'calendario' : (tabs[0] || 'briefs'));
+    }
   }, [session?.user?.id]);
 
   if (loading) return (
@@ -82,6 +89,7 @@ export default function App() {
 
   function renderContent() {
     switch (activeTab) {
+      case 'notificaciones':   return <Notificaciones userEmail={email} onNavigate={({tab, id}) => { if(id && tab==='presupuestos') setPptoInicial(id); setActiveTab(tab); }}/>;
       case 'crm':              return <CRM userRole={role} />;
       case 'briefs':           return <Briefs userRole={role} userEmail={email} />;
       case 'propuestas':       return <Propuestas userRole={role} userEmail={email} />;
@@ -152,6 +160,26 @@ export default function App() {
         display: 'flex', padding: '0 1.5rem', overflowX: 'auto',
         gap: 2,
       }}>
+        {/* Notificaciones siempre visible */}
+        {(()=>{
+          const cfg = TAB_CONFIG['notificaciones'];
+          const isActive = activeTab === 'notificaciones';
+          return (
+            <button key="notificaciones" onClick={()=>setActiveTab('notificaciones')} style={{
+              display:'flex',alignItems:'center',gap:5,
+              padding:'12px 14px',background:'transparent',
+              border:'none',borderBottom:isActive?'2px solid #c8264a':'2px solid transparent',
+              fontSize:13,fontWeight:isActive?600:400,
+              color:isActive?'#c8264a':'#666',
+              cursor:'pointer',whiteSpace:'nowrap',
+              transition:'color .15s, border-color .15s',
+            }}>
+              <span style={{fontSize:13}}>{cfg.icon}</span>
+              {cfg.label}
+              {/* Badge de pendientes — se calcula en el componente */}
+            </button>
+          );
+        })()}
         {tabs.map(tab => {
           const cfg = TAB_CONFIG[tab] || { label: tab, icon: '' };
           const isActive = activeTab === tab;
