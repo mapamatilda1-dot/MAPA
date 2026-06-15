@@ -89,7 +89,7 @@ export default function App() {
 
   function renderContent() {
     switch (activeTab) {
-      case 'notificaciones':   return <Notificaciones userEmail={email} onNavigate={({tab, id}) => { if(id && tab==='presupuestos') setPptoInicial(id); setActiveTab(tab); }}/>;
+      case 'notificaciones':   return <Notificaciones userEmail={email} userRole={role} onNavigate={({tab, id}) => { if(id && tab==='presupuestos') setPptoInicial(id); setActiveTab(tab); }}/>;
       case 'crm':              return <CRM userRole={role} />;
       case 'briefs':           return <Briefs userRole={role} userEmail={email} />;
       case 'propuestas':       return <Propuestas userRole={role} userEmail={email} />;
