@@ -193,6 +193,8 @@ export default function Liquidaciones({ presupuestos, userRole }) {
     // Convertir strings vacíos en campos UUID a null
     if (!editingClean.solicitud_id) editingClean.solicitud_id = null;
     if (!editingClean.presupuesto_id) editingClean.presupuesto_id = null;
+    // Convertir strings vacíos en campos date a null
+    if (!editingClean.fecha_evento) editingClean.fecha_evento = null;
     if(editingClean.id){({error}=await supabase.from('liquidaciones').update(editingClean).eq('id',editingClean.id));}
     else{let data2;({data:data2,error}=await supabase.from('liquidaciones').insert(editingClean).select().single());if(data2){savedId=data2.id;setEditing(prev=>({...prev,id:data2.id}));}}
     setSaving(false);
@@ -461,8 +463,7 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                 <select style={S.select} value={editing.presupuesto_id||''} onChange={e=>setPpto(e.target.value)}>
                   <option value="">— Sin relacionar —</option>
                   {presupuestos
-                    .filter(p=>['aprobado','pendiente_facturar','facturado'].includes(p.estado))
-                    .map(p=><option key={p.id} value={p.id}>{p.nomenclatura||p.nombre||p.cliente}</option>)}
+                    .map(p=><option key={p.id} value={p.id}>{p.nomenclatura||p.nombre||p.cliente} — {p.estado}</option>)}
                 </select>
               </div>
               <div><Label>Nombre del evento</Label><input style={S.input} value={editing.evento||''} onChange={e=>setEditing(p=>({...p,evento:e.target.value}))}/></div>
