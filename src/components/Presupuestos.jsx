@@ -260,7 +260,8 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
         </div>
       </div>
 
-      {/* Métricas */}
+      {/* Métricas — solo admin y financiero */}
+      {['admin','financiero'].includes(userRole) && (<>
       <div style={{ ...S.grid4, marginBottom:16 }}>
         <div style={S.metricNavy}><div style={{ fontSize:11, color:'#8ab4d4', marginBottom:4 }}>Facturado {anioActual}</div><div style={{ fontSize:18, fontWeight:800, color:'#fff' }}>{fmt(globales.facturado)}</div></div>
         <div style={S.metricCard}><div style={{ fontSize:11, color:'#8aa0b8', marginBottom:4 }}>Costo facturado</div><div style={{ fontSize:18, fontWeight:700 }}>{fmt(globales.costoFact)}</div></div>
@@ -283,6 +284,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
           ))}
         </div>
       )}
+      </>)}
 
       {/* Filtros */}
       <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap', alignItems:'center' }}>

@@ -349,16 +349,11 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
   const pptoIdRef = useRef(null);
   useEffect(() => {
     const pptoId = ppto?.id || 'new';
-    // Only reset if the presupuesto ID actually changed (not just a re-render with same ppto)
+    // Only reset if the presupuesto ID actually changed
     if (pptoId === pptoIdRef.current) return;
     pptoIdRef.current = pptoId;
-    try {
-      const draft   = JSON.parse(sessionStorage.getItem(SESSION_KEY));
-      const savedTab = sessionStorage.getItem(SESSION_TAB) || 'info';
-      if (draft && (draft.id === pptoId || (!draft.id && pptoId === 'new'))) {
-        setP(draft); setTab(savedTab); return;
-      }
-    } catch {}
+    // Clear stale draft when switching presupuestos
+    try { sessionStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_TAB); } catch {}
     if (ppto) {
       const items = (ppto.items||[]).map(it=>({
         ...it,
@@ -545,7 +540,12 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     if(error){showToast('Error: '+error.message);return;}
     try{sessionStorage.removeItem(SESSION_KEY);sessionStorage.removeItem(SESSION_TAB);}catch{}
     showToast('Guardado ✓');
-    // Nos quedamos en la página para seguir editando
+    // Recargar desde DB para confirmar que se guardó correctamente
+    const idToLoad = p.id || data?.id;
+    if (idToLoad) {
+      const { data: fresh } = await supabase.from('presupuestos').select('*').eq('id', idToLoad).single();
+      if (fresh) setP(fresh);
+    }
   }
 
   const [pdfModal, setPdfModal] = useState(null); // {tieneSubpptos, tieneOpciones}
