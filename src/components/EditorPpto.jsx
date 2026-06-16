@@ -464,16 +464,20 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     showToast('✓ Ítems movidos a opciones adicionales');
   } // { type:'item'|'subcat', id, fromIndex }
 
-  function moveItem(dragId, targetId) {
-    // Move item with dragId before/after targetId in p.items
+  function moveItem(dragId, targetId, targetSubcat) {
     setP(prev => {
       const items = [...prev.items];
       const fromIdx = items.findIndex(it=>it.id===dragId);
-      const toIdx   = items.findIndex(it=>it.id===targetId);
-      if (fromIdx<0||toIdx<0||fromIdx===toIdx) return prev;
+      const toIdx   = targetId ? items.findIndex(it=>it.id===targetId) : items.length;
+      if (fromIdx<0) return prev;
       const [moved] = items.splice(fromIdx,1);
-      items.splice(toIdx,0,moved);
-      return {...prev,items};
+      // Update subcategoria if dropped into a different one
+      if (targetSubcat !== undefined && moved.subcategoria !== targetSubcat) {
+        moved.subcategoria = targetSubcat;
+      }
+      const insertAt = targetId ? items.findIndex(it=>it.id===targetId) : items.length;
+      items.splice(insertAt >= 0 ? insertAt : items.length, 0, moved);
+      return {...prev, items};
     });
   }
 
@@ -980,7 +984,17 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             const renderGrupos = (gruposArr, spId) => gruposArr.map((grupo,gi)=>(
               <div key={grupo.subcatId} style={{marginBottom:16}}
                 onDragOver={e=>{e.preventDefault();}}
-                onDrop={e=>{e.preventDefault();if(dragRef.current?.type==='subcat'&&dragRef.current.id!==grupo.subcatId)moveSubcat(dragRef.current.id,grupo.subcatId);}}>
+                onDrop={e=>{
+                  e.preventDefault();
+                  if(dragRef.current?.type==='subcat'&&dragRef.current.id!==grupo.subcatId) {
+                    moveSubcat(dragRef.current.id,grupo.subcatId);
+                  } else if(dragRef.current?.type==='item') {
+                    // Drop item at end of this subcategory
+                    const lastItemInSubcat = [...(grupo.items||[])].pop();
+                    const targetId = lastItemInSubcat ? lastItemInSubcat.id : null;
+                    moveItem(dragRef.current.id, targetId, grupo.subcat);
+                  }
+                }}>
                 {/* Cabecera subcategoría */}
                 <div style={{display:'flex',alignItems:'center',gap:8,background:'#0d3b5e',borderRadius:'8px 8px 0 0',padding:'8px 14px'}}>
                   {!bloqueado&&<span title="Arrastrar subcategoría" draggable={true}
@@ -1039,7 +1053,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                     return(
                       <div key={it.id} style={{borderBottom:ii<grupo.items.length-1?'1px solid #eef2f7':'none',background:c.hasWarning?'#fff8f8':'#fff'}}
                         onDragOver={e=>{e.preventDefault();e.stopPropagation();}}
-                        onDrop={e=>{e.preventDefault();e.stopPropagation();if(dragRef.current?.type==='item'&&dragRef.current.id!==it.id)moveItem(dragRef.current.id,it.id);}}>
+                        onDrop={e=>{e.preventDefault();e.stopPropagation();if(dragRef.current?.type==='item'&&dragRef.current.id!==it.id)moveItem(dragRef.current.id,it.id,it.subcategoria);}}>
                         {/* Cabecera ítem */}
                         <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 14px',cursor:'pointer',background:open?(c.hasWarning?'#fdeef1':'#eef4fb'):(c.hasWarning?'#fff8f8':'#fff')}} onClick={()=>setOpenItem(open?null:it.id)}>
                           {!bloqueado&&<input type="checkbox" checked={selectedItems.has(it.id)} onClick={e=>e.stopPropagation()} onChange={()=>toggleSelectItem(it.id)} style={{width:15,height:15,flexShrink:0,accentColor:'#f0a500'}}/>}
