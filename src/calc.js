@@ -35,12 +35,15 @@ export function calcItem(it) {
   const costoRealUnit  = (it.costo_real_unit !== undefined && it.costo_real_unit !== null)
     ? r2(it.costo_real_unit) : costoUnit;
   const costoRealTotal = r2(costoRealUnit * cantidad * dias);
-  const ohRealVal      = r2(costoRealTotal * (oh / 100));
+  // OH y BCO del real usan los mismos porcentajes cotizados (son costos fijos de estructura)
+  const ohRealVal      = ohVal;
   const bcoRealPct     = (it.bco_real_pct !== undefined && it.bco_real_pct !== null)
     ? r2(it.bco_real_pct) : bco;
-  const bcoRealVal     = r2(costoRealTotal * (bcoRealPct / 100));
+  const bcoRealVal     = bcoRealPct !== bco ? r2(costoRealTotal * (bcoRealPct / 100)) : bcoVal;
+  // totalCostoReal: costo real puro + OH cotizado + BCO cotizado (estructura fija)
   const totalCostoReal = r2(costoRealTotal + ohRealVal + bcoRealVal);
-  const ahorro         = r2(totalCosto - totalCostoReal);
+  // Ahorro = solo diferencia en costo puro de proveedor (sin OH/BCO)
+  const ahorro         = r2(costoTotal - costoRealTotal);
 
   // Precio cliente
   const precioU = r2(it.precio_unit ?? 0);
