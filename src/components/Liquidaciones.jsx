@@ -185,8 +185,11 @@ export default function Liquidaciones({ presupuestos, userRole }) {
     }
     setSaving(true);
     let error, savedId = editing.id;
-    // Excluir solo campos internos de React que no son columnas de DB
-    const { _solicitudes_pagadas, ...editingClean } = editing;
+    // Excluir campos internos de React que no son columnas de DB
+    const {
+      _solicitudes_pagadas,
+      ...editingClean
+    } = editing;
     // Convertir strings vacíos en campos UUID a null
     if (!editingClean.solicitud_id) editingClean.solicitud_id = null;
     if (!editingClean.presupuesto_id) editingClean.presupuesto_id = null;
@@ -219,7 +222,21 @@ export default function Liquidaciones({ presupuestos, userRole }) {
       }
     }
 
-    showToast('Guardado ✓ — costos reales actualizados');
+    // Advertencia si valores justificados no corresponden a solicitud (sin bloquear)
+    const solsPagadas = _solicitudes_pagadas || [];
+    if (solsPagadas.length > 0) {
+      const totSolicitud = solsPagadas.reduce((a,s)=>{
+        return a + (s.items||[]).reduce((b,it)=>b+Number(it.valor_solicitado||0),0);
+      }, 0);
+      const totJustificado = (editing.gastos||[]).reduce((a,g)=>a+Number(g.total||0),0);
+      if (totSolicitud > 0 && Math.abs(totJustificado - totSolicitud) > 0.01) {
+        showToast('⚠️ Guardado. Cuidado: los valores justificados no corresponden a la solicitud de valores');
+      } else {
+        showToast('Guardado ✓');
+      }
+    } else {
+      showToast('Guardado ✓');
+    }
     fetchAll();
   }
 
