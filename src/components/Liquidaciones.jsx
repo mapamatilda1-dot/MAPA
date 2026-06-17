@@ -181,6 +181,10 @@ export default function Liquidaciones({ presupuestos, userRole }) {
 
   async function save(){
     if(!editing.responsable){showToast('Ingresa el responsable');return;}
+    // Una vez enviada, solo admin puede modificar
+    if(editing.estado==='enviada' && userRole!=='admin'){
+      showToast('⚠️ La liquidación ya fue enviada a Financiero. Solo Admin puede modificarla.');return;
+    }
     if(editing.estado==='liquidado'&&!canChangeLiqToLiquidado(userRole)){
       showToast('⚠️ Solo Financiero o Admin pueden marcar como Liquidado');return;
     }
@@ -240,7 +244,7 @@ export default function Liquidaciones({ presupuestos, userRole }) {
     } else {
       showToast('Guardado ✓');
     }
-    notifyLiquidacion(editing);
+    showToast('Guardado ✓');
     fetchAll();
   }
 
@@ -389,7 +393,10 @@ export default function Liquidaciones({ presupuestos, userRole }) {
         </div>
       </div>
     </div>
-    ${liq.comprobante_url?`<div style="margin:0 28px 16px;"><div style="font-size:10px;color:#888;margin-bottom:4px;">Comprobante de depósito:</div><img src="${liq.comprobante_url}" style="max-height:120px;border:1px solid #dde6ef;border-radius:4px;"/></div>`:''}
+    <div style="margin:0 28px 16px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
+      ${liq.comprobante_url ? `<div><div style="font-size:10px;color:#888;margin-bottom:4px;font-weight:600;">Comprobante de depósito:</div><img src="${liq.comprobante_url}" style="max-height:140px;border:1px solid #dde6ef;border-radius:4px;"/></div>` : ''}
+      ${(liq.gastos||[]).filter(g=>g.foto_nota).map((g,i) => `<div><div style="font-size:10px;color:#888;margin-bottom:4px;font-weight:600;">Nota de venta${(liq.gastos||[]).filter(x=>x.foto_nota).length>1?' '+(i+1):''}${g.concepto?' — '+g.concepto:''}:</div><img src="${g.foto_nota}" style="max-height:140px;border:1px solid #dde6ef;border-radius:4px;"/></div>`).join('')}
+    </div>
     <div style="background:#0d3b5e;padding:10px 28px;display:flex;justify-content:center;">
       <div style="font-size:9px;color:#3dbfb8;font-style:italic;">"Donde la estrategia se convierte en experiencia."</div>
     </div>
@@ -739,8 +746,8 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                   </div>
                 </div>
                 <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                  {!bloqueado&&<button style={S.btnSm} onClick={async()=>{
-                    // Load solicitudes pagadas for this presupuesto
+                  {/* Editar: solo si abierta, o si admin (puede editar en cualquier estado) */}
+                  {(liq.estado==='abierta' || userRole==='admin') && <button style={S.btnSm} onClick={async()=>{
                     let solsPagadas = [];
                     if (liq.presupuesto_id) {
                       const {data} = await supabase.from('solicitudes').select('*').eq('presupuesto_id',liq.presupuesto_id).eq('estado','pagado').order('created_at');
@@ -748,6 +755,23 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                     }
                     setEditing({...liq, _solicitudes_pagadas: solsPagadas});
                   }}>✏️ Editar</button>}
+                  {/* Enviar a Financiero: solo cuando está abierta */}
+                  {liq.estado==='abierta' && (
+                    <button style={{...S.btnSm,background:'#0d3b5e',color:'#fff',border:'none'}} onClick={async()=>{
+                      if(!window.confirm('¿Enviar esta liquidación a Financiero?'))return;
+                      await supabase.from('liquidaciones').update({estado:'enviada'}).eq('id',liq.id);
+                      notifyLiquidacion({...liq, estado:'enviada'});
+                      fetchAll();
+                    }}>📤 Enviar a Financiero</button>
+                  )}
+                  {/* Marcar como Liquidado: solo financiero y admin, cuando está enviada */}
+                  {liq.estado==='enviada' && ['financiero','admin'].includes(userRole) && (
+                    <button style={{...S.btnSm,background:'#2e8b4e',color:'#fff',border:'none'}} onClick={async()=>{
+                      if(!window.confirm('¿Marcar esta liquidación como Liquidado?'))return;
+                      await supabase.from('liquidaciones').update({estado:'liquidado'}).eq('id',liq.id);
+                      fetchAll();
+                    }}>✅ Liquidado</button>
+                  )}
                   <button style={S.btnSm} onClick={()=>downloadLiqPdf(liq)}>📄 PDF</button>
                   <button style={S.btnSm} onClick={()=>downloadLiqCsv(liq)}>📊 CSV</button>
                   {userRole==='admin'&&<button style={S.btnRed} onClick={()=>deleteLiq(liq.id)}>🗑</button>}

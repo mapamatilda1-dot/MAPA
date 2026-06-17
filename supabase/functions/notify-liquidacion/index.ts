@@ -26,7 +26,7 @@ serve(async (req) => {
     const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
       <div style="background:#0d3b5e;padding:20px;text-align:center;"><span style="color:#fff;font-size:20px;font-weight:700;">Matilda Hub</span></div>
       <div style="padding:24px;background:#f8fafc;border-left:4px solid #c8264a;">
-        <h2 style="color:#c8264a;margin:0 0 12px;">🧾 Nueva Liquidación</h2>
+        <h2 style="color:#c8264a;margin:0 0 12px;">🧾 💰 Liquidación enviada a Financiero</h2>
         <p style="color:#333;"><strong>${liq.presupuesto_nombre || 'Sin presupuesto'}</strong></p>
         <p style="color:#666;">Cliente: ${liq.cliente_nombre || '—'}</p>
         <p style="color:#666;">Responsable: ${liq.responsable || '—'}</p>
@@ -35,7 +35,7 @@ serve(async (req) => {
       </div>
       <div style="background:#0d3b5e;padding:10px;text-align:center;"><span style="color:#3dbfb8;font-size:11px;font-style:italic;">"Donde la estrategia se convierte en experiencia."</span></div>
     </div>`;
-    await sendEmail(DESTINOS, `🧾 Nueva liquidación: ${liq.presupuesto_nombre || ''}`, html);
+    await sendEmail(DESTINOS, `🧾 Liquidación enviada a Financiero: ${liq.presupuesto_nombre || ''}`, html);
     return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
   } catch(e) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });

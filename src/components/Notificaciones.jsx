@@ -247,16 +247,17 @@ export default function Notificaciones({ userEmail, userRole, onNavigate }) {
       if (tipos.includes('liquidaciones_nuevas')) {
         const { data: liqs } = await supabase
           .from('liquidaciones')
-          .select('id, presupuesto_nombre, cliente_nombre, created_at, estado')
-          .gte('created_at', SINCE)
-          .order('created_at', { ascending: false });
+          .select('id, presupuesto_nombre, cliente_nombre, updated_at, estado')
+          .eq('estado', 'enviada')
+          .gte('updated_at', SINCE)
+          .order('updated_at', { ascending: false });
         (liqs||[]).forEach(l => all.push({
           key: 'liq_' + l.id,
           typeStyle: TYPE_STYLE.liquidacion,
-          titulo: 'Liquidación: ' + (l.presupuesto_nombre||l.cliente_nombre||''),
-          subtitulo: l.estado + (l.cliente_nombre ? ' · ' + l.cliente_nombre : ''),
-          fecha: l.created_at,
-          urgente: l.estado === 'abierta',
+          titulo: '🧾 Liquidación enviada: ' + (l.presupuesto_nombre||l.cliente_nombre||''),
+          subtitulo: l.cliente_nombre || '',
+          fecha: l.updated_at,
+          urgente: true,
           accion: 'Ver liquidación',
           nav: { tab: 'liquidaciones' },
         }));
