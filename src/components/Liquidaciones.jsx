@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { notifyLiquidacion } from '../notifyHelper';
 import { S, Label, Toast, Modal } from '../styles.jsx';
 import { fmt } from '../calc';
 import { CATS_LIQUIDACION, canEditLiq, canChangeLiqToLiquidado } from '../roles';
@@ -239,6 +240,7 @@ export default function Liquidaciones({ presupuestos, userRole }) {
     } else {
       showToast('Guardado ✓');
     }
+    notifyLiquidacion(editing);
     fetchAll();
   }
 

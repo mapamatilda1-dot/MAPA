@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { notifyPresupuestoAprobado, notifyPresupuestoCerrado } from '../notifyHelper';
 import { S, Label, Badge, Toast } from '../styles.jsx';
 import { calcItem, calcPpto, genNomenclatura, fmt, fmtPct, fmtDate } from '../calc';
 import { generatePdfClienteHTML, generatePdfFinancieroHTML, generateExcelFinancieroData } from './PdfCliente';
@@ -777,6 +778,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             if (p.id) {
               await supabase.from('presupuestos').update({ estado: nuevoEstado }).eq('id', p.id);
               await saveVersion({ ...p, estado: nuevoEstado }, nuevoEstado);
+              if (nuevoEstado === 'aprobado') notifyPresupuestoAprobado(p);
             }
           }}>
           {ESTADOS_PPTO.map(e=><option key={e} value={e} disabled={!canChangeEstadoPpto(userRole,e)&&p.estado!==e}>{ESTADOS_PPTO_LABELS[e]}</option>)}
@@ -1571,7 +1573,10 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             <div style={{marginBottom:14,padding:'12px 16px',background:p.cerrado_produccion?'#e8f5ee':'#f8fafc',border:`1px solid ${p.cerrado_produccion?'#2e8b4e':'#dde6ef'}`,borderRadius:10,display:'flex',alignItems:'center',gap:12}}>
               <input type="checkbox" id="cerrado_prod" checked={!!p.cerrado_produccion}
                 disabled={!puedecerrarse && !p.cerrado_produccion}
-                onChange={e => setField('cerrado_produccion', e.target.checked)}
+                onChange={e => {
+                  setField('cerrado_produccion', e.target.checked);
+                  if (e.target.checked) notifyPresupuestoCerrado(p);
+                }}
                 style={{width:18,height:18,cursor:puedecerrarse?'pointer':'not-allowed',accentColor:'#2e8b4e'}}/>
               <label htmlFor="cerrado_prod" style={{fontSize:13,fontWeight:600,cursor:puedecerrarse?'pointer':'default',color:p.cerrado_produccion?'#2e8b4e':puedecerrarse?'#0d3b5e':'#aaa'}}>
                 {p.cerrado_produccion ? '✅ Cerrado por producción' : 'Cerrado por producción'}

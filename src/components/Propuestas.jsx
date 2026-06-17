@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { notifyPropuestaNueva } from '../notifyHelper';
 import { canCreatePropuesta, canEditPropuesta, ESTADOS_PROPUESTA, ESTADOS_PROPUESTA_LABELS, ESTADOS_PROPUESTA_COLORS } from '../roles';
 import ExpedientePanel from './ExpedientePanel';
 
@@ -93,7 +94,8 @@ export default function Propuestas({ userRole, userEmail }) {
     setSaving(true);
     const cl = clientes.find(c => c.id === form.cliente_id);
     if (modal === 'new') {
-      await supabase.from('propuestas').insert({ ...form, cliente_nombre: cl?.nombre || '', created_by: userEmail });
+      const { data: newProp } = await supabase.from('propuestas').insert({ ...form, cliente_nombre: cl?.nombre || '', created_by: userEmail }).select().single();
+      if (newProp) notifyPropuestaNueva({ ...newProp, cliente: cl?.nombre || '' });
     } else {
       await supabase.from('propuestas').update({ ...form, cliente_nombre: cl?.nombre || '' }).eq('id', modal.id);
     }

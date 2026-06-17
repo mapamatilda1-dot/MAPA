@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { notifyBriefNuevo } from '../notifyHelper';
 import { canCreateBrief, canEditBrief, canDeleteBrief, ESTADOS_BRIEF, ESTADOS_BRIEF_LABELS, ESTADOS_BRIEF_COLORS } from '../roles';
 import ExpedientePanel from './ExpedientePanel';
 
@@ -239,7 +240,10 @@ export default function Briefs({ userRole, userEmail }) {
       setEditBrief(prev => ({ ...prev, ...data }));
     } else {
       const { data: newBrief } = await supabase.from('briefs').insert({ ...data, created_by: userEmail }).select().single();
-      if (newBrief) setEditBrief(newBrief);
+      if (newBrief) {
+        setEditBrief(newBrief);
+        notifyBriefNuevo({ ...newBrief, creado_por: userEmail });
+      }
     }
     // Nos quedamos en el formulario para seguir editando
     loadAll();

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { notifySolicitudAprobada } from '../notifyHelper';
 
 // ── Helpers ───────────────────────────────────────────────────
 function fmt(n) {
@@ -687,6 +688,8 @@ export default function Solicitudes({ userRole, userEmail, userName, presupuesto
 
   async function marcarPagado(id) {
     await supabase.from('solicitudes').update({estado:'pagado'}).eq('id',id);
+    const sol = solicitudes.find(s=>s.id===id);
+    if (sol?.created_by) notifySolicitudAprobada(sol, sol.created_by);
     setSolicitudes(prev=>prev.map(s=>s.id===id?{...s,estado:'pagado'}:s));
     showToast('Solicitud marcada como pagada ✓');
   }

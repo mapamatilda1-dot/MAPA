@@ -3,13 +3,14 @@ import { supabase } from '../lib/supabase';
 
 // ── Configuración de qué ve cada usuario ──────────────────────
 const NOTIF_CONFIG = {
-  'camille@matilda.agency': ['briefs_nuevos', 'presupuestos_enviados'],
-  'mariajose@matilda.agency': ['briefs_nuevos', 'solicitudes_dinero', 'presupuestos_aprobacion'],
-  'melanie@matilda.agency': ['solicitudes_dinero', 'presupuestos_revision', 'presupuestos_cerrado'],
-  'taylor@matilda.agency': ['solicitudes_dinero'],
-  'johanna@matilda.agency': ['presupuestos_aprobado', 'presupuestos_ejecutado', 'presupuestos_cerrado', 'solicitudes_dinero', 'liquidaciones_nuevas'],
-  'carlos@matilda.agency': ['briefs_nuevos'],
-  'wendy@matilda.agency': ['briefs_nuevos', 'presupuestos_aprobado', 'solicitudes_aprobadas'],
+  'camille@matilda.agency':     ['briefs_nuevos', 'presupuestos_enviados', 'presupuestos_aprobado'],
+  'mariajose@matilda.agency':   ['briefs_nuevos', 'solicitudes_dinero', 'presupuestos_aprobacion_majo', 'presupuestos_cerrado', 'liquidaciones_nuevas'],
+  'melanie@matilda.agency':     ['briefs_nuevos', 'solicitudes_dinero', 'presupuestos_revision_mel', 'presupuestos_cerrado'],
+  'taylor@matilda.agency':      ['solicitudes_dinero'],
+  'johanna@matilda.agency':     ['presupuestos_aprobado', 'presupuestos_ejecutado', 'presupuestos_cerrado', 'solicitudes_dinero', 'liquidaciones_nuevas'],
+  'carlos@matilda.agency':      ['briefs_nuevos'],
+  'wendy@matilda.agency':       ['briefs_nuevos', 'presupuestos_aprobado', 'solicitudes_aprobadas'],
+  'camilo@matilda.agency':      ['briefs_nuevos', 'presupuestos_enviados', 'presupuestos_aprobado'],
 };
 // Producción (juan, firi, cindry, mariaeugenia) — por rol
 const NOTIF_POR_ROL = {
@@ -110,6 +111,7 @@ export default function Notificaciones({ userEmail, userRole, onNavigate }) {
           .from('solicitudes')
           .select('id, presupuesto_nombre, created_at, estado, created_by_nombre, items')
           .eq('estado', 'pagado')
+          .eq('created_by', userEmail)
           .gte('updated_at', SINCE)
           .order('updated_at', { ascending: false });
         (sols||[]).forEach(s => {
@@ -146,7 +148,7 @@ export default function Notificaciones({ userEmail, userRole, onNavigate }) {
       }
 
       // ── Presupuestos pendientes aprobación MJ ───────────────
-      if (tipos.includes('presupuestos_aprobacion')) {
+      if (tipos.includes('presupuestos_aprobacion_majo')) {
         const { data: pptos } = await supabase
           .from('presupuestos')
           .select('id, nombre, cliente, estado, updated_at')
@@ -166,7 +168,7 @@ export default function Notificaciones({ userEmail, userRole, onNavigate }) {
       }
 
       // ── Presupuestos para revisión (melanie) ────────────────
-      if (tipos.includes('presupuestos_revision')) {
+      if (tipos.includes('presupuestos_revision_mel')) {
         const { data: pptos } = await supabase
           .from('presupuestos')
           .select('id, nombre, cliente, estado, updated_at')
