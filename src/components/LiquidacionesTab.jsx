@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import LiquidacionesCore from './Liquidaciones';
 
-export default function LiquidacionesTab({ userRole }) {
+export default function LiquidacionesTab({ userRole, userEmail }) {
   const [pptos, setPptos] = useState([]);
 
   useEffect(() => {
@@ -10,5 +10,5 @@ export default function LiquidacionesTab({ userRole }) {
       .then(({ data }) => { if (data) setPptos(data); });
   }, []);
 
-  return <LiquidacionesCore presupuestos={pptos} userRole={userRole} />;
+  return <LiquidacionesCore presupuestos={pptos} userRole={userRole} userEmail={userEmail} />;
 }

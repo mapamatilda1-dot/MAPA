@@ -97,7 +97,7 @@ function ResumenTotales({ t, fmt }) {
   );
 }
 
-export default function Liquidaciones({ presupuestos, userRole }) {
+export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
   const [liqs, setLiqs]       = useState([]);
   const [editing, setEditing] = useState(null);
   const [toast, setToast]     = useState('');
@@ -115,7 +115,10 @@ export default function Liquidaciones({ presupuestos, userRole }) {
   useEffect(()=>{fetchAll();},[]);
 
   async function fetchAll(){
-    const{data}=await supabase.from('liquidaciones').select('*').order('created_at',{ascending:false});
+    const isAdminOrFinanciero = ['admin','financiero'].includes(userRole);
+    let q = supabase.from('liquidaciones').select('*').order('created_at',{ascending:false});
+    if (!isAdminOrFinanciero) q = q.eq('created_by', userEmail);
+    const{data}=await q;
     setLiqs(data||[]);
   }
   function showToast(m){setToast(m);setTimeout(()=>setToast(''),2500);}
@@ -201,7 +204,7 @@ export default function Liquidaciones({ presupuestos, userRole }) {
     // Convertir strings vacíos en campos date a null
     if (!editingClean.fecha_evento) editingClean.fecha_evento = null;
     if(editingClean.id){({error}=await supabase.from('liquidaciones').update(editingClean).eq('id',editingClean.id));}
-    else{let data2;({data:data2,error}=await supabase.from('liquidaciones').insert(editingClean).select().single());if(data2){savedId=data2.id;setEditing(prev=>({...prev,id:data2.id}));}}
+    else{let data2;({data:data2,error}=await supabase.from('liquidaciones').insert({...editingClean,created_by:userEmail}).select().single());if(data2){savedId=data2.id;setEditing(prev=>({...prev,id:data2.id}));}}
     setSaving(false);
     if(error){showToast('Error: '+error.message);return;}
 

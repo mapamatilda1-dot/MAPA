@@ -530,7 +530,8 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
       const{count}=await supabase.from('presupuestos').select('*',{count:'exact',head:true});
       nomenclatura=genNomenclatura(p.nombre,p.cliente,(count||0)+1);
     }
-    const payload={...p,nomenclatura};
+    const {_notify_productor, ...pClean} = p;
+    const payload={...pClean,nomenclatura};
     // Limpiar campos UUID — string vacío rompe Postgres
     if (!payload.brief_id)   payload.brief_id   = null;
     if (!payload.cliente_id) payload.cliente_id  = null;
@@ -541,6 +542,14 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     if(error){showToast('Error: '+error.message);return;}
     try{sessionStorage.removeItem(SESSION_KEY);sessionStorage.removeItem(SESSION_TAB);}catch{}
     showToast('Guardado ✓');
+    // Notificar al productor si fue asignado/cambiado
+    if (p._notify_productor && p.productor_email) {
+      try {
+        const { notifyProductorAsignado } = await import('../notifyHelper');
+        notifyProductorAsignado(p);
+      } catch(e) { console.warn('notify productor:', e); }
+      setP(prev => { const {_notify_productor, ...rest} = prev; return rest; });
+    }
     // Recargar desde DB para confirmar que se guardó correctamente
     const idToLoad = p.id || data?.id;
     if (idToLoad) {
@@ -878,6 +887,28 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                 <div>
                   <Label>Correo de contacto</Label>
                   <input style={S.input} type="email" value={p.ejecutivo_email||''} onChange={e=>setField('ejecutivo_email',e.target.value)} placeholder="Se completa automáticamente"/>
+                </div>
+              </div>
+              <div style={S.grid2}>
+                <div>
+                  <Label>Productor asignado</Label>
+                  <select style={S.select} value={p.productor_email||''} onChange={e=>{
+                    const prev_prod = p.productor_email;
+                    const prod = (ejecutivos||[]).find(x=>x.email===e.target.value);
+                    setField('productor_email', e.target.value);
+                    setField('productor_nombre', prod?.nombre||'');
+                    // Guardar referencia del nuevo productor para notificar al guardar
+                    if (e.target.value && e.target.value !== prev_prod) {
+                      setP(prev=>({...prev, _notify_productor: true, productor_email:e.target.value, productor_nombre:prod?.nombre||''}));
+                    }
+                  }}>
+                    <option value="">— Sin asignar —</option>
+                    {(ejecutivos||[]).filter(e=>e.email).map(e=><option key={e.id} value={e.email}>{e.nombre}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label>Nombre productor</Label>
+                  <input style={S.input} value={p.productor_nombre||''} readOnly placeholder="Se completa automáticamente" style={{...S.input, background:'#f0f4f8'}}/>
                 </div>
               </div>
             </div>

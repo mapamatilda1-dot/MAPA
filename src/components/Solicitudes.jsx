@@ -622,8 +622,11 @@ export default function Solicitudes({ userRole, userEmail, userName, presupuesto
 
   async function loadAll() {
     setLoading(true);
+    const isAdminOrFinanciero = ['admin','financiero'].includes(userRole);
+    let solQuery = supabase.from('solicitudes').select('*').order('created_at',{ascending:false});
+    if (!isAdminOrFinanciero) solQuery = solQuery.eq('created_by', userEmail);
     const [solR, ppR] = await Promise.all([
-      supabase.from('solicitudes').select('*').order('created_at',{ascending:false}),
+      solQuery,
       supabase.from('presupuestos').select('id,nombre,cliente,nomenclatura,fecha_evento,lugar,dias_evento,items').order('created_at',{ascending:false}),
     ]);
     setSolicitudes(solR.data||[]);

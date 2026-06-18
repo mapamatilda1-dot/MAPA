@@ -14,7 +14,7 @@ const NOTIF_CONFIG = {
 };
 // Producción (juan, firi, cindry, mariaeugenia) — por rol
 const NOTIF_POR_ROL = {
-  produccion: ['solicitudes_aprobadas'],
+  produccion: ['solicitudes_aprobadas', 'presupuestos_asignados'],
   admin: ['briefs_nuevos', 'solicitudes_dinero', 'presupuestos_aprobacion'],
   ventas: ['briefs_nuevos'],
   financiero: ['solicitudes_dinero', 'presupuestos_aprobado', 'liquidaciones_nuevas'],
@@ -260,6 +260,26 @@ export default function Notificaciones({ userEmail, userRole, onNavigate }) {
           urgente: true,
           accion: 'Ver liquidación',
           nav: { tab: 'liquidaciones' },
+        }));
+      }
+
+      // ── Presupuestos asignados al usuario (producción) ────
+      if (tipos.includes('presupuestos_asignados')) {
+        const { data: pptos } = await supabase
+          .from('presupuestos')
+          .select('id, nombre, cliente, estado, updated_at, productor_email, productor_nombre')
+          .eq('productor_email', userEmail)
+          .gte('updated_at', SINCE)
+          .order('updated_at', { ascending: false });
+        (pptos||[]).forEach(p => all.push({
+          key: 'ppto_asig_' + p.id,
+          typeStyle: { ...TYPE_STYLE.presupuesto, icon: '🎯', color: '#7c3aed', bg: '#f5f3ff' },
+          titulo: '🎯 Presupuesto asignado: ' + (p.nombre||p.cliente||''),
+          subtitulo: p.cliente + ' · ' + (p.estado||''),
+          fecha: p.updated_at,
+          urgente: true,
+          accion: 'Ver presupuesto',
+          nav: { tab: 'presupuestos' },
         }));
       }
 

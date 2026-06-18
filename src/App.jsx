@@ -96,7 +96,7 @@ export default function App() {
       case 'proformas':        return <Proformas userRole={role} userEmail={email} />;
       case 'presupuestos':     return <Presupuestos userRole={role} userEmail={email} logoUrl={null} onNavigate={(tab,pptoId)=>{if(pptoId)setPptoInicial(pptoId);setActiveTab(tab);}} />;
       case 'solicitudes':      return <Solicitudes userRole={role} userEmail={email} userName={email.split('@')[0]} presupuesto_id_inicial={pptoInicial} onClearPptoInicial={()=>setPptoInicial(null)}/>;
-      case 'liquidaciones':    return <LiquidacionesTab userRole={role} />;
+      case 'liquidaciones':    return <LiquidacionesTab userRole={role} userEmail={email} />;
       case 'calendario':       return <Calendario />;
       case 'implementaciones': return <Implementaciones userRole={role} />;
       case 'dashboard':        return <Dashboard />;
