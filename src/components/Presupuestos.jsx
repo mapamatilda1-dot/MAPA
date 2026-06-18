@@ -38,7 +38,22 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
   async function fetchAll() {
     setLoading(true);
     let query = supabase.from('presupuestos').select('*').order('created_at', { ascending: false });
-    if (soloMios) query = query.eq('created_by', userEmail);
+    if (soloMios) {
+      // Buscar nombre del productor asociado al email del usuario
+      const {data: prod} = await supabase.from('productores').select('nombre').eq('email', userEmail).single();
+      const nombreUsuario = prod?.nombre || '';
+      if (nombreUsuario) {
+        // Mis presupuestos = los que creé O los que me asignaron por nombre o email
+        query = query.or(
+          'created_by.eq.' + userEmail +
+          ',productor_email.eq.' + userEmail +
+          ',productor_nombre.ilike.%' + nombreUsuario + '%'
+        );
+      } else {
+        // Sin nombre en productores, filtrar solo por email
+        query = query.or('created_by.eq.' + userEmail + ',productor_email.eq.' + userEmail);
+      }
+    }
     const [ppR, catR, cliR, cfgR, ejecR, prodR, brR] = await Promise.all([
       query,
       supabase.from('categorias').select('*').order('nombre'),
