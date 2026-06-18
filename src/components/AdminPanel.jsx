@@ -8,6 +8,9 @@ export default function AdminPanel() {
   const [categorias, setCats]   = useState([]);
   const [clientes, setClis]     = useState([]);
   const [ejecutivos, setEjecs]  = useState([]);
+  const [productores, setProds]  = useState([]);
+  const [newProd, setNewProd]    = useState({ nombre:'', cargo:'' });
+  const [editProd, setEditProd]  = useState(null);
   const [usuarios, setUsuarios] = useState([]);
   const [toast, setToast]       = useState('');
   const [tab, setTab]           = useState('usuarios');
@@ -30,16 +33,18 @@ export default function AdminPanel() {
   }, []);
 
   async function fetchAll() {
-    const [cfgR, catR, cliR, ejecR] = await Promise.all([
+    const [cfgR, catR, cliR, ejecR, prodR] = await Promise.all([
       supabase.from('config').select('*').single(),
       supabase.from('categorias').select('*').order('nombre'),
       supabase.from('clientes').select('*').order('nombre'),
       supabase.from('ejecutivos').select('*').order('nombre'),
+      supabase.from('productores').select('*').order('nombre'),
     ]);
     if (cfgR.data)  setCfg(cfgR.data);
     if (catR.data)  setCats(catR.data);
     if (cliR.data)  setClis(cliR.data);
     if (ejecR.data) setEjecs(ejecR.data);
+    if (prodR.data) setProds(prodR.data);
   }
 
   function showToast(m) { setToast(m); setTimeout(() => setToast(''), 2500); }
@@ -81,6 +86,23 @@ export default function AdminPanel() {
   async function deleteCli(id) {
     if (!window.confirm('¿Eliminar cliente?')) return;
     await supabase.from('clientes').delete().eq('id', id); fetchAll();
+  }
+
+  // ── Productores ────────────────────────────────────────────
+  async function saveProd() {
+    if (!newProd.nombre.trim()) return;
+    const { error } = await supabase.from('productores').insert(newProd);
+    if (error) { showToast('Error: ' + error.message); return; }
+    setNewProd({ nombre:'', cargo:'' }); fetchAll(); showToast('Productor agregado ✓');
+  }
+  async function updateProd() {
+    const { error } = await supabase.from('productores').update(editProd).eq('id', editProd.id);
+    if (error) { showToast('Error: ' + error.message); return; }
+    setEditProd(null); fetchAll(); showToast('Productor actualizado ✓');
+  }
+  async function deleteProd(id) {
+    if (!window.confirm('¿Eliminar productor?')) return;
+    await supabase.from('productores').delete().eq('id', id); fetchAll();
   }
 
   // ── Ejecutivos ─────────────────────────────────────────────
@@ -174,6 +196,7 @@ export default function AdminPanel() {
 
   const TABS = [
     ['usuarios',    '👥 Usuarios'],
+    ['productores', '🎯 Productores'],
     ['ejecutivos',  '👤 Ejecutivos'],
     ['clientes',    '🏢 Clientes'],
     ['categorias',  '🏷️ Categorías'],
@@ -274,6 +297,53 @@ export default function AdminPanel() {
       )}
 
       {/* ── EJECUTIVOS ── */}
+      {tab === 'productores' && (
+        <div>
+          <div style={S.card}>
+            <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Agregar productor</h3>
+            <div style={S.grid2}>
+              <div><Label>Nombre completo *</Label><input style={S.input} value={newProd.nombre} onChange={e=>setNewProd(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Juan Villao"/></div>
+              <div><Label>Cargo</Label><input style={S.input} value={newProd.cargo} onChange={e=>setNewProd(p=>({...p,cargo:e.target.value}))} placeholder="Ej: Productor de Eventos"/></div>
+            </div>
+            <button style={{ ...S.btnPrimary, marginTop:12 }} onClick={saveProd}>+ Agregar productor</button>
+          </div>
+          {editProd && (
+            <div style={S.card}>
+              <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Editar productor</h3>
+              <div style={S.grid2}>
+                <div><Label>Nombre</Label><input style={S.input} value={editProd.nombre} onChange={e=>setEditProd(p=>({...p,nombre:e.target.value}))}/></div>
+                <div><Label>Cargo</Label><input style={S.input} value={editProd.cargo} onChange={e=>setEditProd(p=>({...p,cargo:e.target.value}))}/></div>
+              </div>
+              <div style={{ display:'flex', gap:8, marginTop:12 }}>
+                <button style={S.btnPrimary} onClick={updateProd}>Guardar</button>
+                <button style={S.btnSecondary} onClick={()=>setEditProd(null)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          <div style={S.card}>
+            <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Productores ({productores.length})</h3>
+            <table style={S.table}>
+              <thead><tr>{['Nombre','Cargo',''].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+              <tbody>
+                {productores.map(p=>(
+                  <tr key={p.id}>
+                    <td style={S.td}><strong>{p.nombre}</strong></td>
+                    <td style={S.td}>{p.cargo}</td>
+                    <td style={S.td}>
+                      <div style={{ display:'flex', gap:4 }}>
+                        <button style={S.btnSm} onClick={()=>setEditProd({...p})}>✏️</button>
+                        <button style={S.btnRed} onClick={()=>deleteProd(p.id)}>🗑</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {productores.length===0 && <tr><td colSpan={3} style={{ ...S.td, textAlign:'center', color:'#8aa0b8' }}>Sin productores</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {tab === 'ejecutivos' && (
         <div>
           <div style={S.card}>

@@ -16,6 +16,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
   const [categorias, setCats]     = useState([]);
   const [clientes, setClis]       = useState([]);
   const [ejecutivos, setEjecs]    = useState([]);
+  const [productores, setProds]   = useState([]);
   const [briefs, setBriefs]       = useState([]);
   const [cfg, setCfg]             = useState({ oh_pct:15, bco_pct:5.5, fee_agencia:0, rebate_pct:2 });
   const [editing, setEditing]     = useState(null);
@@ -38,12 +39,13 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
     setLoading(true);
     let query = supabase.from('presupuestos').select('*').order('created_at', { ascending: false });
     if (soloMios) query = query.eq('created_by', userEmail);
-    const [ppR, catR, cliR, cfgR, ejecR, brR] = await Promise.all([
+    const [ppR, catR, cliR, cfgR, ejecR, prodR, brR] = await Promise.all([
       query,
       supabase.from('categorias').select('*').order('nombre'),
       supabase.from('clientes').select('*').order('nombre'),
       supabase.from('config').select('*').single(),
       supabase.from('ejecutivos').select('*').order('nombre'),
+      supabase.from('productores').select('*').order('nombre'),
       supabase.from('briefs').select('id, nombre, cliente_nombre, fecha_entrega, fecha_evento, dias_evento, lugar, ciudad, pax, ejecutivo_nombre, ejecutivo_email').order('nombre'),
     ]);
     if (ppR.data)   setPptos(ppR.data);
@@ -51,6 +53,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
     if (cliR.data)  setClis(cliR.data);
     if (cfgR.data)  setCfg(cfgR.data);
     if (ejecR.data) setEjecs(ejecR.data);
+    if (prodR.data) setProds(prodR.data);
     if (brR.data)   setBriefs(brR.data);
     setLoading(false);
   }
@@ -183,7 +186,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
       <EditorPpto
         ppto={editing === 'new' ? null : editing}
         cfg={cfg} categorias={categorias} clientes={clientes}
-        ejecutivos={ejecutivos} logoUrl={logoUrl} userRole={userRole}
+        ejecutivos={ejecutivos} productores={productores} logoUrl={logoUrl} userRole={userRole}
         briefs={briefs.map(b => ({ ...b, _usado: pptos.some(p => p.brief_id === b.id && p.id !== (editing?.id)) }))}
         onSave={() => { setEditing(null); fetchAll(); showToast('Presupuesto guardado ✓'); }}
         onCancel={() => setEditing(null)}

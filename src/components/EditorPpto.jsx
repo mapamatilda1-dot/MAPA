@@ -331,7 +331,7 @@ function OpcionesAdicionales({ p, setP, bloqueado, fmt, fmtPct, calcItem, S, Lab
   );
 }
 
-export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, clientes, ejecutivos, logoUrl, userRole='produccion', briefs=[] }) {
+export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, clientes, ejecutivos, productores=[], logoUrl, userRole='produccion', briefs=[] }) {
   const [p, setP]               = useState(null);
   const [tab, setTab]           = useState('info');
   const [openItem, setOpenItem] = useState(null);
@@ -892,23 +892,16 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
               <div style={S.grid2}>
                 <div>
                   <Label>Productor asignado</Label>
-                  <select style={S.select} value={p.productor_email||''} onChange={e=>{
-                    const prev_prod = p.productor_email;
-                    const prod = (ejecutivos||[]).find(x=>x.email===e.target.value);
-                    setField('productor_email', e.target.value);
-                    setField('productor_nombre', prod?.nombre||'');
-                    // Guardar referencia del nuevo productor para notificar al guardar
+                  <select style={S.select} value={p.productor_nombre||''} onChange={e=>{
+                    const prev_prod = p.productor_nombre;
+                    setField('productor_nombre', e.target.value);
                     if (e.target.value && e.target.value !== prev_prod) {
-                      setP(prev=>({...prev, _notify_productor: true, productor_email:e.target.value, productor_nombre:prod?.nombre||''}));
+                      setP(prev=>({...prev, _notify_productor: true, productor_nombre:e.target.value}));
                     }
                   }}>
                     <option value="">— Sin asignar —</option>
-                    {(ejecutivos||[]).filter(e=>e.email).map(e=><option key={e.id} value={e.email}>{e.nombre}</option>)}
+                    {productores.map(pr=><option key={pr.id} value={pr.nombre}>{pr.nombre}{pr.cargo?` — ${pr.cargo}`:''}</option>)}
                   </select>
-                </div>
-                <div>
-                  <Label>Nombre productor</Label>
-                  <input style={S.input} value={p.productor_nombre||''} readOnly placeholder="Se completa automáticamente" style={{...S.input, background:'#f0f4f8'}}/>
                 </div>
               </div>
             </div>
