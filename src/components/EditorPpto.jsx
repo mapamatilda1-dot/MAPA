@@ -1574,6 +1574,51 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
           )}
 
           {/* SECCION 4: Desglose por Categoria */}
+          {p.items.filter(it=>!it._type).length>0&&(
+            <div style={{border:'1px solid #dde6ef',borderRadius:12,overflow:'hidden',marginBottom:14}}>
+              <div style={{background:'#0d3b5e',padding:'8px 16px',fontSize:12,fontWeight:700,color:'#fff',letterSpacing:1}}>SECCION 4 — DESGLOSE POR CATEGORIA</div>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead><tr style={{background:'#f0f4f8'}}>
+                  {['Categoría','Ítems','Costo prov.','OH+BCO','Total costo','Precio cliente','Margen','%'].map(h=><th key={h} style={{padding:'7px 10px',textAlign:h==='Categoría'||h==='Ítems'?'left':'right',fontSize:11,color:'#666',fontWeight:700}}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {(()=>{
+                    const cats={};
+                    p.items.filter(it=>!it._type).forEach(it=>{
+                      const cat=it.categoria||'Sin categoría';
+                      if(!cats[cat])cats[cat]={items:0,costoProv:0,oh:0,bco:0,totalCosto:0,precio:0};
+                      const c=calcItem(it);
+                      cats[cat].items+=1;
+                      cats[cat].costoProv+=c.costoTotal;
+                      cats[cat].oh+=c.ohVal;
+                      cats[cat].bco+=c.bcoVal;
+                      cats[cat].totalCosto+=c.totalCosto;
+                      cats[cat].precio+=c.precio;
+                    });
+                    return Object.entries(cats).sort(([a],[b])=>a.localeCompare(b)).map(([cat,v],i)=>{
+                      const margen=v.precio-v.totalCosto;
+                      const margenPct=v.precio>0?margen/v.precio*100:0;
+                      return (
+                        <tr key={cat} style={{borderBottom:'1px solid #eef2f7',background:i%2===0?'#fff':'#f8fafc'}}>
+                          <td style={{padding:'7px 10px',fontWeight:600,color:'#0d3b5e'}}>{cat}</td>
+                          <td style={{padding:'7px 10px',color:'#8aa0b8'}}>{v.items}</td>
+                          <td style={{padding:'7px 10px',textAlign:'right',color:'#c2410c'}}>{fmt(v.costoProv)}</td>
+                          <td style={{padding:'7px 10px',textAlign:'right',color:'#5a7a9a'}}>{fmt(v.oh+v.bco)}</td>
+                          <td style={{padding:'7px 10px',textAlign:'right',fontWeight:600}}>{fmt(v.totalCosto)}</td>
+                          <td style={{padding:'7px 10px',textAlign:'right',fontWeight:600,color:'#0d3b5e'}}>{fmt(v.precio)}</td>
+                          <td style={{padding:'7px 10px',textAlign:'right',color:margen>=0?'#2e8b4e':'#c8264a',fontWeight:600}}>{fmt(margen)}</td>
+                          <td style={{padding:'7px 10px',textAlign:'right',color:margenPct>=0?'#2e8b4e':'#c8264a'}}>{margenPct.toFixed(1)}%</td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {tab==='alcance'&&(
         <AlcanceTab
           presupuestoId={p.id}
