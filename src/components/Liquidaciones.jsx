@@ -117,7 +117,17 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
   async function fetchAll(){
     const isAdminOrFinanciero = ['admin','financiero'].includes(userRole);
     let q = supabase.from('liquidaciones').select('*').order('created_at',{ascending:false});
-    if (!isAdminOrFinanciero) q = q.eq('created_by', userEmail);
+    if (!isAdminOrFinanciero) {
+      // Buscar nombre asociado al email en tabla productores
+      const {data: prod} = await supabase.from('productores').select('nombre').eq('email', userEmail).single();
+      const nombreUsuario = prod?.nombre || '';
+      if (nombreUsuario) {
+        // Filtrar por email directo O por nombre en responsable/solicitante
+        q = q.or('created_by.eq.' + userEmail + ',responsable.ilike.%' + nombreUsuario + '%,solicitante.ilike.%' + nombreUsuario + '%');
+      } else {
+        q = q.eq('created_by', userEmail);
+      }
+    }
     const{data}=await q;
     setLiqs(data||[]);
   }

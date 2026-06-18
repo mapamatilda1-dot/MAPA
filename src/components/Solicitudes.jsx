@@ -624,7 +624,17 @@ export default function Solicitudes({ userRole, userEmail, userName, presupuesto
     setLoading(true);
     const isAdminOrFinanciero = ['admin','financiero'].includes(userRole);
     let solQuery = supabase.from('solicitudes').select('*').order('created_at',{ascending:false});
-    if (!isAdminOrFinanciero) solQuery = solQuery.eq('created_by', userEmail);
+    if (!isAdminOrFinanciero) {
+      // Buscar en productores si hay un nombre asociado al email del usuario
+      const {data: prod} = await supabase.from('productores').select('nombre').eq('email', userEmail).single();
+      const nombreUsuario = prod?.nombre || '';
+      // Filtrar por email directo O por nombre del productor en created_by_nombre
+      if (nombreUsuario) {
+        solQuery = solQuery.or('created_by.eq.' + userEmail + ',created_by_nombre.ilike.%' + nombreUsuario + '%');
+      } else {
+        solQuery = solQuery.eq('created_by', userEmail);
+      }
+    }
     const [solR, ppR] = await Promise.all([
       solQuery,
       supabase.from('presupuestos').select('id,nombre,cliente,nomenclatura,fecha_evento,lugar,dias_evento,items').order('created_at',{ascending:false}),
