@@ -1412,29 +1412,71 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
       {/* ══ TOTALES ══ */}
       {tab==='totales'&&(
         <div>
-          {/* Subtotales costo */}
-          <div style={{...S.grid4,marginBottom:12}}>
-            <div style={S.metricCard}><div style={{fontSize:11,color:'#8aa0b8',marginBottom:4}}>Subtotal costo proveedores</div><div style={{fontSize:16,fontWeight:700,color:'#5a7a9a'}}>{fmt(totales.subtotalCostoBase)}</div></div>
-            <div style={S.metricCard}><div style={{fontSize:11,color:'#8aa0b8',marginBottom:4}}>OH acumulado</div><div style={{fontSize:16,fontWeight:700,color:'#5a7a9a'}}>{fmt(totales.subtotalOH)}</div></div>
-            <div style={S.metricCard}><div style={{fontSize:11,color:'#8aa0b8',marginBottom:4}}>BCO acumulado</div><div style={{fontSize:16,fontWeight:700,color:'#5a7a9a'}}>{fmt(totales.subtotalBCO)}</div></div>
-            <div style={{...S.metricCard,background:'#f0eaf4'}}><div style={{fontSize:11,color:'#8aa0b8',marginBottom:4}}>Total costo c/OH+BCO</div><div style={{fontSize:16,fontWeight:700,color:'#5a3a7e'}}>{fmt(totales.subtotalCosto)}</div></div>
-          </div>
 
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:12}}>
-            <div style={S.metricCard}><div style={{fontSize:11,color:'#8aa0b8',marginBottom:4}}>Subtotal precio cliente</div><div style={{fontSize:16,fontWeight:700}}>{fmt(totales.subtotalPrecio)}</div></div>
-            <div style={S.metricCard}><div style={{fontSize:11,color:'#8aa0b8',marginBottom:4}}>Fee agencia ({p.fee_agencia??0}%)</div><div style={{fontSize:16,fontWeight:700}}>{fmt(totales.feeAgencia)}</div></div>
-            <div style={{...S.metricCard,background:'#e0f7f6'}}><div style={{fontSize:11,color:'#0d6e69',marginBottom:4}}>Margen (sin fee)</div><div style={{fontSize:16,fontWeight:700,color:totales.margenSinFee>=0?'#0d6e69':'#c8264a'}}>{fmt(totales.margenSinFee)} <span style={{fontSize:13}}>({fmtPct(totales.margenSinFeePct)})</span></div></div>
+          {/* SECCION 1: Costos y Margenes sin OH/Banco/Fee */}
+          <div style={{border:'1px solid #dde6ef',borderRadius:12,overflow:'hidden',marginBottom:14}}>
+            <div style={{background:'#0d3b5e',padding:'8px 16px',fontSize:12,fontWeight:700,color:'#fff',letterSpacing:1}}>
+              SECCION 1 — COSTOS Y MARGENES
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:0,borderBottom:'1px solid #dde6ef'}}>
+              <div style={{padding:'14px 18px',borderRight:'1px solid #dde6ef'}}>
+                <div style={{fontSize:11,color:'#8aa0b8',marginBottom:4,textTransform:'uppercase'}}>Costo Proveedor</div>
+                <div style={{fontSize:20,fontWeight:800,color:'#c2410c'}}>{fmt(totales.subtotalCostoBase)}</div>
+              </div>
+              <div style={{padding:'14px 18px',borderRight:'1px solid #dde6ef'}}>
+                <div style={{fontSize:11,color:'#8aa0b8',marginBottom:4,textTransform:'uppercase'}}>Costo Real</div>
+                <div style={{fontSize:20,fontWeight:800,color:totales.subtotalCostoReal>0?'#2e8b4e':'#8aa0b8'}}>
+                  {totales.subtotalCostoReal>0?fmt(totales.subtotalCostoReal):'Sin datos'}
+                </div>
+              </div>
+              <div style={{padding:'14px 18px',background:totales.subtotalAhorro>0?'#edf7ed':'#f8fafc'}}>
+                <div style={{fontSize:11,color:'#8aa0b8',marginBottom:4,textTransform:'uppercase'}}>Ahorro</div>
+                <div style={{fontSize:11,color:'#888',marginBottom:4}}>Costo prov - Costo real</div>
+                <div style={{fontSize:20,fontWeight:800,color:totales.subtotalAhorro>0?'#2e8b4e':totales.subtotalAhorro<0?'#c8264a':'#8aa0b8'}}>
+                  {totales.subtotalCostoReal>0?fmt(totales.subtotalAhorro):'—'}
+                </div>
+              </div>
+            </div>
+            {(()=>{
+              const pc = totales.subtotalPrecio;
+              const cp = totales.subtotalCostoBase;
+              const cr = totales.subtotalCostoReal;
+              const mIni = pc>0?(pc-cp)/pc*100:0;
+              const mPost = pc>0&&cr>0?(pc-cr)/pc*100:null;
+              return (
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0}}>
+                  <div style={{padding:'14px 18px',borderRight:'1px solid #dde6ef'}}>
+                    <div style={{fontSize:11,color:'#8aa0b8',marginBottom:4,textTransform:'uppercase'}}>Margen Inicial</div>
+                    <div style={{fontSize:11,color:'#888',marginBottom:6}}>(Precio cliente - Costo prov) / Precio cliente</div>
+                    <div style={{display:'flex',alignItems:'baseline',gap:10}}>
+                      <span style={{fontSize:20,fontWeight:800,color:mIni>=0?'#0d6e69':'#c8264a'}}>{fmt(pc-cp)}</span>
+                      <span style={{fontSize:14,fontWeight:600,color:mIni>=0?'#0d6e69':'#c8264a'}}>({mIni.toFixed(1)}%)</span>
+                    </div>
+                  </div>
+                  <div style={{padding:'14px 18px',background:mPost!==null?'#f0fdf4':'#f8fafc'}}>
+                    <div style={{fontSize:11,color:'#8aa0b8',marginBottom:4,textTransform:'uppercase'}}>Margen Post (con costo real)</div>
+                    <div style={{fontSize:11,color:'#888',marginBottom:6}}>(Precio cliente - Costo real) / Precio cliente</div>
+                    {mPost!==null?(
+                      <div style={{display:'flex',alignItems:'baseline',gap:10}}>
+                        <span style={{fontSize:20,fontWeight:800,color:mPost>=0?'#2e8b4e':'#c8264a'}}>{fmt(pc-cr)}</span>
+                        <span style={{fontSize:14,fontWeight:600,color:mPost>=0?'#2e8b4e':'#c8264a'}}>({mPost.toFixed(1)}%)</span>
+                      </div>
+                    ):<span style={{fontSize:16,color:'#8aa0b8'}}>Sin costo real ingresado</span>}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Subtotales por subpresupuesto */}
-          {(p.items||[]).some(it=>it._type==='subppto') && (() => {
+          {(p.items||[]).some(it=>it._type==='subppto') && (()=>{
             const spList=[]; let spA=null;
             (p.items||[]).forEach(it=>{
               if(it._type==='subppto'){spA={id:it.id,nombre:it.subpresupuesto,incluir:it.incluir_en_total!==false,items:[]};spList.push(spA);}
               else if(!it._type&&spA) spA.items.push(it);
             });
             return (
-              <div style={{border:'1px solid #7c3aed33',borderRadius:10,overflow:'hidden',marginBottom:16}}>
+              <div style={{border:'1px solid #7c3aed33',borderRadius:10,overflow:'hidden',marginBottom:14}}>
                 <div style={{background:'#5b21b6',padding:'8px 16px',fontSize:12,fontWeight:700,color:'#fff'}}>Subtotales por subpresupuesto</div>
                 {spList.map(sp=>{
                   const spPrecio=sp.items.reduce((a,it)=>a+calcItem(it).precio,0);
@@ -1459,29 +1501,65 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             );
           })()}
 
-          {/* Total principal — SIN rebate */}
-          <div style={{border:'1px solid #dde6ef',borderRadius:10,overflow:'hidden',marginBottom:16}}>
-            <div style={{display:'flex',justifyContent:'space-between',padding:'11px 20px',borderBottom:'1px solid #dde6ef',background:'#f0f4f8'}}>
-              <span style={{fontSize:16,fontWeight:700,color:'#0d3b5e'}}>Subtotal sin IVA</span>
-              <span style={{fontSize:16,fontWeight:700,color:'#0d3b5e'}}>{fmt(totales.totalSinIva)}</span>
+          {/* SECCION 2: Flujo de Caja */}
+          {['aprobado','pendiente_facturar','facturado'].includes(p.estado) && <FlujoCaja p={p} fmt={fmt} fmtDate={fmtDate} />}
+
+          {/* SECCION 3: OH / Banco / Precio Cliente / Margen Real */}
+          <div style={{border:'1px solid #dde6ef',borderRadius:12,overflow:'hidden',marginBottom:14}}>
+            <div style={{background:'#1a5078',padding:'8px 16px',fontSize:12,fontWeight:700,color:'#fff',letterSpacing:1}}>
+              SECCION 3 — OH / BANCO / PRECIO CLIENTE / MARGEN REAL
             </div>
-            <div style={{display:'flex',justifyContent:'space-between',padding:'9px 20px',borderBottom:'1px solid #dde6ef'}}>
-              <span style={{fontSize:13,color:'#5a7a9a'}}>IVA 15%</span>
-              <span style={{fontSize:13,fontWeight:600}}>{fmt(totales.iva15)}</span>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:0}}>
+              <div style={{padding:'14px 16px',borderRight:'1px solid #dde6ef'}}>
+                <div style={{fontSize:11,color:'#8aa0b8',marginBottom:4,textTransform:'uppercase'}}>OH</div>
+                <div style={{fontSize:11,color:'#888',marginBottom:6}}>% sobre costo prov. cotizado</div>
+                <div style={{fontSize:16,fontWeight:700,color:'#5a7a9a'}}>{fmt(totales.subtotalOH)}</div>
+                <div style={{fontSize:12,color:'#8aa0b8',marginTop:2}}>({((totales.subtotalOH/(totales.subtotalCostoBase||1))*100).toFixed(1)}%)</div>
+              </div>
+              <div style={{padding:'14px 16px',borderRight:'1px solid #dde6ef'}}>
+                <div style={{fontSize:11,color:'#8aa0b8',marginBottom:4,textTransform:'uppercase'}}>Banco / BCO</div>
+                <div style={{fontSize:11,color:'#888',marginBottom:6}}>% sobre costo prov. cotizado</div>
+                <div style={{fontSize:16,fontWeight:700,color:'#5a7a9a'}}>{fmt(totales.subtotalBCO)}</div>
+                <div style={{fontSize:12,color:'#8aa0b8',marginTop:2}}>({((totales.subtotalBCO/(totales.subtotalCostoBase||1))*100).toFixed(1)}%)</div>
+              </div>
+              <div style={{padding:'14px 16px',borderRight:'1px solid #dde6ef'}}>
+                <div style={{fontSize:11,color:'#8aa0b8',marginBottom:4,textTransform:'uppercase'}}>Precio Cliente</div>
+                <div style={{fontSize:11,color:'#888',marginBottom:6}}>Subtotal + Fee {p.fee_agencia??0}%</div>
+                <div style={{fontSize:16,fontWeight:700,color:'#0d3b5e'}}>{fmt(totales.subtotalPrecio)}</div>
+                {(p.fee_agencia||0)>0&&<div style={{fontSize:12,color:'#5b21b6',marginTop:2}}>+Fee {fmt(totales.feeAgencia)} = {fmt(totales.totalSinIva)}</div>}
+              </div>
+              <div style={{padding:'14px 16px',background:'#f0fdf4'}}>
+                <div style={{fontSize:11,color:'#8aa0b8',marginBottom:4,textTransform:'uppercase'}}>Margen Real</div>
+                <div style={{fontSize:11,color:'#888',marginBottom:6}}>(Precio+Fee)-(Real+OH+BCO)</div>
+                {totales.subtotalCostoReal>0?(()=>{
+                  const mr=totales.totalSinIva-(totales.subtotalCostoReal+totales.subtotalOH+totales.subtotalBCO);
+                  const mrPct=totales.totalSinIva>0?mr/totales.totalSinIva*100:0;
+                  return <div><div style={{fontSize:16,fontWeight:700,color:mr>=0?'#2e8b4e':'#c8264a'}}>{fmt(mr)}</div><div style={{fontSize:12,fontWeight:600,color:mr>=0?'#2e8b4e':'#c8264a'}}>{mrPct.toFixed(1)}%</div></div>;
+                })():<span style={{fontSize:13,color:'#8aa0b8'}}>Sin costo real</span>}
+              </div>
             </div>
-            <div style={{display:'flex',justifyContent:'space-between',padding:'14px 20px',background:'#0d3b5e'}}>
-              <span style={{fontSize:14,color:'#fff',fontWeight:700}}>TOTAL CON IVA</span>
-              <span style={{fontSize:22,color:'#3dbfb8',fontWeight:800}}>{fmt(totales.totalConIva)}</span>
+            <div style={{borderTop:'1px solid #dde6ef'}}>
+              <div style={{display:'flex',justifyContent:'space-between',padding:'10px 16px',borderBottom:'1px solid #dde6ef',background:'#f0f4f8'}}>
+                <span style={{fontSize:13,color:'#5a7a9a'}}>Subtotal sin IVA</span>
+                <span style={{fontSize:14,fontWeight:700,color:'#0d3b5e'}}>{fmt(totales.totalSinIva)}</span>
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between',padding:'10px 16px',borderBottom:'1px solid #dde6ef'}}>
+                <span style={{fontSize:13,color:'#5a7a9a'}}>IVA 15%</span>
+                <span style={{fontSize:13,fontWeight:600}}>{fmt(totales.iva15)}</span>
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between',padding:'14px 16px',background:'#0d3b5e'}}>
+                <span style={{fontSize:14,color:'#fff',fontWeight:700}}>TOTAL CON IVA</span>
+                <span style={{fontSize:22,color:'#3dbfb8',fontWeight:800}}>{fmt(totales.totalConIva)}</span>
+              </div>
             </div>
           </div>
 
-          {/* REBATE — informativo, después del total */}
           {p.apply_rebate&&(
-            <div style={{border:'1px solid #f0d080',borderRadius:10,overflow:'hidden',marginBottom:16,background:'#fff8e6'}}>
+            <div style={{border:'1px solid #f0d080',borderRadius:10,overflow:'hidden',marginBottom:14,background:'#fff8e6'}}>
               <div style={{padding:'10px 20px',borderBottom:'1px solid #f0d080',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <div>
-                  <div style={{fontSize:13,fontWeight:700,color:'#7a5500'}}>REBATE {p.rebate_pct??0}% — Nota de crédito (informativo)</div>
-                  <div style={{fontSize:11,color:'#a07020'}}>No incluido en factura. Se emite como nota de crédito separada.</div>
+                  <div style={{fontSize:13,fontWeight:700,color:'#7a5500'}}>REBATE {p.rebate_pct??0}% — Nota de credito (informativo)</div>
+                  <div style={{fontSize:11,color:'#a07020'}}>No incluido en factura.</div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:10}}>
                   <input type="number" step="0.1" style={{...S.input,width:70}} value={p.rebate_pct??0} onChange={e=>setNum('rebate_pct',e.target.value)}/>
@@ -1489,70 +1567,13 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                 </div>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0}}>
-                <div style={{padding:'10px 20px',borderRight:'1px solid #f0d080'}}>
-                  <div style={{fontSize:11,color:'#a07020',marginBottom:3}}>Utilidad con rebate</div>
-                  <div style={{fontSize:16,fontWeight:700,color:'#7a5500'}}>{fmt(totales.utilidadConRebate)}</div>
-                </div>
-                <div style={{padding:'10px 20px'}}>
-                  <div style={{fontSize:11,color:'#a07020',marginBottom:3}}>Margen con rebate</div>
-                  <div style={{fontSize:16,fontWeight:700,color:'#7a5500'}}>{fmtPct(totales.utilidadConRebatePct)}</div>
-                </div>
+                <div style={{padding:'10px 20px',borderRight:'1px solid #f0d080'}}><div style={{fontSize:11,color:'#a07020',marginBottom:3}}>Utilidad con rebate</div><div style={{fontSize:16,fontWeight:700,color:'#7a5500'}}>{fmt(totales.utilidadConRebate)}</div></div>
+                <div style={{padding:'10px 20px'}}><div style={{fontSize:11,color:'#a07020',marginBottom:3}}>Margen con rebate</div><div style={{fontSize:16,fontWeight:700,color:'#7a5500'}}>{fmtPct(totales.utilidadConRebatePct)}</div></div>
               </div>
             </div>
           )}
 
-          {/* Ahorro real — solo si hay ítems con costo real ingresado */}
-          {totales.subtotalAhorro!==0&&(
-            <div style={{border:'1px solid #2e8b4e44',borderRadius:10,overflow:'hidden',marginBottom:16,background:'#edf7ed'}}>
-              <div style={{padding:'10px 20px',borderBottom:'1px solid #2e8b4e22',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <div style={{fontSize:13,fontWeight:700,color:'#2e8b4e'}}>✅ Análisis de cierre (costo real vs cotizado)</div>
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:0}}>
-                <div style={{padding:'10px 20px',borderRight:'1px solid #2e8b4e22'}}>
-                  <div style={{fontSize:11,color:'#5a7a9a',marginBottom:3}}>Costo real total</div>
-                  <div style={{fontSize:16,fontWeight:700,color:'#2e8b4e'}}>{fmt(totales.subtotalCostoReal)}</div>
-                </div>
-                <div style={{padding:'10px 20px',borderRight:'1px solid #2e8b4e22'}}>
-                  <div style={{fontSize:11,color:'#5a7a9a',marginBottom:3}}>Ahorro total</div>
-                  <div style={{fontSize:16,fontWeight:700,color:totales.subtotalAhorro>=0?'#2e8b4e':'#c8264a'}}>{fmt(totales.subtotalAhorro)}</div>
-                </div>
-                <div style={{padding:'10px 20px'}}>
-                  <div style={{fontSize:11,color:'#5a7a9a',marginBottom:3}}>Margen real</div>
-                  <div style={{fontSize:16,fontWeight:700,color:totales.margenRealTotal>=0?'#2e8b4e':'#c8264a'}}>{fmt(totales.margenRealTotal)} ({fmtPct(totales.margenRealPct)})</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Desglose por categoría */}
-          <h3 style={{fontSize:14,fontWeight:700,color:'#0d3b5e',margin:'20px 0 10px'}}>Desglose por categoría</h3>
-          <table style={S.table}>
-            <thead><tr>{['Categoría','Ítems','Costo prov.','OH+BCO','Total costo','Precio cliente','Margen','%'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
-            <tbody>
-              {categorias.filter(cat=>p.items.some(it=>it.categoria===cat.nombre)).map(cat=>{
-                const its=p.items.filter(it=>it.categoria===cat.nombre);
-                const tot=its.reduce((a,it)=>{const c=calcItem(it);a.costo+=c.costoTotal;a.ohbco+=c.ohVal+c.bcoVal;a.total+=c.totalCosto;a.precio+=c.precio;a.margen+=c.margen;return a;},{costo:0,ohbco:0,total:0,precio:0,margen:0});
-                const pct=tot.precio>0?(tot.margen/tot.precio)*100:0;
-                return(<tr key={cat.id}>
-                  <td style={S.td}>{cat.nombre}</td>
-                  <td style={{...S.td,textAlign:'right',color:'#8aa0b8'}}>{its.length}</td>
-                  <td style={{...S.td,textAlign:'right',color:'#8aa0b8'}}>{fmt(tot.costo)}</td>
-                  <td style={{...S.td,textAlign:'right',color:'#8aa0b8'}}>{fmt(tot.ohbco)}</td>
-                  <td style={{...S.td,textAlign:'right',color:'#5a3a7e'}}>{fmt(tot.total)}</td>
-                  <td style={{...S.td,textAlign:'right',fontWeight:600}}>{fmt(tot.precio)}</td>
-                  <td style={{...S.td,textAlign:'right',fontWeight:600,color:tot.margen>=0?'#2e8b4e':'#c8264a'}}>{fmt(tot.margen)}</td>
-                  <td style={{...S.td,textAlign:'right',fontWeight:600,color:tot.margen>=0?'#2e8b4e':'#c8264a'}}>{fmtPct(pct)}</td>
-                </tr>);
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* ══ FLUJO DE CAJA ══ */}
-      {tab==='totales' && ['aprobado','pendiente_facturar','facturado'].includes(p.estado) && <FlujoCaja p={p} fmt={fmt} fmtDate={fmtDate} />}
-
-      {/* ══ ALCANCE ══ */}
+          {/* SECCION 4: Desglose por Categoria */}
       {tab==='alcance'&&(
         <AlcanceTab
           presupuestoId={p.id}

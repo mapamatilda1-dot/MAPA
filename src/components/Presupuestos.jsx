@@ -11,6 +11,32 @@ import EditorPpto from './EditorPpto';
 import { generatePdfClienteHTML, generatePdfFinancieroHTML } from './PdfCliente';
 import ExpedientePanel from './ExpedientePanel';
 
+function GrupoCliente({ cliente, pptos, PptoCard }) {
+  const [open, setOpen] = useState(true);
+  const t = pptos.reduce((acc, p) => {
+    const calc = calcPpto(p);
+    acc.total += calc.subtotalPrecio;
+    return acc;
+  }, { total: 0 });
+  return (
+    <div style={{ marginBottom:10, border:'1px solid #dde6ef', borderRadius:10, overflow:'hidden' }}>
+      <div onClick={()=>setOpen(v=>!v)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', background:'#f0f4f8', cursor:'pointer', userSelect:'none' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:13, color:'#8aa0b8' }}>{open ? '▼' : '▶'}</span>
+          <span style={{ fontSize:14, fontWeight:700, color:'#0d3b5e' }}>{cliente}</span>
+          <span style={{ fontSize:12, color:'#8aa0b8', background:'#e8f0f8', padding:'2px 8px', borderRadius:999 }}>{pptos.length} presupuesto{pptos.length!==1?'s':''}</span>
+        </div>
+        <span style={{ fontSize:13, fontWeight:600, color:'#0d3b5e' }}>${t.total.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+      </div>
+      {open && (
+        <div style={{ display:'flex', flexDirection:'column', gap:4, padding:'6px 8px', background:'#fff' }}>
+          {pptos.map(p => <PptoCard key={p.id} p={p}/>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate }) {
   const [pptos, setPptos]         = useState([]);
   const [categorias, setCats]     = useState([]);
@@ -22,6 +48,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
   const [editing, setEditing]     = useState(null);
   const [search, setSearch]       = useState('');
   const [filtroEstado, setFiltro] = useState('todos');
+  const [filtroAnio, setFiltroAnio] = useState(String(new Date().getFullYear()));
   const [toast, setToast]         = useState('');
   const [popupPpto, setPopupPpto] = useState(null);
   const [expedienteId, setExpedienteId] = useState(null);
@@ -178,7 +205,8 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
     const q = search.toLowerCase();
     const ms = !q || (p.nombre||'').toLowerCase().includes(q) || (p.cliente||'').toLowerCase().includes(q) || (p.nomenclatura||'').toLowerCase().includes(q);
     const me = filtroEstado === 'todos' || p.estado === filtroEstado;
-    return ms && me;
+    const ma = filtroAnio === 'todos' || (p.fecha_evento||p.created_at||'').startsWith(filtroAnio) || (p.nomenclatura||'').includes(filtroAnio.slice(2));
+    return ms && me && ma;
   });
 
   const anioActual = new Date().getFullYear();
@@ -314,6 +342,12 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
               {ESTADOS_PPTO_LABELS[e]}
             </button>
           ))}
+          <div style={{width:1,height:20,background:'#dde6ef',margin:'0 4px'}}/>
+          {['todos', String(new Date().getFullYear()), String(new Date().getFullYear()-1)].map(a=>(
+            <button key={a} onClick={()=>setFiltroAnio(a)} style={{...S.btnSm,background:filtroAnio===a?'#5b21b6':'#fff',color:filtroAnio===a?'#fff':'#5b21b6',borderColor:'#7c3aed44',fontSize:11}}>
+              {a==='todos'?'Todos los años':a}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -333,10 +367,21 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
         <span style={{ fontSize:12, color:'#5a7a9a' }}>Seleccionar todos ({filtered.length})</span>
       </div>
 
-      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-        {filtered.map(p => <PptoCard key={p.id} p={p}/>)}
-        {filtered.length === 0 && <div style={S.empty}>{pptos.length === 0 ? 'Sin presupuestos aún.' : 'Sin resultados.'}</div>}
-      </div>
+      {filtered.length === 0 && <div style={S.empty}>{pptos.length === 0 ? 'Sin presupuestos aún.' : 'Sin resultados.'}</div>}
+
+      {/* Agrupado por cliente */}
+      {(()=>{
+        const grupos = {};
+        filtered.forEach(p => {
+          const cli = p.cliente || '— Sin cliente —';
+          if (!grupos[cli]) grupos[cli] = [];
+          grupos[cli].push(p);
+        });
+        const clientesOrdenados = Object.keys(grupos).sort((a,b)=>a.localeCompare(b));
+        return clientesOrdenados.map(cli => (
+          <GrupoCliente key={cli} cliente={cli} pptos={grupos[cli]} PptoCard={PptoCard}/>
+        ));
+      })()}
 
       {/* Popup detalle */}
       {popupPpto && (
