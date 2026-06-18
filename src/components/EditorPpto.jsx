@@ -894,13 +894,15 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                   <Label>Productor asignado</Label>
                   <select style={S.select} value={p.productor_nombre||''} onChange={e=>{
                     const prev_prod = p.productor_nombre;
+                    const prod = productores.find(x=>x.nombre===e.target.value);
                     setField('productor_nombre', e.target.value);
+                    setField('productor_email', prod?.email||'');
                     if (e.target.value && e.target.value !== prev_prod) {
-                      setP(prev=>({...prev, _notify_productor: true, productor_nombre:e.target.value}));
+                      setP(prev=>({...prev, _notify_productor: true, productor_nombre:e.target.value, productor_email:prod?.email||''}));
                     }
                   }}>
                     <option value="">— Sin asignar —</option>
-                    {productores.map(pr=><option key={pr.id} value={pr.nombre}>{pr.nombre}{pr.cargo?` — ${pr.cargo}`:''}</option>)}
+                    {productores.map(pr=><option key={pr.id} value={pr.nombre}>{pr.nombre}{pr.cargo?' — '+pr.cargo:''}</option>)}
                   </select>
                 </div>
               </div>

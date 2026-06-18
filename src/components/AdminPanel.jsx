@@ -9,7 +9,7 @@ export default function AdminPanel() {
   const [clientes, setClis]     = useState([]);
   const [ejecutivos, setEjecs]  = useState([]);
   const [productores, setProds]  = useState([]);
-  const [newProd, setNewProd]    = useState({ nombre:'', cargo:'' });
+  const [newProd, setNewProd]    = useState({ nombre:'', cargo:'', email:'' });
   const [editProd, setEditProd]  = useState(null);
   const [usuarios, setUsuarios] = useState([]);
   const [toast, setToast]       = useState('');
@@ -304,6 +304,7 @@ export default function AdminPanel() {
             <div style={S.grid2}>
               <div><Label>Nombre completo *</Label><input style={S.input} value={newProd.nombre} onChange={e=>setNewProd(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Juan Villao"/></div>
               <div><Label>Cargo</Label><input style={S.input} value={newProd.cargo} onChange={e=>setNewProd(p=>({...p,cargo:e.target.value}))} placeholder="Ej: Productor de Eventos"/></div>
+              <div style={{ gridColumn:'1/-1' }}><Label>Email (opcional — para recibir notificaciones)</Label><input style={S.input} type="email" value={newProd.email||''} onChange={e=>setNewProd(p=>({...p,email:e.target.value}))} placeholder="Ej: juan@matilda.agency"/></div>
             </div>
             <button style={{ ...S.btnPrimary, marginTop:12 }} onClick={saveProd}>+ Agregar productor</button>
           </div>
@@ -313,6 +314,7 @@ export default function AdminPanel() {
               <div style={S.grid2}>
                 <div><Label>Nombre</Label><input style={S.input} value={editProd.nombre} onChange={e=>setEditProd(p=>({...p,nombre:e.target.value}))}/></div>
                 <div><Label>Cargo</Label><input style={S.input} value={editProd.cargo} onChange={e=>setEditProd(p=>({...p,cargo:e.target.value}))}/></div>
+                <div style={{ gridColumn:'1/-1' }}><Label>Email (opcional)</Label><input style={S.input} type="email" value={editProd.email||''} onChange={e=>setEditProd(p=>({...p,email:e.target.value}))} placeholder="juan@matilda.agency"/></div>
               </div>
               <div style={{ display:'flex', gap:8, marginTop:12 }}>
                 <button style={S.btnPrimary} onClick={updateProd}>Guardar</button>
@@ -323,12 +325,13 @@ export default function AdminPanel() {
           <div style={S.card}>
             <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Productores ({productores.length})</h3>
             <table style={S.table}>
-              <thead><tr>{['Nombre','Cargo',''].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Nombre','Cargo','Email',''].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
               <tbody>
                 {productores.map(p=>(
                   <tr key={p.id}>
                     <td style={S.td}><strong>{p.nombre}</strong></td>
                     <td style={S.td}>{p.cargo}</td>
+                    <td style={S.td}>{p.email||'—'}</td>
                     <td style={S.td}>
                       <div style={{ display:'flex', gap:4 }}>
                         <button style={S.btnSm} onClick={()=>setEditProd({...p})}>✏️</button>
@@ -337,7 +340,7 @@ export default function AdminPanel() {
                     </td>
                   </tr>
                 ))}
-                {productores.length===0 && <tr><td colSpan={3} style={{ ...S.td, textAlign:'center', color:'#8aa0b8' }}>Sin productores</td></tr>}
+                {productores.length===0 && <tr><td colSpan={4} style={{ ...S.td, textAlign:'center', color:'#8aa0b8' }}>Sin productores</td></tr>}
               </tbody>
             </table>
           </div>
