@@ -32,18 +32,18 @@ export function calcItem(it) {
   const totalCosto = r2(costoTotal + ohVal + bcoVal);
 
   // Costo real
-  const costoRealUnit  = (it.costo_real_unit !== undefined && it.costo_real_unit !== null)
-    ? r2(it.costo_real_unit) : costoUnit;
-  const costoRealTotal = r2(costoRealUnit * cantidad * dias);
-  // OH y BCO del real usan los mismos porcentajes cotizados (son costos fijos de estructura)
-  const ohRealVal      = ohVal;
+  const tieneReal      = it.costo_real_unit !== undefined && it.costo_real_unit !== null;
+  const costoRealUnit  = tieneReal ? r2(it.costo_real_unit) : 0;
+  const costoRealTotal = tieneReal ? r2(costoRealUnit * cantidad * dias) : 0;
+  // OH y BCO son fijos sobre el costo cotizado — no cambian con el costo real
+  const ohRealVal      = tieneReal ? ohVal : 0;
   const bcoRealPct     = (it.bco_real_pct !== undefined && it.bco_real_pct !== null)
     ? r2(it.bco_real_pct) : bco;
-  const bcoRealVal     = bcoRealPct !== bco ? r2(costoRealTotal * (bcoRealPct / 100)) : bcoVal;
+  const bcoRealVal     = tieneReal ? (bcoRealPct !== bco ? r2(costoRealTotal * (bcoRealPct / 100)) : bcoVal) : 0;
   // totalCostoReal: costo real puro + OH cotizado + BCO cotizado (estructura fija)
-  const totalCostoReal = r2(costoRealTotal + ohRealVal + bcoRealVal);
+  const totalCostoReal = tieneReal ? r2(costoRealTotal + ohRealVal + bcoRealVal) : 0;
   // Ahorro = solo diferencia en costo puro de proveedor (sin OH/BCO)
-  const ahorro         = r2(costoTotal - costoRealTotal);
+  const ahorro         = tieneReal ? r2(costoTotal - costoRealTotal) : 0;
 
   // Precio cliente
   const precioU = r2(it.precio_unit ?? 0);
@@ -51,8 +51,8 @@ export function calcItem(it) {
 
   const margen        = r2(precio - totalCosto);
   const margenPct     = precio > 0 ? r2((margen / precio) * 100) : 0;
-  const margenReal    = r2(precio - totalCostoReal);
-  const margenRealPct = precio > 0 ? r2((margenReal / precio) * 100) : 0;
+  const margenReal    = tieneReal ? r2(precio - totalCostoReal) : 0;
+  const margenRealPct = (tieneReal && precio > 0) ? r2((margenReal / precio) * 100) : 0;
 
   // Warning: costo > precio
   const hasWarning = precio > 0 && totalCosto > precio;
@@ -98,8 +98,12 @@ export function calcPpto(p) {
 
   const rebate_pct = r2(p.rebate_pct ?? 0);
   const rebate     = p.apply_rebate ? r2(subtotalPrecio * (rebate_pct / 100)) : 0;
-  const utilidadConRebate    = r2(margenTotal - rebate);   // Rebate resta utilidad
-  const utilidadConRebatePct = totalSinIva > 0 ? r2((utilidadConRebate / totalSinIva) * 100) : 0;
+  // Utilidad con rebate = (Precio+Fee) - (CostoReal+OH+BCO+Rebate)
+  // Si no hay costo real, usa costo cotizado
+  const costoRealParaRebate = subtotalCostoReal > 0 ? subtotalCostoReal : subtotalCostoBase;
+  const utilidadConRebate    = r2(totalSinIva - (costoRealParaRebate + subtotalOH + subtotalBCO + rebate));
+  // Margen = utilidad / Precio cliente (antes de fee)
+  const utilidadConRebatePct = subtotalPrecio > 0 ? r2((utilidadConRebate / subtotalPrecio) * 100) : 0;
 
   return {
     subtotalCostoBase, subtotalOH, subtotalBCO, subtotalCosto,
