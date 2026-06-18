@@ -494,7 +494,7 @@ export default function Liquidaciones({ presupuestos, userRole }) {
                   setEditing(p=>({...p,estado:e.target.value}));
                 }}>
                   <option value="abierta">Abierta</option>
-                  <option value="enviada">Enviada</option>
+                  {userRole==='admin'&&<option value="enviada">Enviada</option>}
                   {canChangeLiqToLiquidado(userRole)&&<option value="liquidado">Liquidado</option>}
                 </select>
               </div>

@@ -105,7 +105,7 @@ export function canCreateSolicitud(role)   { return ['admin', 'produccion'].incl
 export function canAprobarSolicitud(role)  { return ['admin', 'financiero'].includes(role); }
 
 // ─── Liquidaciones ────────────────────────────────────────────
-const ESTADOS_BLOQUEADOS_LIQ = ['liquidado'];
+const ESTADOS_BLOQUEADOS_LIQ = ['liquidado', 'enviada']; // produccion no puede editar una vez enviada
 export function canViewLiquidaciones(role)  { return ['admin', 'produccion', 'financiero'].includes(role); }
 export function canEditLiq(role, estadoActual) {
   if (role === 'admin') return true;
