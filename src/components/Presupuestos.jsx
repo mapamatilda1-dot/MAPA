@@ -12,12 +12,16 @@ import { generatePdfClienteHTML, generatePdfFinancieroHTML } from './PdfCliente'
 import ExpedientePanel from './ExpedientePanel';
 
 function GrupoCliente({ cliente, pptos, PptoCard }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const t = pptos.reduce((acc, p) => {
     const calc = calcPpto(p);
     acc.total += calc.subtotalPrecio;
     return acc;
   }, { total: 0 });
+  const ultimaFecha = pptos.reduce((max, p) => {
+    const f = p.updated_at || p.created_at || '';
+    return f > max ? f : max;
+  }, '');
   return (
     <div style={{ marginBottom:10, border:'1px solid #dde6ef', borderRadius:10, overflow:'hidden' }}>
       <div onClick={()=>setOpen(v=>!v)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', background:'#f0f4f8', cursor:'pointer', userSelect:'none' }}>
@@ -377,7 +381,20 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
           if (!grupos[cli]) grupos[cli] = [];
           grupos[cli].push(p);
         });
-        const clientesOrdenados = Object.keys(grupos).sort((a,b)=>a.localeCompare(b));
+        // Sort each group by most recent first
+        Object.values(grupos).forEach(g => g.sort((a,b) => (b.updated_at||b.created_at||'').localeCompare(a.updated_at||a.created_at||'')));
+        const clientesOrdenados = Object.keys(grupos).sort((a,b) => {
+          // Get most recent presupuesto date for each client
+          const latestA = grupos[a].reduce((max, p) => {
+            const d = p.updated_at || p.created_at || '';
+            return d > max ? d : max;
+          }, '');
+          const latestB = grupos[b].reduce((max, p) => {
+            const d = p.updated_at || p.created_at || '';
+            return d > max ? d : max;
+          }, '');
+          return latestB.localeCompare(latestA); // most recent first
+        });
         return clientesOrdenados.map(cli => (
           <GrupoCliente key={cli} cliente={cli} pptos={grupos[cli]} PptoCard={PptoCard}/>
         ));
