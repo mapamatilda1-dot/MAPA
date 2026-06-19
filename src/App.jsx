@@ -14,6 +14,8 @@ import Proformas from './components/Proformas';
 import Solicitudes from './components/Solicitudes';
 import Dashboard from './components/Dashboard';
 import Notificaciones from './components/Notificaciones';
+import ActaPublica from './components/ActaPublica';
+import ActasEntrega from './components/ActasEntrega';
 
 // Placeholders — se reemplazarán en las fases siguientes
 const Placeholder = ({ nombre }) => (
@@ -36,11 +38,19 @@ const TAB_CONFIG = {
   liquidaciones:    { label: 'Liquidaciones',   icon: '🧾' },
   calendario:       { label: 'Calendario',      icon: '📅' },
   implementaciones: { label: 'Implementac.',    icon: '⚙️' },
+  actas:            { label: 'Actas entrega',   icon: '📝' },
   dashboard:        { label: 'Dashboard',       icon: '📊' },
   admin_panel:      { label: 'Admin',           icon: '⚙' },
 };
 
+// Ruta pública sin login: /acta/{token} — el proveedor firma desde su celular
+function checkActaPublicaRoute() {
+  const match = window.location.pathname.match(/^\/acta\/([a-zA-Z0-9]+)/);
+  return match ? match[1] : null;
+}
+
 export default function App() {
+  const actaToken = checkActaPublicaRoute();
   const [session, setSession]   = useState(null);
   const [loading, setLoading]   = useState(true);
   const [activeTab, setActiveTab] = useState(null);
@@ -70,6 +80,11 @@ export default function App() {
     }
   }, [session?.user?.id]);
 
+  // Ruta pública sin login: el proveedor firma desde su celular, sin pasar por auth
+  if (actaToken) {
+    return <ActaPublica token={actaToken} />;
+  }
+
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888' }}>
       Cargando...
@@ -97,6 +112,7 @@ export default function App() {
       case 'presupuestos':     return <Presupuestos userRole={role} userEmail={email} logoUrl={null} onNavigate={(tab,pptoId)=>{if(pptoId)setPptoInicial(pptoId);setActiveTab(tab);}} />;
       case 'solicitudes':      return <Solicitudes userRole={role} userEmail={email} userName={email.split('@')[0]} presupuesto_id_inicial={pptoInicial} onClearPptoInicial={()=>setPptoInicial(null)}/>;
       case 'liquidaciones':    return <LiquidacionesTab userRole={role} userEmail={email} />;
+      case 'actas':            return <ActasEntrega userEmail={email} />;
       case 'calendario':       return <Calendario />;
       case 'implementaciones': return <Implementaciones userRole={role} />;
       case 'dashboard':        return <Dashboard />;

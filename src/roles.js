@@ -30,6 +30,7 @@ export function getNavTabs(role) {
     liquidaciones:   ['admin', 'produccion', 'financiero'],
     calendario:      ['admin', 'ventas', 'creativo', 'produccion', 'financiero'],
     implementaciones:['admin', 'produccion', 'financiero'],
+    actas:           ['admin', 'produccion', 'financiero'],
     dashboard:       ['admin', 'financiero'],
     admin_panel:     ['admin'],
   };
