@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { generateActaPdfHTML } from './ActaPdfGenerator';
 
 const S = {
   page: { minHeight:'100vh', background:'#f5f4f0', fontFamily:'Arial,sans-serif' },
@@ -24,10 +25,12 @@ function SignaturePad({ onSave, label, color='#0d3b5e' }) {
     canvas.width = rect.width * ratio;
     canvas.height = rect.height * ratio;
     ctx.scale(ratio, ratio);
+    ctx.clearRect(0, 0, rect.width, rect.height);
     ctx.strokeStyle = '#1a1a1a';
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    setHasSignature(false);
   }, []);
 
   function getPos(e) {
@@ -236,6 +239,14 @@ export default function ActaPublica({ token }) {
               </div>
             )}
           </div>
+          <button onClick={()=>{
+            const html = generateActaPdfHTML(acta);
+            const w = window.open('', '_blank');
+            if(!w){alert('Permití ventanas emergentes para ver el PDF');return;}
+            w.document.write(html); w.document.close();
+          }} style={{ ...S.btn, background:'#0d3b5e', color:'#fff', width:'100%', marginTop:16 }}>
+            📄 Descargar PDF del acta
+          </button>
         </div>
       ) : step === 'form' ? (
         <div style={S.card}>
@@ -276,7 +287,7 @@ export default function ActaPublica({ token }) {
         <div style={S.card}>
           <div style={{ fontSize:14, fontWeight:600, color:'#0d3b5e', marginBottom:4 }}>Firma de quien entrega</div>
           <div style={{ fontSize:13, color:'#8aa0b8', marginBottom:14 }}>{form.persona_entrega}</div>
-          <SignaturePad label="Firma" onSave={onFirmaEntrega} color="#0d3b5e"/>
+          <SignaturePad key="pad-entrega" label="Firma" onSave={onFirmaEntrega} color="#0d3b5e"/>
         </div>
       ) : step === 'firma_recibe' ? (
         <div style={S.card}>
@@ -285,7 +296,7 @@ export default function ActaPublica({ token }) {
           {saving ? (
             <div style={{ textAlign:'center', padding:'30px 0', color:'#8aa0b8' }}>Guardando acta...</div>
           ) : (
-            <SignaturePad label="Firma" onSave={onFirmaRecibe} color="#2e8b4e"/>
+            <SignaturePad key="pad-recibe" label="Firma" onSave={onFirmaRecibe} color="#2e8b4e"/>
           )}
         </div>
       ) : null}

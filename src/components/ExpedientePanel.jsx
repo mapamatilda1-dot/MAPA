@@ -46,6 +46,7 @@ export default function ExpedientePanel({ briefId, onClose }) {
   const [cambiosBrief, setCambiosBrief] = useState([]);
   const [proformas, setProformas]   = useState([]);
   const [solicitudes, setSolicitudes] = useState([]);
+  const [actas, setActas]           = useState([]);
   const [loading, setLoading]       = useState(true);
 
   useEffect(() => {
@@ -70,21 +71,24 @@ export default function ExpedientePanel({ briefId, onClose }) {
     if (cambR.data) setCambiosBrief(cambR.data);
     if (pfR.data)   setProformas(pfR.data);
 
-    // Versiones, liquidaciones y solicitudes vinculadas a presupuestos
+    // Versiones, liquidaciones, solicitudes y actas vinculadas a presupuestos
     if (ppR.data?.length) {
       const ppIds = ppR.data.map(p => p.id);
-      const [{ data: liqData }, { data: verData }, { data: solData }] = await Promise.all([
+      const [{ data: liqData }, { data: verData }, { data: solData }, { data: actData }] = await Promise.all([
         supabase.from('liquidaciones').select('*').in('presupuesto_id', ppIds),
         supabase.from('versiones_ppto').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: true }),
         supabase.from('solicitudes').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: false }),
+        supabase.from('actas_entrega').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: false }),
       ]);
       setLiquidaciones(liqData || []);
       setVersiones(verData || []);
       setSolicitudes(solData || []);
+      setActas(actData || []);
     } else {
       setLiquidaciones([]);
       setVersiones([]);
       setSolicitudes([]);
+      setActas([]);
     }
     setLoading(false);
   }
@@ -244,7 +248,48 @@ export default function ExpedientePanel({ briefId, onClose }) {
                 }
               </Section>
 
-              {/* Implementaciones */}
+              {/* Actas de entrega */}
+              <Section icon="📝" title="Actas de entrega" count={actas.length}>
+                {actas.length === 0
+                  ? <EmptyMsg msg="Sin actas de entrega"/>
+                  : actas.map(a => {
+                    const estadoColor = a.estado === 'firmada' ? '#2e8b4e' : '#e8a020';
+                    return (
+                      <div key={a.id} style={{ background:'#f8fafc', border:'1px solid #eee', borderRadius:9, padding:'10px 12px', marginBottom:8 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                          <span style={{ fontSize:13, fontWeight:600, color:'#0d3b5e', flex:1 }}>{a.evento_nombre || a.presupuesto_nombre}</span>
+                          <span style={{ fontSize:11, padding:'2px 9px', borderRadius:999, fontWeight:500, background:estadoColor+'22', color:estadoColor }}>
+                            {a.estado === 'firmada' ? '✓ Firmada' : 'Pendiente de firma'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize:12, color:'#555', display:'flex', flexWrap:'wrap', gap:8 }}>
+                          {a.persona_entrega && <span>👤 Entrega: {a.persona_entrega}</span>}
+                          {a.persona_recibe && <span>👤 Recibe: {a.persona_recibe}</span>}
+                        </div>
+                        {a.estado === 'firmada' && a.fecha_firma && (
+                          <div style={{ fontSize:11, color:'#2e8b4e', marginTop:4 }}>
+                            Firmada el {new Date(a.fecha_firma).toLocaleString('es-EC')}
+                          </div>
+                        )}
+                        {a.estado === 'firmada' && (a.firma_entrega_url || a.firma_recibe_url) ? (
+                          <div style={{ display:'flex', gap:8, marginTop:8 }}>
+                            {a.firma_entrega_url && <img src={a.firma_entrega_url} alt="" style={{ height:42, border:'1px solid #ddd', borderRadius:5 }}/>}
+                            {a.firma_recibe_url && <img src={a.firma_recibe_url} alt="" style={{ height:42, border:'1px solid #ddd', borderRadius:5 }}/>}
+                            {(a.fotos||[]).slice(0,3).map((f,i) => <img key={i} src={f} alt="" style={{ height:42, width:42, objectFit:'cover', border:'1px solid #ddd', borderRadius:5 }}/>)}
+                          </div>
+                        ) : (
+                          <button onClick={()=>{
+                            const url = `${window.location.origin}/acta/${a.token}`;
+                            navigator.clipboard.writeText(url);
+                          }} style={{ marginTop:6, fontSize:11, padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'#fff', cursor:'pointer', color:'#0d3b5e' }}>
+                            🔗 Copiar link para firmar
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                }
+              </Section>
               <Section icon="🎯" title="Implementaciones" count={implementaciones.length}>
                 {implementaciones.length === 0
                   ? <EmptyMsg msg="Sin implementaciones vinculadas"/>

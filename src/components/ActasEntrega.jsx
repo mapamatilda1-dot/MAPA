@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { generateActaPdfHTML } from './ActaPdfGenerator';
 
 const S = {
   card: { background:'#fff', border:'1px solid #dde6ef', borderRadius:10, padding:'14px 16px', marginBottom:8 },
@@ -133,6 +134,14 @@ export default function ActasEntrega({ userEmail }) {
               )}
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:4, flexShrink:0 }}>
+              {a.estado === 'firmada' && (
+                <button style={{ ...S.btnSm, background:'#0d3b5e', color:'#fff', border:'none' }} onClick={()=>{
+                  const html = generateActaPdfHTML(a);
+                  const w = window.open('', '_blank');
+                  if(!w){alert('Permití ventanas emergentes para ver el PDF');return;}
+                  w.document.write(html); w.document.close();
+                }}>📄 PDF</button>
+              )}
               <button style={S.btnSm} onClick={()=>copiarLink(a.token, a.id)}>
                 {linkCopiado === a.id ? '✓ Copiado' : '🔗 Copiar link'}
               </button>
