@@ -5,6 +5,7 @@ import { S, Label, Badge, Toast } from '../styles.jsx';
 import { calcItem, calcPpto, genNomenclatura, fmt, fmtPct, fmtDate } from '../calc';
 import { generatePdfClienteHTML, generatePdfFinancieroHTML, generateExcelFinancieroData } from './PdfCliente';
 import AlcanceTab from './AlcanceTab';
+import InformeEditor from './InformeEditor';
 import {
   ESTADOS_PPTO, ESTADOS_PPTO_LABELS, ESTADOS_PPTO_COLORS,
   canChangeEstadoPpto, canEditPpto, canApproveCostoReal, canEditBcoReal,
@@ -559,6 +560,7 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
   }
 
   const [pdfModal, setPdfModal] = useState(null); // {tieneSubpptos, tieneOpciones}
+  const [showInforme, setShowInforme] = useState(false);
 
   function openPdfCliente(){
     if(!p)return;
@@ -795,6 +797,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
         <button style={S.btnSecondary} onClick={openPdfCliente}>📄 PDF cliente</button>
         {canDownloadPdfFinanciero(userRole) && <button style={{...S.btnSecondary,color:'#c8264a',borderColor:'#c8264a44'}} onClick={openPdfFinanciero}>📊 PDF financiero</button>}
         {canDownloadExcel(userRole) && <button style={S.btnSecondary} onClick={downloadExcel}>📥 Excel</button>}
+        {p.estado==='aprobado' && <button style={{...S.btnSecondary,color:'#7c3aed',borderColor:'#7c3aed44'}} onClick={()=>setShowInforme(true)}>📋 Informe</button>}
         <button style={S.btnPrimary} onClick={save} disabled={saving}>{saving?'Guardando…':'💾 Guardar'}</button>
       </div>
 
@@ -1802,6 +1805,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
         </div>
       )}
       <Toast msg={toast}/>
+      {showInforme && p.id && <InformeEditor presupuesto={p} onClose={()=>setShowInforme(false)}/>}
       {pdfModal && (
         <div onClick={()=>setPdfModal(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:600,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
           <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:14,padding:24,width:'100%',maxWidth:440}}>

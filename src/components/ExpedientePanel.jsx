@@ -47,6 +47,8 @@ export default function ExpedientePanel({ briefId, onClose }) {
   const [proformas, setProformas]   = useState([]);
   const [solicitudes, setSolicitudes] = useState([]);
   const [actas, setActas]           = useState([]);
+  const [scoutings, setScoutings]   = useState([]);
+  const [informes, setInformes]     = useState([]);
   const [loading, setLoading]       = useState(true);
 
   useEffect(() => {
@@ -71,24 +73,30 @@ export default function ExpedientePanel({ briefId, onClose }) {
     if (cambR.data) setCambiosBrief(cambR.data);
     if (pfR.data)   setProformas(pfR.data);
 
-    // Versiones, liquidaciones, solicitudes y actas vinculadas a presupuestos
+    // Versiones, liquidaciones, solicitudes, actas, scoutings e informes vinculados a presupuestos
     if (ppR.data?.length) {
       const ppIds = ppR.data.map(p => p.id);
-      const [{ data: liqData }, { data: verData }, { data: solData }, { data: actData }] = await Promise.all([
+      const [{ data: liqData }, { data: verData }, { data: solData }, { data: actData }, { data: scoutData }, { data: infData }] = await Promise.all([
         supabase.from('liquidaciones').select('*').in('presupuesto_id', ppIds),
         supabase.from('versiones_ppto').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: true }),
         supabase.from('solicitudes').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: false }),
         supabase.from('actas_entrega').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: false }),
+        supabase.from('scoutings').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: false }),
+        supabase.from('informes').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: false }),
       ]);
       setLiquidaciones(liqData || []);
       setVersiones(verData || []);
       setSolicitudes(solData || []);
       setActas(actData || []);
+      setScoutings(scoutData || []);
+      setInformes(infData || []);
     } else {
       setLiquidaciones([]);
       setVersiones([]);
       setSolicitudes([]);
       setActas([]);
+      setScoutings([]);
+      setInformes([]);
     }
     setLoading(false);
   }
@@ -285,6 +293,61 @@ export default function ExpedientePanel({ briefId, onClose }) {
                             🔗 Copiar link para firmar
                           </button>
                         )}
+                      </div>
+                    );
+                  })
+                }
+              </Section>
+
+              {/* Scouting */}
+              <Section icon="📍" title="Scouting" count={scoutings.length}>
+                {scoutings.length === 0
+                  ? <EmptyMsg msg="Sin scoutings registrados"/>
+                  : scoutings.map(s => {
+                    const estadoColor = s.estado === 'completado' ? '#2e8b4e' : '#e8a020';
+                    return (
+                      <div key={s.id} style={{ background:'#f8fafc', border:'1px solid #eee', borderRadius:9, padding:'10px 12px', marginBottom:8 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                          <span style={{ fontSize:13, fontWeight:600, color:'#0d3b5e', flex:1 }}>{s.lugar}</span>
+                          <span style={{ fontSize:11, padding:'2px 9px', borderRadius:999, fontWeight:500, background:estadoColor+'22', color:estadoColor }}>
+                            {s.estado === 'completado' ? '✓ Completado' : 'En proceso'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize:12, color:'#555' }}>📷 {(s.fotos||[]).length} fotos</div>
+                        {(s.fotos||[]).length > 0 ? (
+                          <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap' }}>
+                            {s.fotos.slice(0,4).map((f,i) => <img key={i} src={f.url} alt="" style={{ height:42, width:42, objectFit:'cover', border:'1px solid #ddd', borderRadius:5 }}/>)}
+                          </div>
+                        ) : (
+                          <button onClick={()=>{
+                            const url = window.location.origin + '/scouting/' + s.token;
+                            navigator.clipboard.writeText(url);
+                          }} style={{ marginTop:6, fontSize:11, padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'#fff', cursor:'pointer', color:'#0d3b5e' }}>
+                            🔗 Copiar link
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                }
+              </Section>
+
+              {/* Informes */}
+              <Section icon="📋" title="Informes" count={informes.length}>
+                {informes.length === 0
+                  ? <EmptyMsg msg="Sin informes generados"/>
+                  : informes.map(inf => {
+                    const incluidos = (inf.items||[]).filter(it => it.incluido).length;
+                    const estadoColor = inf.estado === 'generado' ? '#2e8b4e' : '#e8a020';
+                    return (
+                      <div key={inf.id} style={{ background:'#f8fafc', border:'1px solid #eee', borderRadius:9, padding:'10px 12px', marginBottom:8 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                          <span style={{ fontSize:13, fontWeight:600, color:'#0d3b5e', flex:1 }}>{inf.evento_nombre}</span>
+                          <span style={{ fontSize:11, padding:'2px 9px', borderRadius:999, fontWeight:500, background:estadoColor+'22', color:estadoColor }}>
+                            {inf.estado === 'generado' ? '✓ Generado' : 'En borrador'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize:12, color:'#555' }}>{incluidos} ítem(s) incluido(s)</div>
                       </div>
                     );
                   })

@@ -16,6 +16,9 @@ import Dashboard from './components/Dashboard';
 import Notificaciones from './components/Notificaciones';
 import ActaPublica from './components/ActaPublica';
 import ActasEntrega from './components/ActasEntrega';
+import ScoutingPublico from './components/ScoutingPublico';
+import ScoutingTab from './components/ScoutingTab';
+import InformePublico from './components/InformePublico';
 
 // Placeholders — se reemplazarán en las fases siguientes
 const Placeholder = ({ nombre }) => (
@@ -39,18 +42,25 @@ const TAB_CONFIG = {
   calendario:       { label: 'Calendario',      icon: '📅' },
   implementaciones: { label: 'Implementac.',    icon: '⚙️' },
   actas:            { label: 'Actas entrega',   icon: '📝' },
+  scouting:         { label: 'Scouting',         icon: '📍' },
   dashboard:        { label: 'Dashboard',       icon: '📊' },
   admin_panel:      { label: 'Admin',           icon: '⚙' },
 };
 
-// Ruta pública sin login: /acta/{token} — el proveedor firma desde su celular
-function checkActaPublicaRoute() {
-  const match = window.location.pathname.match(/^\/acta\/([a-zA-Z0-9]+)/);
-  return match ? match[1] : null;
+// Ruta pública sin login: /acta/{token}, /scouting/{token}, /informe/{token}
+function checkPublicRoute() {
+  const path = window.location.pathname;
+  let match = path.match(/^\/acta\/([a-zA-Z0-9]+)/);
+  if (match) return { type: 'acta', token: match[1] };
+  match = path.match(/^\/scouting\/([a-zA-Z0-9]+)/);
+  if (match) return { type: 'scouting', token: match[1] };
+  match = path.match(/^\/informe\/([a-zA-Z0-9]+)/);
+  if (match) return { type: 'informe', token: match[1] };
+  return null;
 }
 
 export default function App() {
-  const actaToken = checkActaPublicaRoute();
+  const publicRoute = checkPublicRoute();
   const [session, setSession]   = useState(null);
   const [loading, setLoading]   = useState(true);
   const [activeTab, setActiveTab] = useState(null);
@@ -80,9 +90,11 @@ export default function App() {
     }
   }, [session?.user?.id]);
 
-  // Ruta pública sin login: el proveedor firma desde su celular, sin pasar por auth
-  if (actaToken) {
-    return <ActaPublica token={actaToken} />;
+  // Ruta pública sin login: proveedor/externo accede sin pasar por auth
+  if (publicRoute) {
+    if (publicRoute.type === 'acta')     return <ActaPublica token={publicRoute.token} />;
+    if (publicRoute.type === 'scouting') return <ScoutingPublico token={publicRoute.token} />;
+    if (publicRoute.type === 'informe')  return <InformePublico token={publicRoute.token} />;
   }
 
   if (loading) return (
@@ -113,6 +125,7 @@ export default function App() {
       case 'solicitudes':      return <Solicitudes userRole={role} userEmail={email} userName={email.split('@')[0]} presupuesto_id_inicial={pptoInicial} onClearPptoInicial={()=>setPptoInicial(null)}/>;
       case 'liquidaciones':    return <LiquidacionesTab userRole={role} userEmail={email} />;
       case 'actas':            return <ActasEntrega userEmail={email} />;
+      case 'scouting':         return <ScoutingTab userEmail={email} />;
       case 'calendario':       return <Calendario />;
       case 'implementaciones': return <Implementaciones userRole={role} />;
       case 'dashboard':        return <Dashboard />;

@@ -31,6 +31,7 @@ export function getNavTabs(role) {
     calendario:      ['admin', 'ventas', 'creativo', 'produccion', 'financiero'],
     implementaciones:['admin', 'produccion', 'financiero'],
     actas:           ['admin', 'produccion', 'financiero'],
+    scouting:        ['admin', 'produccion', 'ventas', 'creativo'],
     dashboard:       ['admin', 'financiero'],
     admin_panel:     ['admin'],
   };
