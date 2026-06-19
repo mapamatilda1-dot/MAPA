@@ -21,8 +21,8 @@ export function generateActaPdfHTML(acta) {
     '</style></head><body>' +
     '<button class="no-print" onclick="window.print()" style="position:fixed;top:16px;right:16px;background:#0d3b5e;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;z-index:999;">⬇ Descargar PDF</button>' +
     '<div style="max-width:760px;margin:0 auto;">' +
-      '<div style="background:#0d3b5e;padding:24px 28px;display:flex;justify-content:space-between;align-items:center;">' +
-        '<img src="' + LOGO_ACTA_B64 + '" style="height:60px;object-fit:contain;" alt="Matilda Event Designers"/>' +
+      '<div style="background:#0d3b5e;padding:18px 28px;display:flex;justify-content:space-between;align-items:center;">' +
+        '<img src="' + LOGO_ACTA_B64 + '" style="height:150px;object-fit:contain;" alt="Matilda Event Designers"/>' +
         '<div style="text-align:right;color:#fff;">' +
           '<div style="font-size:18px;font-weight:800;letter-spacing:1px;">ACTA DE ENTREGA</div>' +
           (acta.estado === 'firmada'
