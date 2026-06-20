@@ -14,15 +14,6 @@ import ExpedientePanel from './ExpedientePanel';
 
 function GrupoCliente({ cliente, pptos, PptoCard }) {
   const [open, setOpen] = useState(false);
-  const t = pptos.reduce((acc, p) => {
-    const calc = calcPpto(p);
-    acc.total += calc.subtotalPrecio;
-    return acc;
-  }, { total: 0 });
-  const ultimaFecha = pptos.reduce((max, p) => {
-    const f = p.updated_at || p.created_at || '';
-    return f > max ? f : max;
-  }, '');
   return (
     <div style={{ marginBottom:10, border:'1px solid #dde6ef', borderRadius:10, overflow:'hidden' }}>
       <div onClick={()=>setOpen(v=>!v)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', background:'#f0f4f8', cursor:'pointer', userSelect:'none' }}>
@@ -31,7 +22,6 @@ function GrupoCliente({ cliente, pptos, PptoCard }) {
           <span style={{ fontSize:14, fontWeight:700, color:'#0d3b5e' }}>{cliente}</span>
           <span style={{ fontSize:12, color:'#8aa0b8', background:'#e8f0f8', padding:'2px 8px', borderRadius:999 }}>{pptos.length} presupuesto{pptos.length!==1?'s':''}</span>
         </div>
-        <span style={{ fontSize:13, fontWeight:600, color:'#0d3b5e' }}>${t.total.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
       </div>
       {open && (
         <div style={{ display:'flex', flexDirection:'column', gap:4, padding:'6px 8px', background:'#fff' }}>
