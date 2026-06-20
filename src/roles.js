@@ -21,6 +21,7 @@ export const ROLES_LABELS = {
 // ─── Navegación disponible por rol ───────────────────────────
 export function getNavTabs(role) {
   const tabs = {
+    notificaciones:  ['admin', 'ventas', 'creativo', 'produccion', 'financiero'],
     crm:             ['admin', 'ventas'],
     briefs:          ['admin', 'ventas', 'creativo', 'produccion', 'financiero'],
     propuestas:      ['admin', 'ventas', 'creativo', 'produccion'],
