@@ -47,6 +47,15 @@ const TAB_CONFIG = {
   admin_panel:      { label: 'Admin',           icon: '⚙' },
 };
 
+// Orden visual con agrupación: notificaciones, calendario, crm, [Creatividad], [Producción], implementaciones, dashboard, admin
+// Cada entrada es { group: 'Etiqueta'|null, tabs: [...] } — separadores visuales entre grupos distintos
+const NAV_ORDER = [
+  { group: null,          tabs: ['calendario', 'crm'] },
+  { group: 'Creatividad', tabs: ['briefs', 'propuestas'] },
+  { group: 'Producción',  tabs: ['presupuestos', 'proformas', 'scouting', 'solicitudes', 'liquidaciones', 'actas'] },
+  { group: null,          tabs: ['implementaciones', 'dashboard', 'admin_panel'] },
+];
+
 // Ruta pública sin login: /acta/{token}, /scouting/{token}, /informe/{token}
 function checkPublicRoute() {
   const path = window.location.pathname;
@@ -209,26 +218,40 @@ export default function App() {
             </button>
           );
         })()}
-        {tabs.map(tab => {
-          const cfg = TAB_CONFIG[tab] || { label: tab, icon: '' };
-          const isActive = activeTab === tab;
+        {tabs.length > 0 && NAV_ORDER.map((section, sIdx) => {
+          const visibleTabs = section.tabs.filter(t => tabs.includes(t));
+          if (visibleTabs.length === 0) return null;
           return (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '12px 14px', background: 'transparent',
-                border: 'none', borderBottom: isActive ? '2px solid #0d3b5e' : '2px solid transparent',
-                fontSize: 13, fontWeight: isActive ? 600 : 400,
-                color: isActive ? '#0d3b5e' : '#666',
-                cursor: 'pointer', whiteSpace: 'nowrap',
-                transition: 'color .15s, border-color .15s',
-              }}
-            >
-              <span style={{ fontSize: 13 }}>{cfg.icon}</span>
-              {cfg.label}
-            </button>
+            <div key={sIdx} style={{ display:'flex', alignItems:'center' }}>
+              {sIdx > 0 && <div style={{ width:1, height:24, background:'#e0e0e0', margin:'0 6px' }}/>}
+              {section.group && (
+                <span style={{ fontSize:10, fontWeight:700, color:'#aab4c0', textTransform:'uppercase', letterSpacing:'.06em', padding:'0 6px 0 2px', whiteSpace:'nowrap' }}>
+                  {section.group}
+                </span>
+              )}
+              {visibleTabs.map(tab => {
+                const cfg = TAB_CONFIG[tab] || { label: tab, icon: '' };
+                const isActive = activeTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '12px 14px', background: 'transparent',
+                      border: 'none', borderBottom: isActive ? '2px solid #0d3b5e' : '2px solid transparent',
+                      fontSize: 13, fontWeight: isActive ? 600 : 400,
+                      color: isActive ? '#0d3b5e' : '#666',
+                      cursor: 'pointer', whiteSpace: 'nowrap',
+                      transition: 'color .15s, border-color .15s',
+                    }}
+                  >
+                    <span style={{ fontSize: 13 }}>{cfg.icon}</span>
+                    {cfg.label}
+                  </button>
+                );
+              })}
+            </div>
           );
         })}
       </nav>
