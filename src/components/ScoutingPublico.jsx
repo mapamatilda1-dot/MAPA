@@ -18,6 +18,8 @@ export default function ScoutingPublico({ token }) {
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const [fotos, setFotos] = useState([]);
   const [comentariosGenerales, setComentariosGenerales] = useState('');
+  const [realizadoPor, setRealizadoPor] = useState('');
+  const [persona, setPersona] = useState('');
 
   useEffect(() => { load(); }, [token]);
 
@@ -28,6 +30,8 @@ export default function ScoutingPublico({ token }) {
     setScouting(data);
     setFotos(data.fotos || []);
     setComentariosGenerales(data.comentarios_generales || '');
+    setRealizadoPor(data.created_by_nombre || '');
+    setPersona(data.persona || '');
     setLoading(false);
   }
 
@@ -66,7 +70,7 @@ export default function ScoutingPublico({ token }) {
   async function finalizar() {
     setSaving(true);
     const { error } = await supabase.from('scoutings').update({
-      fotos, comentarios_generales: comentariosGenerales,
+      fotos, comentarios_generales: comentariosGenerales, created_by_nombre: realizadoPor,
       estado: 'completado', fecha_completado: new Date().toISOString(),
     }).eq('token', token);
     setSaving(false);
@@ -102,6 +106,20 @@ export default function ScoutingPublico({ token }) {
         <div style={{ fontSize:11, color:'#8aa0b8', textTransform:'uppercase', letterSpacing:.5, marginBottom:8 }}>Lugar / Evento</div>
         <div style={{ fontSize:17, fontWeight:700, color:'#0d3b5e', marginBottom:8 }}>{scouting.lugar || scouting.presupuesto_nombre}</div>
         {scouting.cliente_nombre && <div style={{ fontSize:13, color:'#5a7a9a' }}>🏢 {scouting.cliente_nombre}</div>}
+        {!completado ? (
+          <div style={{ marginTop:12 }}>
+            <label style={S.label}>Tu nombre (quien realiza el scouting)</label>
+            <input
+              style={{ ...S.input, marginTop:4 }}
+              value={persona}
+              onChange={e=>setPersona(e.target.value)}
+              onBlur={()=>guardarParcial({ persona })}
+              placeholder="Ej: Camille Andrade"
+            />
+          </div>
+        ) : (
+          scouting.persona && <div style={{ fontSize:13, color:'#5a7a9a', marginTop:8 }}>👤 Realizado por: {scouting.persona}</div>
+        )}
         {completado && (
           <div style={{ marginTop:10, padding:'8px 12px', background:'#edf7ed', borderRadius:8, fontSize:13, color:'#2e8b4e', fontWeight:600 }}>
             ✓ Completado el {new Date(scouting.fecha_completado).toLocaleString('es-EC')}
@@ -110,11 +128,23 @@ export default function ScoutingPublico({ token }) {
       </div>
 
       <div style={S.card}>
+        <label style={S.label}>Realizado por</label>
+        <input
+          style={{ ...S.input, marginTop:6 }}
+          value={realizadoPor}
+          disabled={completado}
+          onChange={e=>setRealizadoPor(e.target.value)}
+          onBlur={()=>guardarParcial({ created_by_nombre: realizadoPor })}
+          placeholder="Tu nombre completo"
+        />
+      </div>
+
+      <div style={S.card}>
         <label style={S.label}>Fotos del lugar</label>
         <div style={{ display:'flex', flexDirection:'column', gap:12, marginTop:8 }}>
           {fotos.map((f, i) => (
             <div key={i} style={{ border:'1px solid #eee', borderRadius:10, padding:10, position:'relative' }}>
-              <img src={f.url} alt="" style={{ width:'100%', maxHeight:220, objectFit:'cover', borderRadius:8, marginBottom:8 }}/>
+              <img src={f.url} alt="" style={{ width:'100%', maxHeight:320, objectFit:'contain', background:'#f0f0f0', borderRadius:8, marginBottom:8 }}/>
               {!completado && (
                 <button onClick={()=>removeFoto(i)} style={{ position:'absolute', top:6, right:6, width:24, height:24, borderRadius:'50%', background:'#c8264a', color:'#fff', border:'none', fontSize:12, cursor:'pointer' }}>✕</button>
               )}
