@@ -20,7 +20,19 @@ export default function InformeEditor({ presupuesto, onClose }) {
   const [uploadingFor, setUploadingFor] = useState(null);
   const [linkCopiado, setLinkCopiado] = useState(false);
 
-  const itemsPresupuesto = (presupuesto.items || []).filter(it => !it._type);
+  // Reconstruir subpresupuesto recorriendo el array secuencialmente (marcadores _type:'subppto')
+  function itemsConContexto() {
+    let subpptoActual = '';
+    const result = [];
+    (presupuesto.items || []).forEach(it => {
+      if (it._type === 'subppto') { subpptoActual = it.subpresupuesto || ''; return; }
+      if (it._type) return; // otros marcadores (subcat) se ignoran, subcategoria ya viene en el item
+      result.push({ ...it, _subppto: subpptoActual });
+    });
+    return result;
+  }
+
+  const itemsPresupuesto = itemsConContexto();
 
   useEffect(() => { load(); }, [presupuesto.id]);
 
@@ -33,7 +45,8 @@ export default function InformeEditor({ presupuesto, onClose }) {
         evento_nombre: presupuesto.nombre || presupuesto.cliente || '',
         cliente_nombre: presupuesto.cliente || '',
         items: itemsPresupuesto.map(it => ({
-          item_id: it.id, item_nombre: it.item, categoria: it.categoria || '',
+          item_id: it.id, item_nombre: it.item,
+          subpresupuesto: it._subppto || '', subcategoria: it.subcategoria || '',
           incluido: false, fotos: [], comentario: '',
         })),
       }).select().single();
@@ -81,6 +94,10 @@ export default function InformeEditor({ presupuesto, onClose }) {
 
   function guardarComentario() {
     guardar({ items: informe.items });
+  }
+
+  function guardarComentariosGenerales() {
+    guardar({ comentarios_generales: informe.comentarios_generales });
   }
 
   function actualizarComentariosGenerales(texto) {
@@ -186,7 +203,7 @@ export default function InformeEditor({ presupuesto, onClose }) {
               style={{ ...S.input, minHeight:80, resize:'vertical', marginTop:6 }}
               value={informe.comentarios_generales || ''}
               onChange={e=>actualizarComentariosGenerales(e.target.value)}
-              onBlur={guardarComentario}
+              onBlur={guardarComentariosGenerales}
               placeholder="Resumen general, conclusiones..."
             />
           </div>

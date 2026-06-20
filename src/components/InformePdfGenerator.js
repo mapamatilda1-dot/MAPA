@@ -13,7 +13,6 @@ function fotosGrid(fotos) {
   if (n === 1) {
     return '<div style="flex:1;border-radius:10px;overflow:hidden;">' + cells + '</div>';
   }
-  // 2x2 grid layout via flex rows
   const row1 = fotos.slice(0,2);
   const row2 = fotos.slice(2,4);
   const rowHtml = (arr) => '<div style="display:flex;gap:8px;flex:1;">' + arr.map(url =>
@@ -36,14 +35,16 @@ function paginaPortada(informe) {
 }
 
 function paginaItem(it, idx, total) {
+  // Encabezado: subpresupuesto / subcategoria / item (sin mostrar categoria interna)
+  const breadcrumb = [it.subpresupuesto, it.subcategoria].filter(Boolean).join(' / ');
   return '<div class="pagina" style="background:#fff;display:flex;flex-direction:column;padding:36px 44px;">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">' +
       '<div>' +
-        '<div style="font-size:10px;color:#0d6e69;font-weight:700;letter-spacing:2px;text-transform:uppercase;">' + (it.categoria||'Ítem') + '</div>' +
+        (breadcrumb ? '<div style="font-size:10px;color:#0d6e69;font-weight:700;letter-spacing:2px;text-transform:uppercase;">' + breadcrumb + '</div>' : '') +
         '<div style="font-size:26px;font-weight:800;color:#0d3b5e;margin-top:2px;">' + it.item_nombre + '</div>' +
       '</div>' +
       '<div style="text-align:right;">' +
-        '<img src="' + LOGO_INFORME_B64 + '" style="height:50px;object-fit:contain;"/>' +
+        '<img src="' + LOGO_INFORME_B64 + '" style="height:100px;object-fit:contain;"/>' +
         '<div style="font-size:10px;color:#aab4c0;margin-top:4px;">' + (idx+1) + ' / ' + total + '</div>' +
       '</div>' +
     '</div>' +
@@ -66,7 +67,8 @@ function paginaCierre(informe) {
     '<div style="font-size:15px;line-height:1.8;color:#e8f0f8;white-space:pre-wrap;flex:1;">' +
       (informe.comentarios_generales || 'Sin comentarios adicionales.') +
     '</div>' +
-    '<div style="text-align:center;padding-top:20px;border-top:1px solid #1a5078;">' +
+    '<div style="text-align:center;padding-top:24px;border-top:1px solid #1a5078;display:flex;flex-direction:column;align-items:center;gap:10px;">' +
+      '<img src="' + LOGO_INFORME_B64 + '" style="height:70px;object-fit:contain;"/>' +
       '<span style="color:#3dbfb8;font-size:12px;font-style:italic;">"Donde la estrategia se convierte en experiencia."</span>' +
     '</div>' +
   '</div>';
