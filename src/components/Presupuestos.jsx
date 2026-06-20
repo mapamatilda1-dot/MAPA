@@ -8,6 +8,7 @@ import {
   canDownloadPdfFinanciero, canDownloadExcel, canDownloadPdfCliente,
 } from '../roles';
 import EditorPpto from './EditorPpto';
+import InformeEditor from './InformeEditor';
 import { generatePdfClienteHTML, generatePdfFinancieroHTML } from './PdfCliente';
 import ExpedientePanel from './ExpedientePanel';
 
@@ -55,6 +56,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
   const [filtroAnio, setFiltroAnio] = useState(String(new Date().getFullYear()));
   const [toast, setToast]         = useState('');
   const [popupPpto, setPopupPpto] = useState(null);
+  const [showInformePopup, setShowInformePopup] = useState(false);
   const [expedienteId, setExpedienteId] = useState(null);
   const [vincularPpto, setVincularPpto] = useState(null);
   const [solicitudPptoId, setSolicitudPptoId] = useState(null);
@@ -452,12 +454,14 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
                 } catch(e){alert('Error PDF: '+e.message);}
               }}>📊 PDF financiero</button>}
               {['admin','produccion'].includes(userRole) && <button style={{ ...S.btnSecondary, color:'#0d3b5e' }} onClick={() => { const id=popupPpto.id; setPopupPpto(null); if(onNavigate) onNavigate('solicitudes', id); }}>📤 Nueva solicitud</button>}
+              {popupPpto.estado==='aprobado' && <button style={{ ...S.btnSecondary, color:'#7c3aed', borderColor:'#7c3aed44' }} onClick={() => setShowInformePopup(true)}>📋 Informe</button>}
               <button style={S.btnSecondary} onClick={() => { setEditing(popupPpto); setPopupPpto(null); }}>✏️ Editar</button>
               <button style={S.btnSm} onClick={() => { duplicatePpto(popupPpto); setPopupPpto(null); }}>📋 Duplicar</button>
             </div>
           </div>
         </div>
       )}
+      {showInformePopup && popupPpto && <InformeEditor presupuesto={popupPpto} onClose={()=>setShowInformePopup(false)}/>}
 
       <Toast msg={toast}/>
 

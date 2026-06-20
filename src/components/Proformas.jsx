@@ -342,7 +342,7 @@ function ProformaEditor({ initial, clientes, ejecutivos, briefs, cfg, presupuest
 }
 
 // ── PDF cliente ───────────────────────────────────────────────
-function buildPDFHtml(pf) {
+export function buildPDFHtml(pf) {
   function fmtN(n){return '$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
   function fmtD(s){if(!s)return '—';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
 

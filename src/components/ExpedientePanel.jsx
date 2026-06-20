@@ -2,6 +2,18 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { calcPpto, fmt } from '../calc';
 import { ESTADOS_BRIEF_LABELS, ESTADOS_BRIEF_COLORS, ESTADOS_PROPUESTA_LABELS, ESTADOS_PROPUESTA_COLORS, ESTADOS_PPTO_LABELS, ESTADOS_PPTO_COLORS } from '../roles';
+import { generatePdfClienteHTML } from './PdfCliente';
+import { buildPDFHtml as buildProformaPdfHtml } from './Proformas';
+import { generateActaPdfHTML } from './ActaPdfGenerator';
+import { generateScoutingPdfHTML } from './ScoutingPdfGenerator';
+import { generateInformePdfHTML } from './InformePdfGenerator';
+
+function abrirPdf(html) {
+  const w = window.open('', '_blank');
+  if (!w) { alert('Permití ventanas emergentes para ver el PDF'); return; }
+  w.document.write(html);
+  w.document.close();
+}
 
 function fmtDate(s) {
   if (!s) return '—';
@@ -208,12 +220,15 @@ export default function ExpedientePanel({ briefId, onClose }) {
                           <StatusBadge estado={p.estado} tipo="ppto"/>
                         </div>
                         {p.nomenclatura && <div style={{ fontSize:10, color:'#8aa0b8', fontFamily:'monospace', marginBottom:4 }}>{p.nomenclatura}</div>}
-                        <div style={{ display:'flex', gap:12, fontSize:12, color:'#555' }}>
+                        <div style={{ display:'flex', gap:12, fontSize:12, color:'#555', alignItems:'center' }}>
                           <span>💵 {fmt(t.totalSinIva)} s/IVA</span>
                           <span style={{ color: t.margenPct >= 20 ? '#2e8b4e' : '#c8264a' }}>
                             Margen: {t.margenPct.toFixed(1)}%
                           </span>
                           {p.ejecutado && <span style={{ color:'#2e8b4e' }}>✅ Ejecutado</span>}
+                          <button onClick={()=>abrirPdf(generatePdfClienteHTML(p, null))} style={{ marginLeft:'auto', fontSize:11, padding:'3px 9px', borderRadius:6, border:'1px solid #ddd', background:'#fff', cursor:'pointer', color:'#0d3b5e' }}>
+                            📄 PDF cliente
+                          </button>
                         </div>
                       </div>
                     );
@@ -280,10 +295,13 @@ export default function ExpedientePanel({ briefId, onClose }) {
                           </div>
                         )}
                         {a.estado === 'firmada' && (a.firma_entrega_url || a.firma_recibe_url) ? (
-                          <div style={{ display:'flex', gap:8, marginTop:8 }}>
+                          <div style={{ display:'flex', gap:8, marginTop:8, alignItems:'center' }}>
                             {a.firma_entrega_url && <img src={a.firma_entrega_url} alt="" style={{ height:42, border:'1px solid #ddd', borderRadius:5 }}/>}
                             {a.firma_recibe_url && <img src={a.firma_recibe_url} alt="" style={{ height:42, border:'1px solid #ddd', borderRadius:5 }}/>}
                             {(a.fotos||[]).slice(0,3).map((f,i) => <img key={i} src={f} alt="" style={{ height:42, width:42, objectFit:'cover', border:'1px solid #ddd', borderRadius:5 }}/>)}
+                            <button onClick={()=>abrirPdf(generateActaPdfHTML(a))} style={{ marginLeft:'auto', fontSize:11, padding:'3px 9px', borderRadius:6, border:'1px solid #ddd', background:'#fff', cursor:'pointer', color:'#0d3b5e' }}>
+                              📄 PDF
+                            </button>
                           </div>
                         ) : (
                           <button onClick={()=>{
@@ -315,8 +333,13 @@ export default function ExpedientePanel({ briefId, onClose }) {
                         </div>
                         <div style={{ fontSize:12, color:'#555' }}>📷 {(s.fotos||[]).length} fotos</div>
                         {(s.fotos||[]).length > 0 ? (
-                          <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap' }}>
+                          <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap', alignItems:'center' }}>
                             {s.fotos.slice(0,4).map((f,i) => <img key={i} src={f.url} alt="" style={{ height:42, width:42, objectFit:'cover', border:'1px solid #ddd', borderRadius:5 }}/>)}
+                            {s.estado === 'completado' && (
+                              <button onClick={()=>abrirPdf(generateScoutingPdfHTML(s))} style={{ marginLeft:'auto', fontSize:11, padding:'3px 9px', borderRadius:6, border:'1px solid #ddd', background:'#fff', cursor:'pointer', color:'#0d3b5e' }}>
+                                📄 PDF
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <button onClick={()=>{
@@ -347,7 +370,14 @@ export default function ExpedientePanel({ briefId, onClose }) {
                             {inf.estado === 'generado' ? '✓ Generado' : 'En borrador'}
                           </span>
                         </div>
-                        <div style={{ fontSize:12, color:'#555' }}>{incluidos} ítem(s) incluido(s)</div>
+                        <div style={{ fontSize:12, color:'#555', display:'flex', alignItems:'center', gap:8 }}>
+                          <span>{incluidos} ítem(s) incluido(s)</span>
+                          {inf.estado === 'generado' && (
+                            <button onClick={()=>abrirPdf(generateInformePdfHTML(inf))} style={{ marginLeft:'auto', fontSize:11, padding:'3px 9px', borderRadius:6, border:'1px solid #ddd', background:'#fff', cursor:'pointer', color:'#0d3b5e' }}>
+                              📄 PDF
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })
@@ -399,6 +429,9 @@ export default function ExpedientePanel({ briefId, onClose }) {
                           </div>
                           <span style={{fontSize:11,padding:'2px 8px',borderRadius:999,background:color+'22',color,fontWeight:600}}>{pf.estado}</span>
                         </div>
+                        <button onClick={()=>abrirPdf(buildProformaPdfHtml(pf))} style={{ marginTop:6, fontSize:11, padding:'3px 9px', borderRadius:6, border:'1px solid #ddd', background:'#fff', cursor:'pointer', color:'#0d3b5e' }}>
+                          📄 PDF cliente
+                        </button>
                       </div>
                     );
                   })}
