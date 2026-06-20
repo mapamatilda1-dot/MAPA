@@ -47,13 +47,17 @@ const TAB_CONFIG = {
   admin_panel:      { label: 'Admin',           icon: '⚙' },
 };
 
-// Orden visual con agrupación: notificaciones, calendario, crm, [Creatividad], [Producción], implementaciones, dashboard, admin
-// Cada entrada es { group: 'Etiqueta'|null, tabs: [...] } — separadores visuales entre grupos distintos
-const NAV_ORDER = [
-  { group: null,          tabs: ['calendario', 'crm'] },
-  { group: 'Creatividad', tabs: ['briefs', 'propuestas'] },
-  { group: 'Producción',  tabs: ['presupuestos', 'proformas', 'scouting', 'solicitudes', 'liquidaciones', 'actas'] },
-  { group: null,          tabs: ['implementaciones', 'dashboard', 'admin_panel'] },
+// 8 grupos principales de navegación. Los que tienen 'tabs' con más de 1 elemento
+// muestran una segunda fila con sub-pestañas cuando están activos.
+const NAV_GROUPS = [
+  { id: 'notificaciones',   label: 'Notificaciones', icon: '🔔', tabs: ['notificaciones'] },
+  { id: 'calendario',       label: 'Calendario',     icon: '📅', tabs: ['calendario'] },
+  { id: 'crm',              label: 'CRM',             icon: '◎', tabs: ['crm'] },
+  { id: 'creatividad',      label: 'Creatividad',    icon: '◈', tabs: ['briefs', 'propuestas'] },
+  { id: 'produccion',       label: 'Producción',     icon: '💰', tabs: ['presupuestos', 'proformas', 'scouting', 'solicitudes', 'liquidaciones', 'actas'] },
+  { id: 'implementaciones', label: 'Implementac.',   icon: '⚙️', tabs: ['implementaciones'] },
+  { id: 'dashboard',        label: 'Dashboard',      icon: '📊', tabs: ['dashboard'] },
+  { id: 'admin_panel',      label: 'Admin',          icon: '⚙', tabs: ['admin_panel'] },
 ];
 
 // Ruta pública sin login: /acta/{token}, /scouting/{token}, /informe/{token}
@@ -192,69 +196,73 @@ export default function App() {
         </button>
       </header>
 
-      {/* Navigation */}
+      {/* Navigation — fila 1: grupos principales */}
       <nav style={{
         background: '#fff', borderBottom: '1px solid #e8e8e8',
         display: 'flex', padding: '0 1.5rem', overflowX: 'auto',
         gap: 2,
       }}>
-        {/* Notificaciones siempre visible */}
-        {(()=>{
-          const cfg = TAB_CONFIG['notificaciones'];
-          const isActive = activeTab === 'notificaciones';
+        {NAV_GROUPS.map(group => {
+          const visibleSubTabs = group.tabs.filter(t => tabs.includes(t));
+          if (visibleSubTabs.length === 0) return null;
+          const isActiveGroup = visibleSubTabs.includes(activeTab);
           return (
-            <button key="notificaciones" onClick={()=>setActiveTab('notificaciones')} style={{
-              display:'flex',alignItems:'center',gap:5,
-              padding:'12px 14px',background:'transparent',
-              border:'none',borderBottom:isActive?'2px solid #c8264a':'2px solid transparent',
-              fontSize:13,fontWeight:isActive?600:400,
-              color:isActive?'#c8264a':'#666',
-              cursor:'pointer',whiteSpace:'nowrap',
-              transition:'color .15s, border-color .15s',
-            }}>
-              <span style={{fontSize:13}}>{cfg.icon}</span>
-              {cfg.label}
-              {/* Badge de pendientes — se calcula en el componente */}
+            <button
+              key={group.id}
+              onClick={() => setActiveTab(visibleSubTabs.includes(activeTab) ? activeTab : visibleSubTabs[0])}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '12px 14px', background: 'transparent',
+                border: 'none', borderBottom: isActiveGroup ? '2px solid #0d3b5e' : '2px solid transparent',
+                fontSize: 13, fontWeight: isActiveGroup ? 600 : 400,
+                color: isActiveGroup ? '#0d3b5e' : '#666',
+                cursor: 'pointer', whiteSpace: 'nowrap',
+                transition: 'color .15s, border-color .15s',
+              }}
+            >
+              <span style={{ fontSize: 13 }}>{group.icon}</span>
+              {group.label}
             </button>
-          );
-        })()}
-        {tabs.length > 0 && NAV_ORDER.map((section, sIdx) => {
-          const visibleTabs = section.tabs.filter(t => tabs.includes(t));
-          if (visibleTabs.length === 0) return null;
-          return (
-            <div key={sIdx} style={{ display:'flex', alignItems:'center' }}>
-              {sIdx > 0 && <div style={{ width:1, height:24, background:'#e0e0e0', margin:'0 6px' }}/>}
-              {section.group && (
-                <span style={{ fontSize:10, fontWeight:700, color:'#aab4c0', textTransform:'uppercase', letterSpacing:'.06em', padding:'0 6px 0 2px', whiteSpace:'nowrap' }}>
-                  {section.group}
-                </span>
-              )}
-              {visibleTabs.map(tab => {
-                const cfg = TAB_CONFIG[tab] || { label: tab, icon: '' };
-                const isActive = activeTab === tab;
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 5,
-                      padding: '12px 14px', background: 'transparent',
-                      border: 'none', borderBottom: isActive ? '2px solid #0d3b5e' : '2px solid transparent',
-                      fontSize: 13, fontWeight: isActive ? 600 : 400,
-                      color: isActive ? '#0d3b5e' : '#666',
-                      cursor: 'pointer', whiteSpace: 'nowrap',
-                      transition: 'color .15s, border-color .15s',
-                    }}
-                  >
-                    <span style={{ fontSize: 13 }}>{cfg.icon}</span>
-                    {cfg.label}
-                  </button>
-                );
-              })}
-            </div>
           );
         })}
       </nav>
+
+      {/* Navigation — fila 2: sub-pestañas del grupo activo (solo si tiene más de 1) */}
+      {(() => {
+        const activeGroup = NAV_GROUPS.find(g => g.tabs.includes(activeTab));
+        const visibleSubTabs = activeGroup ? activeGroup.tabs.filter(t => tabs.includes(t)) : [];
+        if (!activeGroup || visibleSubTabs.length <= 1) return null;
+        return (
+          <nav style={{
+            background: '#fafbfc', borderBottom: '1px solid #e8e8e8',
+            display: 'flex', padding: '0 1.5rem', overflowX: 'auto',
+            gap: 2,
+          }}>
+            {visibleSubTabs.map(tab => {
+              const cfg = TAB_CONFIG[tab] || { label: tab, icon: '' };
+              const isActive = activeTab === tab;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    padding: '9px 14px', background: 'transparent',
+                    border: 'none', borderBottom: isActive ? '2px solid #7c3aed' : '2px solid transparent',
+                    fontSize: 12, fontWeight: isActive ? 600 : 400,
+                    color: isActive ? '#7c3aed' : '#888',
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    transition: 'color .15s, border-color .15s',
+                  }}
+                >
+                  <span style={{ fontSize: 12 }}>{cfg.icon}</span>
+                  {cfg.label}
+                </button>
+              );
+            })}
+          </nav>
+        );
+      })()}
 
       {/* Content */}
       <main style={{ flex: 1, padding: '1.5rem', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
