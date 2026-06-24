@@ -395,7 +395,8 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     setP(prev => ({
       ...prev,
       cliente: n,
-      apply_rebate: feeData?.bco ?? n.toUpperCase().includes('TESALIA'),
+      // El rebate es exclusivo de TESALIA — no debe depender del flag bco (que es otro concepto: Banco)
+      apply_rebate: n.toUpperCase().includes('TESALIA'),
       ...(feeData?.fee !== undefined ? { fee_agencia: feeData.fee } : {}),
     }));
   }
