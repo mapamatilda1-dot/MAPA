@@ -38,14 +38,23 @@ export default function ScoutingPublico({ token }) {
   async function uploadFoto(file) {
     setUploadingFoto(true);
     const ext = file.name.split('.').pop();
-    const fileName = `${token}/foto_${Date.now()}.${ext}`;
+    const fileName = `${token}/foto_${Date.now()}_${Math.random().toString(36).slice(2,7)}.${ext}`;
     const { error } = await supabase.storage.from('scouting').upload(fileName, file);
     if (error) { alert('Error subiendo foto: ' + error.message); setUploadingFoto(false); return; }
     const { data: urlData } = supabase.storage.from('scouting').getPublicUrl(fileName);
-    const nuevasFotos = [...fotos, { url: urlData.publicUrl, comentario: '' }];
-    setFotos(nuevasFotos);
+    let nuevasFotos;
+    setFotos(prev => {
+      nuevasFotos = [...prev, { url: urlData.publicUrl, comentario: '' }];
+      return nuevasFotos;
+    });
     await guardarParcial({ fotos: nuevasFotos });
     setUploadingFoto(false);
+  }
+
+  async function uploadFotos(files) {
+    for (const file of files) {
+      await uploadFoto(file);
+    }
   }
 
   function actualizarComentarioFoto(idx, texto) {
@@ -161,9 +170,13 @@ export default function ScoutingPublico({ token }) {
         </div>
         {!completado && (
           <label style={{ display:'inline-block', cursor:'pointer', marginTop:10 }}>
-            <input type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={e=>{ const f=e.target.files[0]; if(f) uploadFoto(f); }}/>
+            <input type="file" accept="image/*" multiple style={{ display:'none' }} onChange={e=>{ 
+              const files = Array.from(e.target.files);
+              uploadFotos(files);
+              e.target.value = '';
+            }}/>
             <span style={{ ...S.btn, background:'#eef4fb', color:'#0d3b5e', display:'inline-block' }}>
-              {uploadingFoto ? 'Subiendo...' : '📷 Agregar foto'}
+              {uploadingFoto ? 'Subiendo...' : '📷 Agregar fotos'}
             </span>
           </label>
         )}
