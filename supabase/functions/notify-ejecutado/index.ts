@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SMTP_HOST     = Deno.env.get('SMTP_HOST')!;
 const SMTP_PORT     = parseInt(Deno.env.get('SMTP_PORT') || '465');
@@ -29,12 +28,7 @@ async function sendEmail(to: string[], subject: string, html: string) {
     `--${boundary}--`,
   ].join('\r\n');
 
-  // Conectar via SMTP usando Deno
-  const conn = await Deno.connectTls({
-    hostname: SMTP_HOST,
-    port: SMTP_PORT,
-  });
-
+  const conn = await Deno.connectTls({ hostname: SMTP_HOST, port: SMTP_PORT });
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
 
@@ -43,31 +37,25 @@ async function sendEmail(to: string[], subject: string, html: string) {
     const n = await conn.read(buf);
     return decoder.decode(buf.subarray(0, n!));
   }
-
   async function write(s: string) {
     await conn.write(encoder.encode(s + '\r\n'));
   }
 
-  await read(); // 220 greeting
+  await read();
   await write(`EHLO matilda.agency`);
-  await read(); // EHLO response
-
-  // AUTH LOGIN
+  await read();
   await write('AUTH LOGIN');
   await read();
   await write(btoa(SMTP_USER));
   await read();
   await write(btoa(SMTP_PASS));
-  await read(); // 235 authenticated
-
+  await read();
   await write(`MAIL FROM:<${SMTP_USER}>`);
   await read();
-
   for (const addr of to) {
     await write(`RCPT TO:<${addr}>`);
     await read();
   }
-
   await write('DATA');
   await read();
   await write(message + '\r\n.');
@@ -76,46 +64,65 @@ async function sendEmail(to: string[], subject: string, html: string) {
   conn.close();
 }
 
+// Calcula el total sin IVA de un presupuesto a partir de sus items,
+// replicando con fidelidad la fórmula real del Hub (calc.js):
+// el OH y el BCO son % POR ÍTEM (it.oh_pct / it.bco_pct), no campos
+// globales del presupuesto, y cada ítem se multiplica por cantidad * dias.
+function calcularTotales(record: any) {
+  const items = (record.items || []).filter((it: any) => !it._type);
+  const fee = (record.fee_agencia || 0) / 100;
+
+  let subtotalPrecio = 0;
+  let subtotalCostoBase = 0;
+
+  for (const it of items) {
+    const cantidad = Number(it.cantidad ?? 1);
+    const dias     = Number(it.dias ?? 1);
+    const costoUnit  = Number(it.costo_unit ?? it.costo ?? 0);
+    const precioUnit = Number(it.precio_unit ?? 0);
+    subtotalCostoBase += costoUnit * cantidad * dias;
+    subtotalPrecio    += precioUnit * cantidad * dias;
+  }
+
+  const feeAgencia     = subtotalPrecio * fee;
+  const subtotalSinIva = subtotalPrecio + feeAgencia;
+  const iva            = subtotalSinIva * 0.15;
+  const totalConIva    = subtotalSinIva + iva;
+  const margen         = subtotalSinIva - subtotalCostoBase;
+  const margenPct      = subtotalSinIva > 0 ? (margen / subtotalSinIva) * 100 : 0;
+
+  return { subtotalPrecio, subtotalCostoBase, feeAgencia, subtotalSinIva, iva, totalConIva, margen, margenPct };
+}
+
 serve(async (req) => {
   try {
     const payload = await req.json();
     const record = payload.record;
-
-    // Solo disparar cuando ejecutado cambia a true
-    if (!record || !record.ejecutado) {
-      return new Response(JSON.stringify({ ok: true, skipped: true }), { status: 200 });
-    }
-
     const oldRecord = payload.old_record;
-    if (oldRecord?.ejecutado === true) {
-      return new Response(JSON.stringify({ ok: true, skipped: 'already ejecutado' }), { status: 200 });
+
+    // Solo nos interesan presupuestos que ESTÁN ejecutados ahora.
+    if (!record || !record.ejecutado) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'not ejecutado' }), { status: 200 });
     }
 
-    // Calcular totales básicos desde items
-    const items = (record.items || []).filter((it: any) => !it._type);
-    const oh    = record.oh_pct / 100;
-    const bco   = record.bco_pct / 100;
-    const fee   = record.fee_agencia / 100;
+    // Detectar si este update es relevante para reenviar el correo:
+    // (a) Recién se marcó como ejecutado (oldRecord.ejecutado era false/null), o
+    // (b) Ya estaba ejecutado, pero el monto cambió desde el último envío
+    //     (ej: el admin corrigió el precio después de marcar ejecutado).
+    const recienEjecutado = !(oldRecord?.ejecutado === true);
 
-    let subtotalPrecio = 0;
-    let subtotalCosto  = 0;
+    const totalesNuevo = calcularTotales(record);
+    const totalesViejo = oldRecord ? calcularTotales(oldRecord) : null;
+    const montoCambio = totalesViejo
+      ? Math.abs(totalesNuevo.subtotalSinIva - totalesViejo.subtotalSinIva) > 0.01
+      : false;
 
-    for (const it of items) {
-      const qty   = Number(it.cantidad || 0);
-      const price = Number(it.precio_unit || 0);
-      const cost  = Number(it.costo_unit || 0);
-      subtotalPrecio += qty * price;
-      subtotalCosto  += qty * cost;
+    if (!recienEjecutado && !montoCambio) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'ya ejecutado, sin cambio de monto' }), { status: 200 });
     }
 
-    const totalOH       = subtotalCosto * oh;
-    const totalCosto    = subtotalCosto + totalOH;
-    const feeAgencia    = subtotalPrecio * fee;
-    const subtotalSinIva = subtotalPrecio + feeAgencia;
-    const iva           = subtotalSinIva * 0.15;
-    const totalConIva   = subtotalSinIva + iva;
-    const margen        = subtotalSinIva - totalCosto;
-    const margenPct     = subtotalSinIva > 0 ? (margen / subtotalSinIva) * 100 : 0;
+    const t = totalesNuevo;
+    const esCorreccion = !recienEjecutado && montoCambio;
 
     const html = `
 <!DOCTYPE html>
@@ -129,7 +136,7 @@ serve(async (req) => {
     .header h1 { color: #fff; margin: 0; font-size: 20px; }
     .header p { color: rgba(255,255,255,0.7); margin: 6px 0 0; font-size: 13px; }
     .body { padding: 28px 32px; }
-    .badge { display: inline-block; background: #e8f5ee; color: #2e8b4e; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-bottom: 20px; }
+    .badge { display: inline-block; background: ${esCorreccion ? '#fff3da' : '#e8f5ee'}; color: ${esCorreccion ? '#a07020' : '#2e8b4e'}; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-bottom: 20px; }
     .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
     .row:last-child { border-bottom: none; }
     .label { color: #888; }
@@ -137,18 +144,18 @@ serve(async (req) => {
     .total-box { background: #0d3b5e; border-radius: 10px; padding: 16px 20px; margin: 20px 0; }
     .total-box .t-label { color: rgba(255,255,255,0.7); font-size: 12px; margin-bottom: 4px; }
     .total-box .t-value { color: #fff; font-size: 22px; font-weight: 700; }
-    .margen { background: ${margenPct >= 20 ? '#e8f5ee' : '#fde8ec'}; border-radius: 8px; padding: 10px 16px; margin-top: 12px; font-size: 13px; color: ${margenPct >= 20 ? '#2e8b4e' : '#c8264a'}; font-weight: 600; }
+    .margen { background: ${t.margenPct >= 20 ? '#e8f5ee' : '#fde8ec'}; border-radius: 8px; padding: 10px 16px; margin-top: 12px; font-size: 13px; color: ${t.margenPct >= 20 ? '#2e8b4e' : '#c8264a'}; font-weight: 600; }
     .footer { background: #f8f9fa; padding: 16px 32px; font-size: 12px; color: #aaa; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>✅ Presupuesto ejecutado</h1>
+      <h1>${esCorreccion ? '✏️ Presupuesto ejecutado — monto corregido' : '✅ Presupuesto ejecutado'}</h1>
       <p>Matilda Hub · Notificación automática</p>
     </div>
     <div class="body">
-      <div class="badge">✅ Marcado como ejecutado</div>
+      <div class="badge">${esCorreccion ? '✏️ Monto actualizado después de ejecutado' : '✅ Marcado como ejecutado'}</div>
       <div class="row"><span class="label">Presupuesto</span><span class="value">${record.nombre || '—'}</span></div>
       <div class="row"><span class="label">Cliente</span><span class="value">${record.cliente || '—'}</span></div>
       <div class="row"><span class="label">Código</span><span class="value">${record.nomenclatura || '—'}</span></div>
@@ -157,21 +164,23 @@ serve(async (req) => {
 
       <div class="total-box">
         <div class="t-label">Total s/IVA</div>
-        <div class="t-value">${fmt(subtotalSinIva)}</div>
+        <div class="t-value">${fmt(t.subtotalSinIva)}</div>
       </div>
 
-      <div class="row"><span class="label">Subtotal precio</span><span class="value">${fmt(subtotalPrecio)}</span></div>
-      <div class="row"><span class="label">Fee agencia</span><span class="value">${fmt(feeAgencia)}</span></div>
-      <div class="row"><span class="label">IVA 15%</span><span class="value">${fmt(iva)}</span></div>
-      <div class="row"><span class="label">Total c/IVA</span><span class="value">${fmt(totalConIva)}</span></div>
-      <div class="row"><span class="label">Costo total</span><span class="value">${fmt(totalCosto)}</span></div>
+      <div class="row"><span class="label">Subtotal precio</span><span class="value">${fmt(t.subtotalPrecio)}</span></div>
+      <div class="row"><span class="label">Fee agencia</span><span class="value">${fmt(t.feeAgencia)}</span></div>
+      <div class="row"><span class="label">IVA 15%</span><span class="value">${fmt(t.iva)}</span></div>
+      <div class="row"><span class="label">Total c/IVA</span><span class="value">${fmt(t.totalConIva)}</span></div>
+      <div class="row"><span class="label">Costo total</span><span class="value">${fmt(t.subtotalCostoBase)}</span></div>
 
       <div class="margen">
-        Margen: ${fmt(margen)} (${margenPct.toFixed(1)}%)
+        Margen: ${fmt(t.margen)} (${t.margenPct.toFixed(1)}%)
       </div>
 
       <p style="margin-top:24px; font-size:13px; color:#888;">
-        Este presupuesto está listo para facturar. Por favor actualizá el estado en Matilda Hub.
+        ${esCorreccion
+          ? 'El monto de este presupuesto fue corregido luego de marcarse como ejecutado. Este correo refleja el valor más reciente.'
+          : 'Este presupuesto está listo para facturar. Por favor actualizá el estado en Matilda Hub.'}
       </p>
     </div>
     <div class="footer">Matilda Event Designers · Sistema Matilda Hub</div>
@@ -181,11 +190,11 @@ serve(async (req) => {
 
     await sendEmail(
       NOTIFY_EMAILS,
-      `✅ Ejecutado: ${record.nombre || record.cliente} — ${fmt(subtotalSinIva)}`,
+      `${esCorreccion ? '✏️ Corregido' : '✅ Ejecutado'}: ${record.nombre || record.cliente} — ${fmt(t.subtotalSinIva)}`,
       html,
     );
 
-    return new Response(JSON.stringify({ ok: true, sent: true }), { status: 200 });
+    return new Response(JSON.stringify({ ok: true, sent: true, esCorreccion }), { status: 200 });
 
   } catch (err) {
     console.error('Error:', err);
