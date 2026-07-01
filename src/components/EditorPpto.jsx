@@ -351,11 +351,19 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
   const pptoIdRef = useRef(null);
   useEffect(() => {
     const pptoId = ppto?.id || 'new';
-    // Only reset if the presupuesto ID actually changed
-    if (pptoId === pptoIdRef.current) return;
-    pptoIdRef.current = pptoId;
     // Clear stale draft when switching presupuestos
-    try { sessionStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_TAB); } catch {}
+    if (pptoId !== pptoIdRef.current) {
+      pptoIdRef.current = pptoId;
+      try { sessionStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_TAB); } catch {}
+    } else {
+      // Mismo presupuesto — solo actualizar si el prop trae datos más nuevos
+      // (ej: otro usuario guardó cambios y Presupuestos.jsx recargó la lista)
+      // No sobreescribir si hay cambios locales sin guardar (comparamos updated_at)
+      if (!ppto || !p.id) return;
+      const propUpdated = ppto.updated_at || '';
+      const localUpdated = p.updated_at || '';
+      if (propUpdated <= localUpdated) return; // el local es igual o más nuevo
+    }
     if (ppto) {
       const items = (ppto.items||[]).map(it=>({
         ...it,
@@ -1209,9 +1217,9 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                                 <span style={{fontSize:15,fontWeight:700,color:c.margen>=0?'#2e8b4e':'#c8264a'}}>{fmt(c.margen)} ({fmtPct(c.margenPct)})</span>
                               </div>
 
-                              <div><Label>Razón social proveedor</Label><input style={S.input} value={it.proveedor||''} onChange={e=>updItem(it.id,'proveedor',e.target.value)}/></div>
-                              <div><Label># Factura proveedor</Label><input style={S.input} value={it.num_factura_prov||''} onChange={e=>updItem(it.id,'num_factura_prov',e.target.value)} placeholder="Ej: 001-001-000123456"/></div>
-                              <div><Label>Info general</Label><input style={S.input} value={it.info||''} onChange={e=>updItem(it.id,'info',e.target.value)}/></div>
+                              <div><Label>Razón social proveedor</Label><input style={S.input} value={it.proveedor||''} onChange={e=>updItem(it.id,'proveedor',e.target.value)} onBlur={save}/></div>
+                              <div><Label># Factura proveedor</Label><input style={S.input} value={it.num_factura_prov||''} onChange={e=>updItem(it.id,'num_factura_prov',e.target.value)} onBlur={save} placeholder="Ej: 001-001-000123456"/></div>
+                              <div><Label>Info general</Label><input style={S.input} value={it.info||''} onChange={e=>updItem(it.id,'info',e.target.value)} onBlur={save}/></div>
 
                               {/* CONDICIÓN DE PAGO */}
                               <div style={{gridColumn:'1/-1',background:'#fdf8ee',borderRadius:8,padding:'10px 12px',border:'1px solid #e8d8a0'}}>

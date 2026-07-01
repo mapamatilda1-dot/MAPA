@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const ZOHO_USER = Deno.env.get('ZOHO_USER') || 'camille@matilda.agency';
 const ZOHO_PASS = Deno.env.get('ZOHO_PASS') || '';
-const DESTINOS  = ['camille@matilda.agency','mariajose@matilda.agency','carlos@matilda.agency','wendy@matilda.agency','camilo@matilda.agency'];
+const DESTINOS  = ['camille@matilda.agency','mariajose@matilda.agency','carlos@matilda.agency','wendy@matilda.agency','camilo@matilda.agency','mariaisabel@matilda.agency'];
 
 async function sendEmail(to: string[], subject: string, html: string) {
   const msg = [`From: Matilda Hub <${ZOHO_USER}>`,`To: ${to.join(', ')}`,`Subject: ${subject}`,`MIME-Version: 1.0`,`Content-Type: text/html; charset=UTF-8`,``,html].join('\r\n');

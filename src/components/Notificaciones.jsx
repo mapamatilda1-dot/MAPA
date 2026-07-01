@@ -11,6 +11,7 @@ const NOTIF_CONFIG = {
   'carlos@matilda.agency':      ['briefs_nuevos'],
   'wendy@matilda.agency':       ['briefs_nuevos', 'presupuestos_aprobado', 'solicitudes_aprobadas'],
   'camilo@matilda.agency':      ['briefs_nuevos', 'presupuestos_enviados', 'presupuestos_aprobado'],
+  'mariaisabel@matilda.agency': ['briefs_nuevos', 'presupuestos_enviados', 'presupuestos_aprobado'],
 };
 // Producción (juan, firi, cindry, mariaeugenia) — por rol
 const NOTIF_POR_ROL = {
