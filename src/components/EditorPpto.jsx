@@ -351,30 +351,24 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
   const pptoIdRef = useRef(null);
   useEffect(() => {
     const pptoId = ppto?.id || 'new';
-    // Clear stale draft when switching presupuestos
-    if (pptoId !== pptoIdRef.current) {
-      pptoIdRef.current = pptoId;
-      try { sessionStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_TAB); } catch {}
-    } else {
-      // Mismo presupuesto — solo actualizar si el prop trae datos más nuevos
-      // (ej: otro usuario guardó cambios y Presupuestos.jsx recargó la lista)
-      // No sobreescribir si hay cambios locales sin guardar (comparamos updated_at)
-      if (!ppto || !p.id) return;
-      const propUpdated = ppto.updated_at || '';
-      const localUpdated = p.updated_at || '';
-      if (propUpdated <= localUpdated) return; // el local es igual o más nuevo
-    }
-    if (ppto) {
-      const items = (ppto.items||[]).map(it=>({
-        ...it,
-        costo_unit:      it.costo_unit      ?? it.costo ?? 0,
-        costo_real_unit: it.costo_real_unit ?? null,
-        precio_unit:     it.precio_unit     ?? it.precio ?? 0,
-        cantidad:        it.cantidad        ?? 1,
-        dias:            it.dias            ?? 1,
-      }));
-      setP({...JSON.parse(JSON.stringify(ppto)), items});
-    } else {
+    if (pptoId === pptoIdRef.current) return;
+    pptoIdRef.current = pptoId;
+    try { sessionStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_TAB); } catch {}
+    if (ppto?.id) {
+      // Siempre cargar datos frescos desde DB para evitar que se muestren datos viejos del prop
+      supabase.from('presupuestos').select('*').eq('id', ppto.id).single().then(({ data: fresh }) => {
+        const source = fresh || ppto;
+        const items = (source.items||[]).map(it=>({
+          ...it,
+          costo_unit:      it.costo_unit      ?? it.costo ?? 0,
+          costo_real_unit: it.costo_real_unit ?? null,
+          precio_unit:     it.precio_unit     ?? it.precio ?? 0,
+          cantidad:        it.cantidad        ?? 1,
+          dias:            it.dias            ?? 1,
+        }));
+        setP({...JSON.parse(JSON.stringify(source)), items});
+      });
+    } else if (!ppto) {
       setP({
         nombre:'', cliente:'', fecha_evento:new Date().toISOString().slice(0,10),
         ciudad:'Guayaquil', lugar:'', horario:'', personas:0, dias_evento:1,
@@ -387,9 +381,20 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
         ejecutado: false, cerrado_produccion: false,
         ejecutivo_nombre:'', ejecutivo_email:'',
       });
+    } else {
+      // ppto sin id (nuevo) — usar el prop directamente
+      const items = (ppto.items||[]).map(it=>({
+        ...it,
+        costo_unit:      it.costo_unit      ?? it.costo ?? 0,
+        costo_real_unit: it.costo_real_unit ?? null,
+        precio_unit:     it.precio_unit     ?? it.precio ?? 0,
+        cantidad:        it.cantidad        ?? 1,
+        dias:            it.dias            ?? 1,
+      }));
+      setP({...JSON.parse(JSON.stringify(ppto)), items});
     }
     setTab('info');
-  }, [ppto, cfg]);
+  }, [ppto?.id, cfg]);
 
   function showToast(m){setToast(m);setTimeout(()=>setToast(''),2500);}
   function setField(k,v){setP(prev=>({...prev,[k]:v}));}
