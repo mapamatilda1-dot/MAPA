@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase';
 import { notifyBriefNuevo } from '../notifyHelper';
 import { canCreateBrief, canEditBrief, canDeleteBrief, ESTADOS_BRIEF, ESTADOS_BRIEF_LABELS, ESTADOS_BRIEF_COLORS } from '../roles';
 import ExpedientePanel from './ExpedientePanel';
+import ListadoProduccion from './ListadoProduccion';
+import PropuestasTab from './Propuestas';
 
 const TIPOS_EVENTO = ['Corporativo', 'Lanzamiento', 'Fiesta', 'Congreso', 'Capacitación', 'Otro'];
 
@@ -205,8 +207,10 @@ export default function Briefs({ userRole, userEmail }) {
   const [clientes, setClientes]     = useState([]);
   const [ejecutivos, setEjecutivos] = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [view, setView]             = useState('list'); // list | form
+  const [view, setView]             = useState('list'); // list | form | detail
   const [editBrief, setEditBrief]   = useState(null);
+  const [detailBrief, setDetailBrief] = useState(null);
+  const [detailTab, setDetailTab]   = useState('info'); // info | propuestas | listado
   const [detalle, setDetalle]       = useState(null);
   const [expedienteId, setExpedienteId] = useState(null);
   const [modalCambios, setModalCambios] = useState(null); // { brief, nuevoEstado }
@@ -312,6 +316,84 @@ export default function Briefs({ userRole, userEmail }) {
   if (loading) return <div style={{ padding:'2rem', textAlign:'center', color:'#888' }}>Cargando proyectos…</div>;
 
   // ── Formulario ────────────────────────────────────────────
+  if (view === 'detail' && detailBrief) {
+    const subTabs = [
+      { id:'info',      label:'📋 Info del proyecto' },
+      { id:'propuestas',label:'◈ Propuestas' },
+      { id:'listado',   label:'🔧 Listado de producción' },
+    ];
+    return (
+      <div>
+        {/* Header */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
+          <button onClick={()=>{ setView('list'); setDetailBrief(null); }} style={{ background:'none', border:'none', cursor:'pointer', color:'#0d3b5e', fontSize:20, padding:4 }}>←</button>
+          <div>
+            <div style={{ fontSize:18, fontWeight:700, color:'#0d3b5e' }}>{detailBrief.nombre}</div>
+            <div style={{ fontSize:12, color:'#8aa0b8' }}>{detailBrief.cliente_nombre} · {ESTADOS_BRIEF_LABELS[detailBrief.estado] || detailBrief.estado}</div>
+          </div>
+          <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
+            {canEdit && <button onClick={()=>{ setEditBrief(detailBrief); setView('form'); }} style={{ padding:'6px 14px', borderRadius:8, border:'1px solid #ddd', background:'#fff', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>✏️ Editar</button>}
+          </div>
+        </div>
+
+        {/* Sub-tabs */}
+        <div style={{ display:'flex', gap:2, borderBottom:'2px solid #eef2f7', marginBottom:20 }}>
+          {subTabs.map(t => (
+            <button key={t.id} onClick={()=>setDetailTab(t.id)} style={{
+              padding:'9px 16px', background:'transparent', border:'none',
+              borderBottom: detailTab===t.id ? '2px solid #7c3aed' : '2px solid transparent',
+              fontSize:13, fontWeight: detailTab===t.id ? 600 : 400,
+              color: detailTab===t.id ? '#7c3aed' : '#666',
+              cursor:'pointer', marginBottom:-2, whiteSpace:'nowrap',
+              transition:'color .15s, border-color .15s',
+            }}>{t.label}</button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        {detailTab === 'info' && (
+          <div style={{ background:'#fff', border:'1px solid #dde6ef', borderRadius:12, padding:20 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+              {[
+                ['Cliente', detailBrief.cliente_nombre],
+                ['Estado', ESTADOS_BRIEF_LABELS[detailBrief.estado] || detailBrief.estado],
+                ['Fecha entrega', detailBrief.fecha_entrega],
+                ['Fecha evento', detailBrief.fecha_evento],
+                ['Lugar', detailBrief.lugar],
+                ['Ciudad', detailBrief.ciudad],
+                ['PAX', detailBrief.pax],
+                ['Ejecutivo', detailBrief.ejecutivo_nombre],
+              ].map(([label, value]) => value ? (
+                <div key={label}>
+                  <div style={{ fontSize:10, fontWeight:700, color:'#8aa0b8', textTransform:'uppercase', letterSpacing:.5, marginBottom:3 }}>{label}</div>
+                  <div style={{ fontSize:14, color:'#0d3b5e', fontWeight:500 }}>{value}</div>
+                </div>
+              ) : null)}
+            </div>
+            {detailBrief.descripcion && (
+              <div style={{ marginTop:16, paddingTop:16, borderTop:'1px solid #eef2f7' }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#8aa0b8', textTransform:'uppercase', letterSpacing:.5, marginBottom:6 }}>Descripción</div>
+                <div style={{ fontSize:13, color:'#333', lineHeight:1.7, whiteSpace:'pre-wrap' }}>{detailBrief.descripcion}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {detailTab === 'propuestas' && (
+          <PropuestasTab userRole={userRole} userEmail={userEmail} briefFiltroId={detailBrief.id} />
+        )}
+
+        {detailTab === 'listado' && (
+          <ListadoProduccion
+            briefId={detailBrief.id}
+            briefNombre={detailBrief.nombre}
+            clienteNombre={detailBrief.cliente_nombre}
+          />
+        )}
+      </div>
+    );
+  }
+
   if (view === 'form') return (
     <div>
       <div style={{ fontSize:16, fontWeight:500, marginBottom:'1rem' }}>{editBrief ? 'Editar proyecto' : 'Nuevo proyecto'}</div>
@@ -376,7 +458,10 @@ export default function Briefs({ userRole, userEmail }) {
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                    <span style={{ fontWeight:500, fontSize:15 }}>{b.nombre}</span>
+                    <span onClick={()=>{ setDetailBrief(b); setDetailTab('info'); setView('detail'); }}
+                      style={{ fontWeight:500, fontSize:15, cursor:'pointer', color:'#0d3b5e', textDecoration:'underline', textDecorationColor:'#c8d4e0' }}>
+                      {b.nombre}
+                    </span>
                     <StatusChip estado={b.estado}/>
                     <DaysChip days={days} estado={b.estado}/>
                   </div>

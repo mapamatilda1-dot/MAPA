@@ -45,7 +45,7 @@ function Btn({ onClick, variant='primary', size='md', disabled, children }) {
   return <button onClick={onClick} disabled={disabled} style={{...base,...variants[variant],...sizes[size]}}>{children}</button>;
 }
 
-export default function Propuestas({ userRole, userEmail }) {
+export default function Propuestas({ userRole, userEmail, briefFiltroId }) {
   const [propuestas, setPropuestas] = useState([]);
   const [briefs, setBriefs]         = useState([]);
   const [clientes, setClientes]     = useState([]);
@@ -110,7 +110,9 @@ export default function Propuestas({ userRole, userEmail }) {
     setPropuestas(prev => prev.map(p => p.id === id ? { ...p, estado } : p));
   }
 
-  const filtered = propuestas.filter(p => filter === 'todos' || p.estado === filter);
+  const filtered = propuestas
+    .filter(p => !briefFiltroId || p.brief_id === briefFiltroId)
+    .filter(p => filter === 'todos' || p.estado === filter);
 
   if (loading) return <div style={{ padding:'2rem', textAlign:'center', color:'#888' }}>Cargando propuestas…</div>;
 
@@ -125,7 +127,7 @@ export default function Propuestas({ userRole, userEmail }) {
             </button>
           ))}
         </div>
-        {canCreate && <Btn size="sm" onClick={()=>{ setForm({ brief_id:'', cliente_id:'', titulo:'', canva_url:'', notas:'', estado:'borrador' }); setModal('new'); }}>+ Nueva propuesta</Btn>}
+        {canCreate && <Btn size="sm" onClick={()=>{ setForm({ brief_id: briefFiltroId||'', cliente_id:'', titulo:'', canva_url:'', notas:'', estado:'borrador' }); setModal('new'); }}>+ Nueva propuesta</Btn>}
       </div>
 
       {/* Stats */}
