@@ -4,7 +4,6 @@ import { notifyBriefNuevo } from '../notifyHelper';
 import { canCreateBrief, canEditBrief, canDeleteBrief, ESTADOS_BRIEF, ESTADOS_BRIEF_LABELS, ESTADOS_BRIEF_COLORS } from '../roles';
 import ExpedientePanel from './ExpedientePanel';
 import ListadoProduccion from './ListadoProduccion';
-import PropuestasTab from './Propuestas';
 
 const TIPOS_EVENTO = ['Corporativo', 'Lanzamiento', 'Fiesta', 'Congreso', 'Capacitación', 'Otro'];
 
@@ -73,7 +72,7 @@ function BriefForm({ clientes, ejecutivos, onSave, onCancel, initial = {}, isEdi
     fecha_entrega: '', fecha_evento: '', ciudad: 'Guayaquil', lugar: '',
     horario: '', pax: '', dias_evento: 1, descripcion: '', notas: '',
     responsable: '', estado: 'pendiente', presupuesto_estimado: '',
-    archivo_nombre: '', archivo_url: '',
+    archivo_nombre: '', archivo_url: '', link_canva: '',
     ...initial,
   });
   const [uploading, setUploading] = useState(false);
@@ -178,6 +177,10 @@ function BriefForm({ clientes, ejecutivos, onSave, onCancel, initial = {}, isEdi
         <div style={{ gridColumn:'1/-1' }}>
           <label style={lbl}>Notas internas</label>
           <textarea value={form.notas} onChange={e=>set('notas',e.target.value)} style={{...inp, minHeight:60, resize:'vertical'}} placeholder="Observaciones del equipo..."/>
+        </div>
+        <div style={{ gridColumn:'1/-1' }}>
+          <label style={lbl}>Link de Canva (opcional)</label>
+          <input value={form.link_canva} onChange={e=>set('link_canva',e.target.value)} style={inp} placeholder="https://www.canva.com/design/..."/>
         </div>
         <div style={{ gridColumn:'1/-1' }}>
           <label style={lbl}>Adjuntar brief (PDF / PPT)</label>
@@ -319,7 +322,6 @@ export default function Briefs({ userRole, userEmail }) {
   if (view === 'detail' && detailBrief) {
     const subTabs = [
       { id:'info',      label:'📋 Info del proyecto' },
-      { id:'propuestas',label:'◈ Propuestas' },
       { id:'listado',   label:'🔧 Listado de producción' },
     ];
     return (
@@ -376,11 +378,13 @@ export default function Briefs({ userRole, userEmail }) {
                 <div style={{ fontSize:13, color:'#333', lineHeight:1.7, whiteSpace:'pre-wrap' }}>{detailBrief.descripcion}</div>
               </div>
             )}
+            {detailBrief.link_canva && (
+              <div style={{ marginTop:16, paddingTop:16, borderTop:'1px solid #eef2f7' }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#8aa0b8', textTransform:'uppercase', letterSpacing:.5, marginBottom:6 }}>Link de Canva</div>
+                <a href={detailBrief.link_canva} target="_blank" rel="noopener noreferrer" style={{ fontSize:13, color:'#7c3aed', wordBreak:'break-all' }}>◈ {detailBrief.link_canva}</a>
+              </div>
+            )}
           </div>
-        )}
-
-        {detailTab === 'propuestas' && (
-          <PropuestasTab userRole={userRole} userEmail={userEmail} briefFiltroId={detailBrief.id} />
         )}
 
         {detailTab === 'listado' && (
