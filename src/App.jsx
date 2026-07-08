@@ -5,6 +5,7 @@ import Login from './components/Login';
 import CRM from './components/CRM';
 import Briefs from './components/Briefs';
 import Propuestas from './components/Propuestas';
+import Trafico from './components/Trafico';
 import Calendario from './components/Calendario';
 import Presupuestos from './components/Presupuestos';
 import LiquidacionesTab from './components/LiquidacionesTab';
@@ -35,6 +36,7 @@ const TAB_CONFIG = {
   crm:              { label: 'CRM',            icon: '◎' },
   briefs:           { label: 'Proyectos',       icon: '◇' },
   propuestas:       { label: 'Propuestas',      icon: '◈' },
+  trafico:          { label: 'Tráfico',         icon: '🗂️' },
   proformas:        { label: 'Proformas',       icon: '📋' },
   presupuestos:     { label: 'Presupuestos',    icon: '💰' },
   solicitudes:      { label: 'Solicitudes',     icon: '📤' },
@@ -52,6 +54,7 @@ const TAB_CONFIG = {
 const NAV_GROUPS = [
   { id: 'notificaciones',   label: 'Notificaciones', icon: '🔔', tabs: ['notificaciones'] },
   { id: 'calendario',       label: 'Calendario',     icon: '📅', tabs: ['calendario'] },
+  { id: 'trafico',          label: 'Tráfico',        icon: '🗂️', tabs: ['trafico'] },
   { id: 'crm',              label: 'CRM',             icon: '◎', tabs: ['crm'] },
   { id: 'creatividad',      label: 'Creatividad',    icon: '◈', tabs: ['briefs', 'propuestas'] },
   { id: 'produccion',       label: 'Producción',     icon: '💰', tabs: ['presupuestos', 'proformas', 'scouting', 'solicitudes', 'liquidaciones', 'actas'] },
@@ -133,6 +136,7 @@ export default function App() {
       case 'crm':              return <CRM userRole={role} />;
       case 'briefs':           return <Briefs userRole={role} userEmail={email} />;
       case 'propuestas':       return <Propuestas userRole={role} userEmail={email} />;
+      case 'trafico':          return <Trafico userRole={role} userEmail={email} />;
       case 'proformas':        return <Proformas userRole={role} userEmail={email} />;
       case 'presupuestos':     return <Presupuestos userRole={role} userEmail={email} logoUrl={null} onNavigate={(tab,pptoId)=>{if(pptoId)setPptoInicial(pptoId);setActiveTab(tab);}} />;
       case 'solicitudes':      return <Solicitudes userRole={role} userEmail={email} userName={email.split('@')[0]} presupuesto_id_inicial={pptoInicial} onClearPptoInicial={()=>setPptoInicial(null)}/>;

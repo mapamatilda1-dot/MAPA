@@ -25,6 +25,7 @@ export function getNavTabs(role) {
     crm:             ['admin', 'ventas'],
     briefs:          ['admin', 'ventas', 'creativo', 'produccion', 'financiero'],
     propuestas:      ['admin', 'ventas', 'creativo', 'produccion'],
+    trafico:         ['admin', 'ventas', 'creativo', 'produccion', 'financiero'],
     proformas:       ['admin', 'produccion'],
     presupuestos:    ['admin', 'produccion', 'financiero'],
     solicitudes:     ['admin', 'produccion', 'financiero'],
@@ -63,6 +64,19 @@ export function canDeleteBrief(role)  { return role === 'admin'; }
 export function canViewPropuestas(role)   { return ['admin', 'ventas', 'creativo', 'produccion'].includes(role); }
 export function canCreatePropuesta(role)  { return ['admin', 'creativo', 'produccion'].includes(role); }
 export function canEditPropuesta(role)    { return ['admin', 'creativo', 'produccion'].includes(role); }
+
+// ─── Tráfico / Tareas ───────────────────────────────────────────
+export function canViewTrafico(role)   { return true; }
+export function canCreateTarea(role)   { return ['admin', 'ventas', 'creativo', 'produccion'].includes(role); }
+export function canDeleteTarea(role)   { return ['admin'].includes(role); }
+
+export const PRIORIDADES_TAREA = ['baja', 'media', 'alta', 'urgente'];
+export const PRIORIDADES_TAREA_LABELS = { baja: 'Baja', media: 'Media', alta: 'Alta', urgente: '🔥 Urgente' };
+export const PRIORIDADES_TAREA_COLORS = { baja: '#8aa0b8', media: '#e8a020', alta: '#c8264a', urgente: '#dc2626' };
+
+export const ESTADOS_TAREA = ['pendiente', 'en_progreso', 'hecho'];
+export const ESTADOS_TAREA_LABELS = { pendiente: 'Pendiente', en_progreso: 'En progreso', hecho: 'Hecho' };
+export const ESTADOS_TAREA_COLORS = { pendiente: '#8aa0b8', en_progreso: '#0d3b5e', hecho: '#2e8b4e' };
 
 // ─── Presupuestos ─────────────────────────────────────────────
 // Ventas NO tiene acceso a presupuestos

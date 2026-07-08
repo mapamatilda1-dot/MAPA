@@ -3,22 +3,22 @@ import { supabase } from '../lib/supabase';
 
 // ── Configuración de qué ve cada usuario ──────────────────────
 const NOTIF_CONFIG = {
-  'camille@matilda.agency':     ['briefs_nuevos', 'presupuestos_enviados', 'presupuestos_aprobado'],
-  'mariajose@matilda.agency':   ['briefs_nuevos', 'solicitudes_dinero', 'presupuestos_aprobacion_majo', 'presupuestos_cerrado', 'liquidaciones_nuevas'],
-  'melanie@matilda.agency':     ['briefs_nuevos', 'solicitudes_dinero', 'presupuestos_revision_mel', 'presupuestos_cerrado'],
-  'taylor@matilda.agency':      ['solicitudes_dinero'],
-  'johanna@matilda.agency':     ['presupuestos_aprobado', 'presupuestos_ejecutado', 'presupuestos_cerrado', 'solicitudes_dinero', 'liquidaciones_nuevas'],
-  'carlos@matilda.agency':      ['briefs_nuevos'],
-  'wendy@matilda.agency':       ['briefs_nuevos', 'presupuestos_aprobado', 'solicitudes_aprobadas'],
-  'camilo@matilda.agency':      ['briefs_nuevos', 'presupuestos_enviados', 'presupuestos_aprobado'],
-  'mariaisabel@matilda.agency': ['briefs_nuevos', 'presupuestos_enviados', 'presupuestos_aprobado'],
+  'camille@matilda.agency':     ['briefs_nuevos', 'presupuestos_enviados', 'presupuestos_aprobado', 'tareas_asignadas'],
+  'mariajose@matilda.agency':   ['briefs_nuevos', 'solicitudes_dinero', 'presupuestos_aprobacion_majo', 'presupuestos_cerrado', 'liquidaciones_nuevas', 'tareas_asignadas'],
+  'melanie@matilda.agency':     ['briefs_nuevos', 'solicitudes_dinero', 'presupuestos_revision_mel', 'presupuestos_cerrado', 'tareas_asignadas'],
+  'taylor@matilda.agency':      ['solicitudes_dinero', 'tareas_asignadas'],
+  'johanna@matilda.agency':     ['presupuestos_aprobado', 'presupuestos_ejecutado', 'presupuestos_cerrado', 'solicitudes_dinero', 'liquidaciones_nuevas', 'tareas_asignadas'],
+  'carlos@matilda.agency':      ['briefs_nuevos', 'tareas_asignadas'],
+  'wendy@matilda.agency':       ['briefs_nuevos', 'presupuestos_aprobado', 'solicitudes_aprobadas', 'tareas_asignadas'],
+  'camilo@matilda.agency':      ['briefs_nuevos', 'presupuestos_enviados', 'presupuestos_aprobado', 'tareas_asignadas'],
+  'mariaisabel@matilda.agency': ['briefs_nuevos', 'presupuestos_enviados', 'presupuestos_aprobado', 'tareas_asignadas'],
 };
 // Producción (juan, firi, cindry, mariaeugenia) — por rol
 const NOTIF_POR_ROL = {
-  produccion: ['solicitudes_aprobadas', 'presupuestos_asignados'],
-  admin: ['briefs_nuevos', 'solicitudes_dinero', 'presupuestos_aprobacion'],
-  ventas: ['briefs_nuevos'],
-  financiero: ['solicitudes_dinero', 'presupuestos_aprobado', 'liquidaciones_nuevas'],
+  produccion: ['solicitudes_aprobadas', 'presupuestos_asignados', 'tareas_asignadas'],
+  admin: ['briefs_nuevos', 'solicitudes_dinero', 'presupuestos_aprobacion', 'tareas_asignadas'],
+  ventas: ['briefs_nuevos', 'tareas_asignadas'],
+  financiero: ['solicitudes_dinero', 'presupuestos_aprobado', 'liquidaciones_nuevas', 'tareas_asignadas'],
 };
 
 function getNotifTypes(email, role) {
@@ -33,6 +33,7 @@ const TYPE_STYLE = {
   sol_aprobada: { icon: '✅', color: '#2e8b4e', bg: '#edf7ed', label: 'Solicitud aprobada' },
   presupuesto:  { icon: '📊', color: '#7c3aed', bg: '#f5f3ff', label: 'Presupuesto' },
   liquidacion:  { icon: '🧾', color: '#c8264a', bg: '#fff0f3', label: 'Liquidación' },
+  tarea:        { icon: '🗂️', color: '#0d3b5e', bg: '#eef4fb', label: 'Tarea asignada' },
 };
 
 function timeAgo(dateStr) {
@@ -282,6 +283,29 @@ export default function Notificaciones({ userEmail, userRole, onNavigate }) {
           accion: 'Ver presupuesto',
           nav: { tab: 'presupuestos' },
         }));
+      }
+
+      // ── Tareas asignadas (Tráfico) ──────────────────────────
+      if (tipos.includes('tareas_asignadas')) {
+        const { data: tareas } = await supabase
+          .from('tareas')
+          .select('id, titulo, fecha_entrega, prioridad, estado, updated_at, asignado_email, brief_nombre')
+          .eq('asignado_email', userEmail)
+          .neq('estado', 'hecho')
+          .order('updated_at', { ascending: false });
+        (tareas||[]).forEach(t => {
+          const urgente = t.prioridad === 'urgente' || t.prioridad === 'alta';
+          all.push({
+            key: 'tarea_' + t.id,
+            typeStyle: TYPE_STYLE.tarea,
+            titulo: '🗂️ Tarea: ' + (t.titulo||''),
+            subtitulo: (t.brief_nombre ? t.brief_nombre + ' · ' : '') + (t.fecha_entrega ? 'Entrega ' + t.fecha_entrega.split('-').reverse().join('/') : ''),
+            fecha: t.updated_at,
+            urgente,
+            accion: 'Ver tarea',
+            nav: { tab: 'trafico' },
+          });
+        });
       }
 
       // Ordenar: urgentes primero, luego no gestionadas, luego por fecha

@@ -22,3 +22,4 @@ export const notifyLiquidacion      = (liq)              => callEdgeFunction('no
 export const notifySolicitudAprobada = (solicitud, solicitanteEmail) => callEdgeFunction('notify-solicitud-aprobada', { solicitud, solicitanteEmail });
 
 export const notifyProductorAsignado = (ppto) => callEdgeFunction('notify-productor-asignado', { ppto });
+export const notifyTareaAsignada     = (tarea) => callEdgeFunction('notify-tarea-asignada',     { tarea });
