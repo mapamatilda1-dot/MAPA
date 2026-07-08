@@ -484,6 +484,9 @@ export default function Briefs({ userRole, userEmail }) {
                     {b.archivo_url && (
                       <a href={b.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize:12, color:'#2563eb', textDecoration:'none' }}>📎 {b.archivo_nombre} ↗</a>
                     )}
+                    {b.link_canva && (
+                      <a href={b.link_canva} target="_blank" rel="noreferrer" style={{ fontSize:12, color:'#7c3aed', textDecoration:'none' }}>◈ Ver Canva ↗</a>
+                    )}
                     <span style={{ fontSize:12, color:'#7c3aed', cursor:'pointer', fontWeight:500 }} onClick={()=>setExpedienteId(b.id)}>📁 Ver expediente</span>
                   </div>
                 </div>
@@ -539,6 +542,11 @@ export default function Briefs({ userRole, userEmail }) {
             {detalle.archivo_url && <>
               <div style={{ height:1, background:'#eee', margin:'12px 0' }}/>
               <a href={detalle.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize:13, color:'#2563eb' }}>📎 {detalle.archivo_nombre} ↗</a>
+            </>}
+            {detalle.link_canva && <>
+              <div style={{ height:1, background:'#eee', margin:'12px 0' }}/>
+              <div style={{ fontSize:11, color:'#888', marginBottom:5 }}>Propuesta creativa</div>
+              <a href={detalle.link_canva} target="_blank" rel="noreferrer" style={{ fontSize:13, color:'#7c3aed' }}>◈ Ver Canva ↗</a>
             </>}
           </div>
         )}

@@ -184,6 +184,11 @@ export default function ExpedientePanel({ briefId, onClose }) {
                     📎 {brief.archivo_nombre || 'Ver brief adjunto'} ↗
                   </a>
                 )}
+                {brief?.link_canva && (
+                  <a href={brief.link_canva} target="_blank" rel="noreferrer" style={{ display:'inline-flex', alignItems:'center', gap:5, marginTop:8, marginLeft:14, fontSize:12, color:'#7c3aed', textDecoration:'none' }}>
+                    ◈ Ver Canva ↗
+                  </a>
+                )}
               </Section>
 
               {/* Propuestas */}
