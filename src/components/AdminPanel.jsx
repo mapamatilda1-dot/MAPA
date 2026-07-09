@@ -7,10 +7,9 @@ export default function AdminPanel() {
   const [cfg, setCfg]           = useState({ oh_pct:15, bco_pct:5.5, fee_agencia:0, rebate_pct:2 });
   const [categorias, setCats]   = useState([]);
   const [clientes, setClis]     = useState([]);
-  const [ejecutivos, setEjecs]  = useState([]);
-  const [productores, setProds]  = useState([]);
-  const [newProd, setNewProd]    = useState({ nombre:'', cargo:'', email:'' });
-  const [editProd, setEditProd]  = useState(null);
+  const [equipo, setEquipo]     = useState([]);
+  const [newTeam, setNewTeam]   = useState({ nombre:'', email:'', cargo:'', es_productor:false, es_ejecutivo:false, es_creativo:false });
+  const [editTeam, setEditTeam] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
   const [toast, setToast]       = useState('');
   const [tab, setTab]           = useState('usuarios');
@@ -21,8 +20,6 @@ export default function AdminPanel() {
   const [newCat,  setNewCat]  = useState('');
   const [newCli,  setNewCli]  = useState({ nombre:'', ruc:'', contacto:'', telefono:'', email:'', notas:'', fee_agencia:0, bco_aplica:false });
   const [editCli, setEditCli] = useState(null);
-  const [newEjec,  setNewEjec]  = useState({ nombre:'', email:'', cargo:'' });
-  const [editEjec, setEditEjec] = useState(null);
   const [newUser,  setNewUser]  = useState({ email:'', password:'', role:'ventas' });
   const [editUser, setEditUser] = useState(null);
 
@@ -33,18 +30,16 @@ export default function AdminPanel() {
   }, []);
 
   async function fetchAll() {
-    const [cfgR, catR, cliR, ejecR, prodR] = await Promise.all([
+    const [cfgR, catR, cliR, eqR] = await Promise.all([
       supabase.from('config').select('*').single(),
       supabase.from('categorias').select('*').order('nombre'),
       supabase.from('clientes').select('*').order('nombre'),
-      supabase.from('ejecutivos').select('*').order('nombre'),
-      supabase.from('productores').select('*').order('nombre'),
+      supabase.from('equipo').select('*').order('nombre'),
     ]);
     if (cfgR.data)  setCfg(cfgR.data);
     if (catR.data)  setCats(catR.data);
     if (cliR.data)  setClis(cliR.data);
-    if (ejecR.data) setEjecs(ejecR.data);
-    if (prodR.data) setProds(prodR.data);
+    if (eqR.data)   setEquipo(eqR.data);
   }
 
   function showToast(m) { setToast(m); setTimeout(() => setToast(''), 2500); }
@@ -88,38 +83,60 @@ export default function AdminPanel() {
     await supabase.from('clientes').delete().eq('id', id); fetchAll();
   }
 
-  // ── Productores ────────────────────────────────────────────
-  async function saveProd() {
-    if (!newProd.nombre.trim()) return;
-    const { error } = await supabase.from('productores').insert(newProd);
-    if (error) { showToast('Error: ' + error.message); return; }
-    setNewProd({ nombre:'', cargo:'' }); fetchAll(); showToast('Productor agregado ✓');
+  // ── Equipo (reemplaza Productores + Ejecutivos) ─────────────
+  // Mantiene sincronizadas las tablas productores/ejecutivos que
+  // ya usan Presupuestos.jsx y Briefs.jsx, para no romper nada.
+  async function upsertByEmail(table, email, data) {
+    if (!email) return supabase.from(table).insert(data);
+    const { data: existing } = await supabase.from(table).select('id').eq('email', email).maybeSingle();
+    if (existing) return supabase.from(table).update(data).eq('id', existing.id);
+    return supabase.from(table).insert(data);
   }
-  async function updateProd() {
-    const { error } = await supabase.from('productores').update(editProd).eq('id', editProd.id);
-    if (error) { showToast('Error: ' + error.message); return; }
-    setEditProd(null); fetchAll(); showToast('Productor actualizado ✓');
+  async function deleteByEmail(table, email) {
+    if (!email) return;
+    await supabase.from(table).delete().eq('email', email);
   }
-  async function deleteProd(id) {
-    if (!window.confirm('¿Eliminar productor?')) return;
-    await supabase.from('productores').delete().eq('id', id); fetchAll();
+  async function syncRosterTables(p, oldEmail) {
+    // Si cambió el email, limpiar los registros viejos primero
+    if (oldEmail && oldEmail !== p.email) {
+      await deleteByEmail('productores', oldEmail);
+      await deleteByEmail('ejecutivos', oldEmail);
+    }
+    const rosterData = { nombre: p.nombre, email: p.email, cargo: p.cargo };
+    if (p.es_productor) await upsertByEmail('productores', p.email, rosterData);
+    else await deleteByEmail('productores', p.email);
+    if (p.es_ejecutivo) await upsertByEmail('ejecutivos', p.email, rosterData);
+    else await deleteByEmail('ejecutivos', p.email);
   }
 
-  // ── Ejecutivos ─────────────────────────────────────────────
-  async function saveEjec() {
-    if (!newEjec.nombre.trim()) return;
-    const { error } = await supabase.from('ejecutivos').insert(newEjec);
+  async function saveTeam() {
+    if (!newTeam.nombre.trim()) { showToast('Falta el nombre'); return; }
+    if (!newTeam.email.trim()) { showToast('El email es necesario para asignar tareas y notificaciones'); return; }
+    if (!newTeam.es_productor && !newTeam.es_ejecutivo && !newTeam.es_creativo) { showToast('Elegí al menos una categoría'); return; }
+    const payload = { ...newTeam, nombre:newTeam.nombre.trim(), email:newTeam.email.trim().toLowerCase() };
+    const { error } = await supabase.from('equipo').insert(payload);
     if (error) { showToast('Error: ' + error.message); return; }
-    setNewEjec({ nombre:'', email:'', cargo:'' }); fetchAll(); showToast('Ejecutivo agregado ✓');
+    await syncRosterTables(payload);
+    setNewTeam({ nombre:'', email:'', cargo:'', es_productor:false, es_ejecutivo:false, es_creativo:false });
+    fetchAll(); showToast('Persona agregada al equipo ✓');
   }
-  async function updateEjec() {
-    const { error } = await supabase.from('ejecutivos').update(editEjec).eq('id', editEjec.id);
+  async function updateTeam() {
+    const oldEmail = equipo.find(e => e.id === editTeam.id)?.email;
+    const payload = { ...editTeam, email: (editTeam.email||'').trim().toLowerCase() };
+    const { error } = await supabase.from('equipo').update({
+      nombre: payload.nombre, email: payload.email, cargo: payload.cargo,
+      es_productor: payload.es_productor, es_ejecutivo: payload.es_ejecutivo, es_creativo: payload.es_creativo,
+    }).eq('id', editTeam.id);
     if (error) { showToast('Error: ' + error.message); return; }
-    setEditEjec(null); fetchAll(); showToast('Ejecutivo actualizado ✓');
+    await syncRosterTables(payload, oldEmail);
+    setEditTeam(null); fetchAll(); showToast('Actualizado ✓');
   }
-  async function deleteEjec(id) {
-    if (!window.confirm('¿Eliminar ejecutivo?')) return;
-    await supabase.from('ejecutivos').delete().eq('id', id); fetchAll();
+  async function deleteTeam(id) {
+    if (!window.confirm('¿Eliminar esta persona del equipo? También se quitará de Productores/Ejecutivos.')) return;
+    const p = equipo.find(e => e.id === id);
+    await supabase.from('equipo').delete().eq('id', id);
+    if (p?.email) { await deleteByEmail('productores', p.email); await deleteByEmail('ejecutivos', p.email); }
+    fetchAll();
   }
 
   // ── Usuarios ───────────────────────────────────────────────
@@ -161,11 +178,11 @@ export default function AdminPanel() {
   async function downloadBackup() {
     showToast('Generando backup…');
     try {
-      const [ppR, cliR, catR, ejecR, liqR, cfgR, brR, prR] = await Promise.all([
+      const [ppR, cliR, catR, eqR, liqR, cfgR, brR, prR] = await Promise.all([
         supabase.from('presupuestos').select('*'),
         supabase.from('clientes').select('*'),
         supabase.from('categorias').select('*'),
-        supabase.from('ejecutivos').select('*'),
+        supabase.from('equipo').select('*'),
         supabase.from('liquidaciones').select('*'),
         supabase.from('config').select('*'),
         supabase.from('briefs').select('*'),
@@ -177,7 +194,7 @@ export default function AdminPanel() {
           presupuestos:  ppR.data  || [],
           clientes:      cliR.data || [],
           categorias:    catR.data || [],
-          ejecutivos:    ejecR.data|| [],
+          equipo:        eqR.data  || [],
           liquidaciones: liqR.data || [],
           config:        cfgR.data || [],
           briefs:        brR.data  || [],
@@ -196,8 +213,7 @@ export default function AdminPanel() {
 
   const TABS = [
     ['usuarios',    '👥 Usuarios'],
-    ['productores', '🎯 Productores'],
-    ['ejecutivos',  '👤 Ejecutivos'],
+    ['equipo',      '🧩 Equipo'],
     ['clientes',    '🏢 Clientes'],
     ['categorias',  '🏷️ Categorías'],
     ['config',      '⚙️ Config'],
@@ -296,87 +312,86 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* ── EJECUTIVOS ── */}
-      {tab === 'productores' && (
+      {/* ── EQUIPO (unifica Productores + Ejecutivos + Creativos) ── */}
+      {tab === 'equipo' && (
         <div>
           <div style={S.card}>
-            <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Agregar productor</h3>
+            <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:6 }}>Agregar persona al equipo</h3>
+            <p style={{ fontSize:12, color:'#8aa0b8', marginBottom:16 }}>Un solo registro por persona. Marcá las categorías que le apliquen — eso decide en qué listas va a aparecer (Responsable de proyectos, asignación de presupuestos, tareas de Tráfico).</p>
             <div style={S.grid2}>
-              <div><Label>Nombre completo *</Label><input style={S.input} value={newProd.nombre} onChange={e=>setNewProd(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Juan Villao"/></div>
-              <div><Label>Cargo</Label><input style={S.input} value={newProd.cargo} onChange={e=>setNewProd(p=>({...p,cargo:e.target.value}))} placeholder="Ej: Productor de Eventos"/></div>
-              <div style={{ gridColumn:'1/-1' }}><Label>Email (opcional — para recibir notificaciones)</Label><input style={S.input} type="email" value={newProd.email||''} onChange={e=>setNewProd(p=>({...p,email:e.target.value}))} placeholder="Ej: juan@matilda.agency"/></div>
+              <div><Label>Nombre completo *</Label><input style={S.input} value={newTeam.nombre} onChange={e=>setNewTeam(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Juan Villao"/></div>
+              <div><Label>Cargo</Label><input style={S.input} value={newTeam.cargo} onChange={e=>setNewTeam(p=>({...p,cargo:e.target.value}))} placeholder="Ej: Productor de Eventos"/></div>
+              <div style={{ gridColumn:'1/-1' }}>
+                <Label>Email * (debe ser el mismo con el que inicia sesión en MAPA)</Label>
+                <input style={S.input} type="email" value={newTeam.email} onChange={e=>setNewTeam(p=>({...p,email:e.target.value}))} placeholder="Ej: juan@matilda.agency"/>
+              </div>
+              <div style={{ gridColumn:'1/-1' }}>
+                <Label>Categorías *</Label>
+                <div style={{ display:'flex', gap:16, marginTop:6 }}>
+                  {[['es_productor','🎯 Productor'],['es_ejecutivo','👤 Ejecutivo'],['es_creativo','🎨 Creativo']].map(([k,l])=>(
+                    <label key={k} style={{ display:'flex', alignItems:'center', gap:6, fontSize:13, cursor:'pointer', color:'#333' }}>
+                      <input type="checkbox" checked={!!newTeam[k]} onChange={e=>setNewTeam(p=>({...p,[k]:e.target.checked}))} style={{ width:15, height:15, cursor:'pointer' }}/>
+                      {l}
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
-            <button style={{ ...S.btnPrimary, marginTop:12 }} onClick={saveProd}>+ Agregar productor</button>
+            <button style={{ ...S.btnPrimary, marginTop:12 }} onClick={saveTeam}>+ Agregar al equipo</button>
           </div>
-          {editProd && (
+
+          {editTeam && (
             <div style={S.card}>
-              <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Editar productor</h3>
+              <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Editar persona</h3>
               <div style={S.grid2}>
-                <div><Label>Nombre</Label><input style={S.input} value={editProd.nombre} onChange={e=>setEditProd(p=>({...p,nombre:e.target.value}))}/></div>
-                <div><Label>Cargo</Label><input style={S.input} value={editProd.cargo} onChange={e=>setEditProd(p=>({...p,cargo:e.target.value}))}/></div>
-                <div style={{ gridColumn:'1/-1' }}><Label>Email (opcional)</Label><input style={S.input} type="email" value={editProd.email||''} onChange={e=>setEditProd(p=>({...p,email:e.target.value}))} placeholder="juan@matilda.agency"/></div>
+                <div><Label>Nombre</Label><input style={S.input} value={editTeam.nombre} onChange={e=>setEditTeam(p=>({...p,nombre:e.target.value}))}/></div>
+                <div><Label>Cargo</Label><input style={S.input} value={editTeam.cargo||''} onChange={e=>setEditTeam(p=>({...p,cargo:e.target.value}))}/></div>
+                <div style={{ gridColumn:'1/-1' }}><Label>Email</Label><input style={S.input} type="email" value={editTeam.email||''} onChange={e=>setEditTeam(p=>({...p,email:e.target.value}))}/></div>
+                <div style={{ gridColumn:'1/-1' }}>
+                  <Label>Categorías</Label>
+                  <div style={{ display:'flex', gap:16, marginTop:6 }}>
+                    {[['es_productor','🎯 Productor'],['es_ejecutivo','👤 Ejecutivo'],['es_creativo','🎨 Creativo']].map(([k,l])=>(
+                      <label key={k} style={{ display:'flex', alignItems:'center', gap:6, fontSize:13, cursor:'pointer', color:'#333' }}>
+                        <input type="checkbox" checked={!!editTeam[k]} onChange={e=>setEditTeam(p=>({...p,[k]:e.target.checked}))} style={{ width:15, height:15, cursor:'pointer' }}/>
+                        {l}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div style={{ display:'flex', gap:8, marginTop:12 }}>
-                <button style={S.btnPrimary} onClick={updateProd}>Guardar</button>
-                <button style={S.btnSecondary} onClick={()=>setEditProd(null)}>Cancelar</button>
+                <button style={S.btnPrimary} onClick={updateTeam}>Guardar</button>
+                <button style={S.btnSecondary} onClick={()=>setEditTeam(null)}>Cancelar</button>
               </div>
             </div>
           )}
+
           <div style={S.card}>
-            <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Productores ({productores.length})</h3>
+            <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Equipo ({equipo.length})</h3>
             <table style={S.table}>
-              <thead><tr>{['Nombre','Cargo','Email',''].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Nombre','Cargo','Email','Categorías',''].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
               <tbody>
-                {productores.map(p=>(
+                {equipo.map(p=>(
                   <tr key={p.id}>
                     <td style={S.td}><strong>{p.nombre}</strong></td>
                     <td style={S.td}>{p.cargo}</td>
                     <td style={S.td}>{p.email||'—'}</td>
                     <td style={S.td}>
-                      <div style={{ display:'flex', gap:4 }}>
-                        <button style={S.btnSm} onClick={()=>setEditProd({...p})}>✏️</button>
-                        <button style={S.btnRed} onClick={()=>deleteProd(p.id)}>🗑</button>
+                      <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                        {p.es_productor && <span style={{ fontSize:10, padding:'2px 7px', borderRadius:999, background:'#fdf5e8', color:'#c8264a', fontWeight:600 }}>Productor</span>}
+                        {p.es_ejecutivo && <span style={{ fontSize:10, padding:'2px 7px', borderRadius:999, background:'#eef4fb', color:'#0d3b5e', fontWeight:600 }}>Ejecutivo</span>}
+                        {p.es_creativo  && <span style={{ fontSize:10, padding:'2px 7px', borderRadius:999, background:'#f5f3ff', color:'#7c3aed', fontWeight:600 }}>Creativo</span>}
                       </div>
                     </td>
-                  </tr>
-                ))}
-                {productores.length===0 && <tr><td colSpan={4} style={{ ...S.td, textAlign:'center', color:'#8aa0b8' }}>Sin productores</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {tab === 'ejecutivos' && (
-        <div>
-          <div style={S.card}>
-            <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Agregar ejecutivo</h3>
-            <div style={S.grid2}>
-              <div><Label>Nombre completo *</Label><input style={S.input} value={newEjec.nombre} onChange={e=>setNewEjec(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Camille Andrade"/></div>
-              <div><Label>Cargo</Label><input style={S.input} value={newEjec.cargo} onChange={e=>setNewEjec(p=>({...p,cargo:e.target.value}))} placeholder="Ej: Ejecutiva de Eventos"/></div>
-              <div style={{ gridColumn:'1/-1' }}><Label>Email</Label><input style={S.input} type="email" value={newEjec.email} onChange={e=>setNewEjec(p=>({...p,email:e.target.value}))}/></div>
-            </div>
-            <button style={{ ...S.btnPrimary, marginTop:12 }} onClick={saveEjec}>+ Agregar ejecutivo</button>
-          </div>
-          <div style={S.card}>
-            <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Equipo ({ejecutivos.length})</h3>
-            <table style={S.table}>
-              <thead><tr>{['Nombre','Cargo','Email',''].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
-              <tbody>
-                {ejecutivos.map(e=>(
-                  <tr key={e.id}>
-                    <td style={S.td}><strong>{e.nombre}</strong></td>
-                    <td style={S.td}>{e.cargo}</td>
-                    <td style={S.td}>{e.email}</td>
                     <td style={S.td}>
                       <div style={{ display:'flex', gap:4 }}>
-                        <button style={S.btnSm} onClick={()=>setEditEjec({...e})}>✏️</button>
-                        <button style={S.btnRed} onClick={()=>deleteEjec(e.id)}>🗑</button>
+                        <button style={S.btnSm} onClick={()=>setEditTeam({...p})}>✏️</button>
+                        <button style={S.btnRed} onClick={()=>deleteTeam(p.id)}>🗑</button>
                       </div>
                     </td>
                   </tr>
                 ))}
-                {ejecutivos.length===0 && <tr><td colSpan={4} style={{ ...S.td, textAlign:'center', color:'#8aa0b8' }}>Sin ejecutivos</td></tr>}
+                {equipo.length===0 && <tr><td colSpan={5} style={{ ...S.td, textAlign:'center', color:'#8aa0b8' }}>Sin personas en el equipo</td></tr>}
               </tbody>
             </table>
           </div>
@@ -498,13 +513,13 @@ export default function AdminPanel() {
           <div style={S.card}>
             <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:8 }}>💾 Copia de seguridad</h3>
             <p style={{ fontSize:13, color:'#5a7a9a', marginBottom:20, lineHeight:1.6 }}>
-              Descargá un archivo JSON con todos los datos: presupuestos, ítems, clientes, ejecutivos, briefs, propuestas, liquidaciones y configuración.
+              Descargá un archivo JSON con todos los datos: presupuestos, ítems, clientes, equipo, briefs, propuestas, liquidaciones y configuración.
             </p>
             <div style={{ background:'#f0f4f8', borderRadius:10, padding:20, marginBottom:16, display:'flex', alignItems:'center', gap:20 }}>
               <div style={{ fontSize:48 }}>📦</div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:4 }}>Backup completo Matilda Hub</div>
-                <div style={{ fontSize:13, color:'#5a7a9a' }}>Presupuestos · Clientes · Briefs · Propuestas · Ejecutivos · Liquidaciones · Config</div>
+                <div style={{ fontSize:13, color:'#5a7a9a' }}>Presupuestos · Clientes · Briefs · Propuestas · Equipo · Liquidaciones · Config</div>
                 <div style={{ fontSize:12, color:'#8aa0b8', marginTop:4 }}>Formato JSON · v2.0</div>
               </div>
               <button style={{ ...S.btnPrimary, padding:'12px 24px', fontSize:15, background:'#2e8b4e' }} onClick={downloadBackup}>
@@ -541,20 +556,6 @@ export default function AdminPanel() {
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:8 }}>
               <button style={S.btnSecondary} onClick={()=>setEditCli(null)}>Cancelar</button>
               <button style={S.btnPrimary} onClick={updateCli}>Guardar</button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {editEjec && (
-        <Modal title="Editar ejecutivo" onClose={()=>setEditEjec(null)}>
-          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-            <div><Label>Nombre</Label><input style={S.input} value={editEjec.nombre} onChange={e=>setEditEjec(p=>({...p,nombre:e.target.value}))}/></div>
-            <div><Label>Cargo</Label><input style={S.input} value={editEjec.cargo||''} onChange={e=>setEditEjec(p=>({...p,cargo:e.target.value}))}/></div>
-            <div><Label>Email</Label><input style={S.input} type="email" value={editEjec.email||''} onChange={e=>setEditEjec(p=>({...p,email:e.target.value}))}/></div>
-            <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:8 }}>
-              <button style={S.btnSecondary} onClick={()=>setEditEjec(null)}>Cancelar</button>
-              <button style={S.btnPrimary} onClick={updateEjec}>Guardar</button>
             </div>
           </div>
         </Modal>

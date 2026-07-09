@@ -78,7 +78,7 @@ function emptyForm() {
 
 export default function Trafico({ userRole, userEmail }) {
   const [tareas, setTareas]     = useState([]);
-  const [ejecutivos, setEjecs]  = useState([]);
+  const [equipo, setEquipo]     = useState([]);
   const [briefs, setBriefs]     = useState([]);
   const [loading, setLoading]   = useState(true);
   const [form, setForm]         = useState(emptyForm());
@@ -97,11 +97,11 @@ export default function Trafico({ userRole, userEmail }) {
     setLoading(true);
     const [tR, eR, bR] = await Promise.all([
       supabase.from('tareas').select('*').order('created_at', { ascending:false }),
-      supabase.from('ejecutivos').select('*').order('nombre'),
+      supabase.from('equipo').select('*').order('nombre'),
       supabase.from('briefs').select('id, nombre').order('nombre'),
     ]);
     if (tR.data) setTareas(tR.data);
-    if (eR.data) setEjecs(eR.data);
+    if (eR.data) setEquipo(eR.data);
     if (bR.data) setBriefs(bR.data);
     setLoading(false);
   }
@@ -111,7 +111,7 @@ export default function Trafico({ userRole, userEmail }) {
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
   function onPickAsignado(nombre) {
-    const ej = ejecutivos.find(e => e.nombre === nombre);
+    const ej = equipo.find(e => e.nombre === nombre);
     setForm(f => ({ ...f, asignado_nombre: nombre, asignado_email: ej?.email || '' }));
   }
 
@@ -201,7 +201,7 @@ export default function Trafico({ userRole, userEmail }) {
         }}>👤 Solo mis tareas</button>
         <select value={filtroAsig} onChange={e=>setFiltroAsig(e.target.value)} style={{ ...sel, width:'auto', minWidth:180 }}>
           <option value="">Todos los asignados</option>
-          {ejecutivos.map(e => <option key={e.id} value={e.nombre}>{e.nombre}</option>)}
+          {equipo.map(e => <option key={e.id} value={e.nombre}>{e.nombre}</option>)}
         </select>
       </div>
 
@@ -272,7 +272,7 @@ export default function Trafico({ userRole, userEmail }) {
               <label style={lbl}>Asignar a</label>
               <select value={form.asignado_nombre} onChange={e=>onPickAsignado(e.target.value)} style={sel}>
                 <option value="">Sin asignar</option>
-                {ejecutivos.map(e => <option key={e.id} value={e.nombre}>{e.nombre}</option>)}
+                {equipo.map(e => <option key={e.id} value={e.nombre}>{e.nombre}</option>)}
               </select>
             </div>
             <div>
