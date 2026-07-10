@@ -4,13 +4,20 @@ const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 async function callEdgeFunction(name, body) {
   try {
-    await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON}` },
       body: JSON.stringify(body),
     });
+    if (!res.ok) {
+      const txt = await res.text().catch(()=>'(sin detalle)');
+      console.error(`⚠ notify ${name} respondió ${res.status}:`, txt);
+      return { ok:false, error: txt };
+    }
+    return { ok:true };
   } catch(e) {
-    console.warn(`notify ${name} failed:`, e);
+    console.error(`⚠ notify ${name} no se pudo llamar (red / función no desplegada):`, e);
+    return { ok:false, error: String(e) };
   }
 }
 

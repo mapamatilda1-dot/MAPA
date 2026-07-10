@@ -159,6 +159,11 @@ export default function Trafico({ userRole, userEmail }) {
   const [ocultarHechas, setOcultarHechas] = useState(false);
   const [expandedCard, setExpandedCard] = useState(null);
   const [toast, setToast]       = useState('');
+  const [showIaModal, setShowIaModal] = useState(false);
+  const [iaTexto, setIaTexto]   = useState('');
+  const [iaLoading, setIaLoading] = useState(false);
+  const [iaTareas, setIaTareas] = useState(null); // null = pantalla de pegar texto, array = pantalla de revisión
+  const [iaCreando, setIaCreando] = useState(false);
 
   const canCreate = canCreateTarea(userRole);
   const canDelete = canDeleteTarea(userRole);
@@ -244,16 +249,22 @@ export default function Trafico({ userRole, userEmail }) {
       const { error } = await supabase.from('tareas').update(payload).eq('id', editing.id);
       if (error) { showToast('Error: ' + error.message); return; }
       if (editing.asignado_email !== payload.asignado_email && payload.asignado_email) {
-        notifyTareaAsignada({ ...payload, creado_por: userEmail });
+        const r = await notifyTareaAsignada({ ...payload, creado_por: userEmail });
+        showToast(r?.ok ? 'Tarea actualizada ✓ (correo enviado)' : 'Tarea actualizada, pero el correo no se pudo enviar ⚠');
+      } else {
+        showToast('Tarea actualizada ✓');
       }
-      showToast('Tarea actualizada ✓');
     } else {
       const { data, error } = await supabase.from('tareas')
         .insert({ ...payload, creado_por: userEmail, estado:'pendiente' })
         .select().single();
       if (error) { showToast('Error: ' + error.message); return; }
-      if (data?.asignado_email) notifyTareaAsignada({ ...data, creado_por: userEmail });
-      showToast('Tarea creada ✓');
+      if (data?.asignado_email) {
+        const r = await notifyTareaAsignada({ ...data, creado_por: userEmail });
+        showToast(r?.ok ? 'Tarea creada ✓ (correo enviado)' : 'Tarea creada, pero el correo no se pudo enviar ⚠');
+      } else {
+        showToast('Tarea creada ✓');
+      }
     }
     setShowForm(false);
     load();
@@ -273,6 +284,84 @@ export default function Trafico({ userRole, userEmail }) {
   async function deleteTarea(id) {
     if (!window.confirm('¿Eliminar esta tarea?')) return;
     await supabase.from('tareas').delete().eq('id', id);
+    load();
+  }
+
+  function closeIaModal() {
+    setShowIaModal(false); setIaTexto(''); setIaTareas(null);
+  }
+
+  async function generarTareasDesdeReunion() {
+    if (!iaTexto.trim()) return;
+    setIaLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-extraer-tareas', {
+        body: {
+          texto: iaTexto,
+          equipo: equipo.map(e => ({ nombre: e.nombre })),
+          clientes: clientes.map(c => ({ nombre: c.nombre })),
+          briefs: briefs.map(b => ({ nombre: b.nombre })),
+        },
+      });
+      if (error || data?.error) throw new Error(data?.error || error.message);
+      const drafts = (data.tareas || []).map(t => {
+        const ej = equipo.find(e => e.nombre === t.asignado_nombre);
+        const cl = clientes.find(c => c.nombre === t.cliente_nombre);
+        const br = briefs.find(b => b.nombre === t.brief_nombre);
+        return {
+          _id: uid(),
+          titulo: t.titulo || '', descripcion: t.descripcion || '',
+          prioridad: PRIORIDADES_TAREA.includes(t.prioridad) ? t.prioridad : 'media',
+          fecha_entrega: t.fecha_entrega || '', hora_entrega: t.hora_entrega || '',
+          asignado_nombre: ej?.nombre || '', asignado_email: ej?.email || '',
+          cliente_id: cl?.id || '', cliente_nombre: cl?.nombre || t.cliente_nombre || '',
+          brief_id: br?.id || '', brief_nombre: br?.nombre || '',
+          subtareas: (t.subtareas||[]).map(s => ({ id:uid(), titulo:s, completada:false })),
+        };
+      });
+      if (drafts.length === 0) showToast('No se detectaron tareas claras en ese texto');
+      setIaTareas(drafts);
+    } catch (e) {
+      alert('No se pudo generar: ' + e.message);
+    }
+    setIaLoading(false);
+  }
+
+  function updateIaTarea(id, patch) {
+    setIaTareas(list => list.map(t => t._id === id ? { ...t, ...patch } : t));
+  }
+  function removeIaTarea(id) {
+    setIaTareas(list => list.filter(t => t._id !== id));
+  }
+  function onPickAsignadoIa(id, nombre) {
+    const ej = equipo.find(e => e.nombre === nombre);
+    updateIaTarea(id, { asignado_nombre: nombre, asignado_email: ej?.email || '' });
+  }
+
+  async function crearTareasEnBloque() {
+    if (!iaTareas || iaTareas.length === 0) return;
+    setIaCreando(true);
+    let fallosCorreo = 0;
+    for (const t of iaTareas) {
+      const payload = {
+        titulo: t.titulo, descripcion: t.descripcion,
+        prioridad: t.prioridad, fecha_entrega: t.fecha_entrega || null, hora_entrega: t.hora_entrega || null,
+        asignado_nombre: t.asignado_nombre, asignado_email: t.asignado_email,
+        cliente_id: t.cliente_id || null, cliente_nombre: t.cliente_nombre,
+        brief_id: t.brief_id || null, brief_nombre: t.brief_nombre,
+        subtareas: t.subtareas, creado_por: userEmail, estado: 'pendiente',
+      };
+      const { data } = await supabase.from('tareas').insert(payload).select().single();
+      if (data?.asignado_email) {
+        const r = await notifyTareaAsignada({ ...data, creado_por: userEmail });
+        if (!r?.ok) fallosCorreo++;
+      }
+    }
+    setIaCreando(false);
+    showToast(fallosCorreo > 0
+      ? `${iaTareas.length} tarea(s) creada(s), ${fallosCorreo} correo(s) no se pudieron enviar ⚠`
+      : `${iaTareas.length} tarea(s) creada(s) ✓`);
+    closeIaModal();
     load();
   }
 
@@ -322,7 +411,10 @@ export default function Trafico({ userRole, userEmail }) {
           <h2 style={{ fontSize:20, fontWeight:800, color:'#0d3b5e', margin:0 }}>🗂️ Tráfico</h2>
           <div style={{ fontSize:13, color:'#8aa0b8', marginTop:4 }}>Tareas del equipo · {filtered.length} total{vencidas>0 && ` · ${vencidas} vencida${vencidas!==1?'s':''}`}{prontas>0 && ` · ${prontas} vence${prontas===1?'':'n'} pronto`}</div>
         </div>
-        {canCreate && <Btn onClick={openNew}>+ Nueva tarea</Btn>}
+        {canCreate && <div style={{ display:'flex', gap:8 }}>
+          <Btn variant="secondary" onClick={()=>setShowIaModal(true)}>🤖 Crear desde reunión</Btn>
+          <Btn onClick={openNew}>+ Nueva tarea</Btn>
+        </div>}
       </div>
 
       {/* Filtros */}
@@ -457,6 +549,63 @@ export default function Trafico({ userRole, userEmail }) {
             <div style={{ fontSize:11, color:'#e8a020' }}>⚠ Esta persona no tiene email cargado en Admin → Equipo, no le va a llegar el correo.</div>
           )}
         </div>
+      </Modal>
+
+      {/* Modal: crear tareas desde resumen de reunión (IA) */}
+      <Modal open={showIaModal} onClose={()=>{ if(!iaLoading && !iaCreando) closeIaModal(); }}
+        title={iaTareas ? `Revisar tareas detectadas (${iaTareas.length})` : '🤖 Crear tareas desde una reunión'}
+        footer={ iaTareas ? (
+          <>
+            <Btn variant="secondary" onClick={()=>setIaTareas(null)} disabled={iaCreando}>‹ Volver</Btn>
+            <Btn onClick={crearTareasEnBloque} disabled={iaCreando || iaTareas.length===0}>{iaCreando ? 'Creando…' : `Crear ${iaTareas.length} tarea(s)`}</Btn>
+          </>
+        ) : (
+          <>
+            <Btn variant="secondary" onClick={closeIaModal} disabled={iaLoading}>Cancelar</Btn>
+            <Btn onClick={generarTareasDesdeReunion} disabled={iaLoading || !iaTexto.trim()}>{iaLoading ? 'Analizando…' : '✨ Generar tareas'}</Btn>
+          </>
+        )}>
+        {!iaTareas ? (
+          <>
+            <p style={{ fontSize:12, color:'#888', marginBottom:10 }}>Pegá el resumen, transcripción o notas de la reunión. La IA va a identificar los pendientes, con responsable, fecha y subtareas si aplica — vas a poder revisar todo antes de crearlas.</p>
+            <textarea
+              value={iaTexto}
+              onChange={e=>setIaTexto(e.target.value)}
+              placeholder="Pegá acá el resumen o transcripción de la reunión..."
+              style={{ ...inp, minHeight:220, resize:'vertical' }}
+              disabled={iaLoading}
+              autoFocus
+            />
+          </>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            {iaTareas.map(t => (
+              <div key={t._id} style={{ border:'1px solid #e5e5e5', borderRadius:10, padding:12 }}>
+                <div style={{ display:'flex', gap:8, alignItems:'flex-start' }}>
+                  <input value={t.titulo} onChange={e=>updateIaTarea(t._id,{titulo:e.target.value})} style={{ ...inp, fontWeight:600, flex:1 }}/>
+                  <button onClick={()=>removeIaTarea(t._id)} style={{ background:'none', border:'none', color:'#ccc', cursor:'pointer', fontSize:15 }}>✕</button>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginTop:8 }}>
+                  <select value={t.asignado_nombre} onChange={e=>onPickAsignadoIa(t._id, e.target.value)} style={{ ...sel, fontSize:12, padding:'6px 8px' }}>
+                    <option value="">Sin asignar</option>
+                    {equipo.map(e => <option key={e.id} value={e.nombre}>{e.nombre}</option>)}
+                  </select>
+                  <select value={t.prioridad} onChange={e=>updateIaTarea(t._id,{prioridad:e.target.value})} style={{ ...sel, fontSize:12, padding:'6px 8px' }}>
+                    {PRIORIDADES_TAREA.map(p => <option key={p} value={p}>{PRIORIDADES_TAREA_LABELS[p]}</option>)}
+                  </select>
+                  <input type="date" value={t.fecha_entrega} onChange={e=>updateIaTarea(t._id,{fecha_entrega:e.target.value})} style={{ ...inp, fontSize:12, padding:'6px 8px' }}/>
+                </div>
+                {t.cliente_nombre && <div style={{ fontSize:11, color:'#7c3aed', marginTop:6 }}>◇ {t.cliente_nombre}{t.brief_nombre ? ' · '+t.brief_nombre : ''}</div>}
+                {t.subtareas.length > 0 && (
+                  <div style={{ marginTop:6, display:'flex', flexDirection:'column', gap:2 }}>
+                    {t.subtareas.map(s => <div key={s.id} style={{ fontSize:11, color:'#666' }}>☐ {s.titulo}</div>)}
+                  </div>
+                )}
+              </div>
+            ))}
+            {iaTareas.length === 0 && <div style={{ textAlign:'center', color:'#c0c8d0', fontSize:13, padding:'20px 0' }}>No se detectaron tareas. Volvé y probá con más detalle.</div>}
+          </div>
+        )}
       </Modal>
 
       {toast && <div style={{ position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)', background:'#0d3b5e', color:'#fff', padding:'9px 22px', borderRadius:8, fontSize:13, zIndex:9999, boxShadow:'0 4px 16px rgba(13,59,94,0.35)' }}>{toast}</div>}
