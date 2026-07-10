@@ -1,21 +1,58 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
-const ZOHO_USER = Deno.env.get('ZOHO_USER') || 'camille@matilda.agency';
-const ZOHO_PASS = Deno.env.get('ZOHO_PASS') || '';
+const SMTP_HOST = Deno.env.get('SMTP_HOST') || 'smtp.zoho.com';
+const SMTP_PORT = parseInt(Deno.env.get('SMTP_PORT') || '465');
+const SMTP_USER = Deno.env.get('SMTP_USER') || 'camille@matilda.agency';
+const SMTP_PASS = Deno.env.get('SMTP_PASS') || '';
 const DESTINOS  = ['camille@matilda.agency','johanna@matilda.agency'];
 
 async function sendEmail(to: string[], subject: string, html: string) {
-  const msg = [`From: Matilda Hub <${ZOHO_USER}>`,`To: ${to.join(', ')}`,`Subject: ${subject}`,`MIME-Version: 1.0`,`Content-Type: text/html; charset=UTF-8`,``,html].join('\r\n');
-  const conn = await Deno.connectTls({ hostname: 'smtp.zoho.com', port: 465 });
+  if (!SMTP_PASS) throw new Error('Falta configurar el secret SMTP_PASS en Supabase (Edge Functions → Secrets)');
+  const msg = [`From: Matilda Hub <${SMTP_USER}>`,`To: ${to.join(', ')}`,`Subject: ${subject}`,`MIME-Version: 1.0`,`Content-Type: text/html; charset=UTF-8`,``,html].join('\r\n');
+  const conn = await Deno.connectTls({ hostname: SMTP_HOST, port: SMTP_PORT });
   const enc = new TextEncoder(); const dec = new TextDecoder();
-  const read = async () => dec.decode(await conn.read(new Uint8Array(1024)) || new Uint8Array());
+  const readBuf = new Uint8Array(4096);
+
+  // Lee la respuesta COMPLETA de un comando SMTP, que puede venir en varias
+  // líneas (ej: el saludo EHLO). Sigue leyendo hasta encontrar la línea final
+  // (código de 3 dígitos seguido de espacio, no guion).
+  async function readResponse(): Promise<string> {
+    let full = '';
+    for (let i = 0; i < 25; i++) {
+      const n = await conn.read(readBuf);
+      if (!n) break;
+      full += dec.decode(readBuf.subarray(0, n));
+      const lines = full.split('\r\n').filter(l => l.length > 0);
+      const last = lines[lines.length - 1] || '';
+      if (/^\d{3} /.test(last) || /^\d{3}$/.test(last)) break;
+    }
+    return full;
+  }
+
   const write = async (s: string) => { await conn.write(enc.encode(s + '\r\n')); };
   const b64 = (s: string) => btoa(s);
-  await read(); await write('EHLO matilda.agency'); await read();
-  await write('AUTH LOGIN'); await read(); await write(b64(ZOHO_USER)); await read(); await write(b64(ZOHO_PASS)); await read();
-  await write(`MAIL FROM:<${ZOHO_USER}>`); await read();
-  for (const t of to) { await write(`RCPT TO:<${t}>`); await read(); }
-  await write('DATA'); await read(); await write(msg + '\r\n.'); await read(); await write('QUIT'); conn.close();
+  const log: string[] = [];
+  async function step(label: string, cmd?: string, expect?: string) {
+    if (cmd !== undefined) await write(cmd);
+    const resp = await readResponse();
+    log.push(`${label} -> ${resp.trim().replace(/\r?\n/g, ' | ')}`);
+    if (expect && !resp.startsWith(expect)) {
+      conn.close();
+      throw new Error(`Falló en "${label}" (se esperaba ${expect}xx). Detalle SMTP: ` + log.join(' || '));
+    }
+    return resp;
+  }
+  await step('greeting');
+  await step('EHLO', 'EHLO matilda.agency', '250');
+  await step('AUTH LOGIN', 'AUTH LOGIN', '334');
+  await step('usuario', b64(SMTP_USER), '334');
+  await step('password', b64(SMTP_PASS), '235');
+  await step('MAIL FROM', `MAIL FROM:<${SMTP_USER}>`, '250');
+  for (const t of to) { await step('RCPT TO ' + t, `RCPT TO:<${t}>`, '250'); }
+  await step('DATA', 'DATA', '354');
+  await step('envío del mensaje', msg + '\r\n.', '250');
+  await write('QUIT');
+  conn.close();
 }
 
 serve(async (req) => {

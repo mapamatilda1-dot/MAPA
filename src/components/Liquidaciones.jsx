@@ -430,19 +430,19 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
         const items=grupos[cat]||[];
         if(!items.length)return;
         rows.push([cat.toUpperCase()]);
-        rows.push(['Concepto','Sub 0%','Sub 15%','IVA','Total','RUC','Proveedor','# Factura','# Autorización']);
-        items.forEach(g=>rows.push([g.concepto,g.subtotal0,g.subtotal15,g.iva,g.total,g.ruc_proveedor,g.nombre_proveedor,g.num_factura,g.num_autorizacion]));
+        rows.push(['Concepto','Sub 0%','Sub 15%','IVA %','IVA','Total','RUC','Proveedor','Fecha Factura','# Factura','# Autorización']);
+        items.forEach(g=>rows.push([g.concepto,g.subtotal0,g.subtotal15,g.iva_pct??15,g.iva,g.total,g.ruc_proveedor,g.nombre_proveedor,g.fecha_factura,g.num_factura,g.num_autorizacion]));
         const subtot=items.reduce((a,g)=>a+(g.total||0),0);
-        rows.push([`Subtotal ${cat}`,'','','',subtot,'','','','']);
+        rows.push([`Subtotal ${cat}`,'','','','',subtot,'','','','','']);
         rows.push([]);
       });
-      rows.push(['TOTAL GENERAL','','','',t.justificado]);
+      rows.push(['TOTAL GENERAL','','','','',t.justificado]);
       rows.push([]);
       rows.push(['Monto asignado:',t.asignado]);
       rows.push(['Total justificado:',t.justificado]);
       rows.push(['Saldo:',t.saldo]);
       const ws=XLSX.utils.aoa_to_sheet(rows);
-      ws['!cols']=[{wch:40},{wch:12},{wch:12},{wch:10},{wch:12},{wch:15},{wch:25},{wch:20},{wch:20}];
+      ws['!cols']=[{wch:40},{wch:12},{wch:12},{wch:8},{wch:10},{wch:12},{wch:15},{wch:25},{wch:14},{wch:20},{wch:20}];
       const wb=XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb,ws,'Liquidación');
       XLSX.writeFile(wb,`liquidacion_${liq.responsable||'liq'}.xlsx`);
@@ -450,8 +450,8 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
       // CSV fallback
       const t=totalesLiq(liq);const grupos=agruparPorCat(liq.gastos||[]);
       const rows=[['Evento:',liq.evento],['Responsable:',liq.responsable]];
-      CATS_LIQUIDACION.forEach(cat=>{const items=grupos[cat]||[];if(!items.length)return;rows.push([cat]);items.forEach(g=>rows.push([g.concepto,g.subtotal0,g.subtotal15,g.iva,g.total,g.ruc_proveedor,g.nombre_proveedor,g.num_factura,g.num_autorizacion]));});
-      rows.push(['TOTAL','','','',t.justificado]);rows.push(['Saldo:',t.saldo]);
+      CATS_LIQUIDACION.forEach(cat=>{const items=grupos[cat]||[];if(!items.length)return;rows.push([cat]);rows.push(['Concepto','Sub 0%','Sub 15%','IVA %','IVA','Total','RUC','Proveedor','Fecha Factura','# Factura','# Autorización']);items.forEach(g=>rows.push([g.concepto,g.subtotal0,g.subtotal15,g.iva_pct??15,g.iva,g.total,g.ruc_proveedor,g.nombre_proveedor,g.fecha_factura,g.num_factura,g.num_autorizacion]));});
+      rows.push(['TOTAL','','','','',t.justificado]);rows.push(['Saldo:',t.saldo]);
       const csv=rows.map(r=>r.map(c=>String(c??'')).join(',')).join('\n');
       const blob=new Blob(['\uFEFF'+csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`liquidacion.csv`;a.click();URL.revokeObjectURL(url);
     });
