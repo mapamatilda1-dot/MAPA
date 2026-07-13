@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { notifyPresupuestoAprobado, notifyPresupuestoCerrado } from '../notifyHelper';
-import { S, Label, Badge, Toast } from '../styles.jsx';
+import { S, Label, Badge, Toast, Modal } from '../styles.jsx';
 import { calcItem, calcPpto, genNomenclatura, fmt, fmtPct, fmtDate } from '../calc';
 import { generatePdfClienteHTML, generatePdfFinancieroHTML, generateExcelFinancieroData } from './PdfCliente';
 import AlcanceTab from './AlcanceTab';
@@ -474,6 +474,49 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     setSelectedItems(new Set());
     showToast('✓ Ítems movidos a opciones adicionales');
   } // { type:'item'|'subcat', id, fromIndex }
+
+  // ── Copiar ítems seleccionados a otro presupuesto ──────────────
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [otrosPresupuestos, setOtrosPresupuestos] = useState([]);
+  const [copySearch, setCopySearch] = useState('');
+  const [copyDropdownOpen, setCopyDropdownOpen] = useState(false);
+  const [copyTargetId, setCopyTargetId] = useState('');
+  const [copiando, setCopiando] = useState(false);
+
+  async function abrirModalCopiar() {
+    if (selectedItems.size === 0) return;
+    setCopySearch(''); setCopyTargetId(''); setShowCopyModal(true);
+    const { data } = await supabase.from('presupuestos')
+      .select('id,nombre,cliente,nomenclatura')
+      .neq('id', p.id || '00000000-0000-0000-0000-000000000000')
+      .order('created_at', { ascending:false })
+      .limit(300);
+    setOtrosPresupuestos(data || []);
+  }
+
+  const otrosFiltrados = otrosPresupuestos.filter(op => {
+    if (!copySearch.trim()) return true;
+    const q = copySearch.toLowerCase();
+    return (op.nomenclatura||'').toLowerCase().includes(q)
+        || (op.nombre||'').toLowerCase().includes(q)
+        || (op.cliente||'').toLowerCase().includes(q);
+  });
+
+  async function copiarItemsAOtroPresupuesto() {
+    if (!copyTargetId) { showToast('Elegí a qué presupuesto copiar'); return; }
+    setCopiando(true);
+    const itemsSeleccionados = (p.items||[]).filter(it => selectedItems.has(it.id));
+    const { data: destino, error: errGet } = await supabase.from('presupuestos').select('items').eq('id', copyTargetId).single();
+    if (errGet) { showToast('Error: ' + errGet.message); setCopiando(false); return; }
+    const itemsCopiados = itemsSeleccionados.map(it => ({ ...it, id: crypto.randomUUID() }));
+    const nuevosItems = [...(destino.items||[]), ...itemsCopiados];
+    const { error: errUpd } = await supabase.from('presupuestos').update({ items: nuevosItems }).eq('id', copyTargetId);
+    setCopiando(false);
+    if (errUpd) { showToast('Error: ' + errUpd.message); return; }
+    setShowCopyModal(false);
+    setSelectedItems(new Set());
+    showToast(`✓ ${itemsCopiados.length} ítem(s) copiado(s) al otro presupuesto`);
+  }
 
   function moveItem(dragId, targetId, targetSubcat) {
     setP(prev => {
@@ -969,6 +1012,11 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
               {selectedItems.size > 0 && !bloqueado && (
                 <button style={{...S.btnPrimary,background:'#f0a500',color:'#fff'}} onClick={moverAOpcionAdicional}>
                   ✦ Mover {selectedItems.size} ítem(s) a Opción adicional
+                </button>
+              )}
+              {selectedItems.size > 0 && (
+                <button style={{...S.btnPrimary,background:'#0d3b5e',color:'#fff'}} onClick={abrirModalCopiar}>
+                  📋 Copiar {selectedItems.size} ítem(s) a otro presupuesto
                 </button>
               )}
             </div>
@@ -1848,6 +1896,41 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             </div>
           </div>
         </div>
+      )}
+
+      {showCopyModal && (
+        <Modal title={`Copiar ${selectedItems.size} ítem(s) a otro presupuesto`} onClose={()=>setShowCopyModal(false)}>
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            <div style={{ position:'relative' }}>
+              <Label>Buscar presupuesto destino</Label>
+              <input
+                style={S.input}
+                value={copySearch}
+                onChange={e=>{ setCopySearch(e.target.value); setCopyDropdownOpen(true); if(!e.target.value) setCopyTargetId(''); }}
+                onFocus={()=>setCopyDropdownOpen(true)}
+                onBlur={()=>setTimeout(()=>setCopyDropdownOpen(false), 150)}
+                placeholder="Escribí por número, nombre o cliente…"
+              />
+              {copyDropdownOpen && (
+                <div style={{ position:'absolute', zIndex:20, top:'100%', left:0, right:0, background:'#fff', border:'1px solid #ddd', borderRadius:9, marginTop:4, maxHeight:260, overflowY:'auto', boxShadow:'0 4px 14px rgba(0,0,0,.12)' }}>
+                  {otrosFiltrados.length === 0 && <div style={{ padding:'9px 12px', fontSize:13, color:'#bbb' }}>Sin resultados</div>}
+                  {otrosFiltrados.map(op => (
+                    <div key={op.id} onMouseDown={()=>{ setCopyTargetId(op.id); setCopySearch(`${op.nomenclatura?op.nomenclatura+' — ':''}${op.nombre} — ${op.cliente||''}`); setCopyDropdownOpen(false); }}
+                      style={{ padding:'9px 12px', fontSize:13, cursor:'pointer', borderBottom:'1px solid #f7f7f7', background: copyTargetId===op.id?'#eef4fb':'transparent' }}>
+                      {op.nomenclatura && <strong style={{ color:'#0d3b5e' }}>{op.nomenclatura}</strong>} {op.nomenclatura && '— '}{op.nombre} <span style={{ color:'#999' }}>— {op.cliente}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:8 }}>
+              <button onClick={()=>setShowCopyModal(false)} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid #ddd', background:'#fff', cursor:'pointer', fontFamily:'inherit' }}>Cancelar</button>
+              <button onClick={copiarItemsAOtroPresupuesto} disabled={!copyTargetId || copiando} style={{ padding:'8px 20px', borderRadius:8, border:'none', background:'#0d3b5e', color:'#fff', cursor:'pointer', fontFamily:'inherit', fontWeight:700, opacity:(!copyTargetId||copiando)?0.5:1 }}>
+                {copiando ? 'Copiando…' : '📋 Copiar ítems'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
