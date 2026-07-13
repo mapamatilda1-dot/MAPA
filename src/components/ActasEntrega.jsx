@@ -36,9 +36,11 @@ export default function ActasEntrega({ userEmail }) {
   const [linkCopiado, setLinkCopiado] = useState(null);
 
   const [form, setForm] = useState({
-    presupuesto_id:'', evento_nombre:'', cliente_nombre:'', fecha_evento:'', lugar:'',
+    presupuesto_id:'', evento_nombre:'', cliente_nombre:'', fecha_evento:'', lugar:'', lugar_entrega:'',
     persona_entrega:'', persona_recibe:'', listado_items:'',
   });
+  const [pptoSearch, setPptoSearch] = useState('');
+  const [pptoDropdownOpen, setPptoDropdownOpen] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -46,7 +48,7 @@ export default function ActasEntrega({ userEmail }) {
     setLoading(true);
     const [{ data: ac }, { data: pp }] = await Promise.all([
       supabase.from('actas_entrega').select('*').order('created_at', { ascending:false }),
-      supabase.from('presupuestos').select('id,nombre,cliente,fecha_evento,lugar').order('created_at', { ascending:false }).limit(200),
+      supabase.from('presupuestos').select('id,nombre,cliente,fecha_evento,lugar,nomenclatura,estado').order('created_at', { ascending:false }).limit(200),
     ]);
     setActas(ac || []);
     setPresupuestos(pp || []);
@@ -62,7 +64,17 @@ export default function ActasEntrega({ userEmail }) {
       fecha_evento: pp?.fecha_evento || '',
       lugar: pp?.lugar || '',
     }));
+    setPptoSearch(pp ? `${pp.nomenclatura ? pp.nomenclatura+' — ' : ''}${pp.nombre} — ${pp.cliente||''}` : '');
+    setPptoDropdownOpen(false);
   }
+
+  const pptosFiltrados = presupuestos.filter(p => {
+    if (!pptoSearch.trim()) return true;
+    const q = pptoSearch.toLowerCase();
+    return (p.nomenclatura||'').toLowerCase().includes(q)
+        || (p.nombre||'').toLowerCase().includes(q)
+        || (p.cliente||'').toLowerCase().includes(q);
+  });
 
   async function crearActa() {
     if (!form.evento_nombre.trim()) { alert('El nombre del evento es obligatorio'); return; }
@@ -73,6 +85,7 @@ export default function ActasEntrega({ userEmail }) {
       evento_nombre: form.evento_nombre,
       fecha_evento: form.fecha_evento || null,
       lugar: form.lugar,
+      lugar_entrega: form.lugar_entrega,
       persona_entrega: form.persona_entrega,
       persona_recibe: form.persona_recibe,
       listado_items: form.listado_items,
@@ -80,7 +93,8 @@ export default function ActasEntrega({ userEmail }) {
     }).select().single();
     if (error) { alert('Error: ' + error.message); return; }
     setModal(null);
-    setForm({ presupuesto_id:'', evento_nombre:'', cliente_nombre:'', fecha_evento:'', lugar:'', persona_entrega:'', persona_recibe:'', listado_items:'' });
+    setForm({ presupuesto_id:'', evento_nombre:'', cliente_nombre:'', fecha_evento:'', lugar:'', lugar_entrega:'', persona_entrega:'', persona_recibe:'', listado_items:'' });
+    setPptoSearch('');
     load();
     // Mostrar el link recién creado
     copiarLink(data.token, data.id);
@@ -106,7 +120,7 @@ export default function ActasEntrega({ userEmail }) {
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
         <h2 style={{ fontSize:20, fontWeight:700, color:'#0d3b5e', margin:0 }}>📝 Actas de Entrega</h2>
-        <button style={S.btnPrimary} onClick={()=>setModal('new')}>+ Nueva acta</button>
+        <button style={S.btnPrimary} onClick={()=>{ setForm({ presupuesto_id:'', evento_nombre:'', cliente_nombre:'', fecha_evento:'', lugar:'', lugar_entrega:'', persona_entrega:'', persona_recibe:'', listado_items:'' }); setPptoSearch(''); setModal('new'); }}>+ Nueva acta</button>
       </div>
 
       {actas.length === 0 && <div style={{ textAlign:'center', padding:'3rem', color:'#aaa', fontSize:14 }}>Sin actas registradas.</div>}
@@ -161,12 +175,27 @@ export default function ActasEntrega({ userEmail }) {
 
       <Modal open={modal==='new'} onClose={()=>setModal(null)} title="Nueva acta de entrega">
         <div style={{ display:'flex', flexDirection:'column', gap:13 }}>
-          <div>
+          <div style={{ position:'relative' }}>
             <label style={S.label}>Vincular a presupuesto (opcional)</label>
-            <select value={form.presupuesto_id} onChange={e=>selectPpto(e.target.value)} style={S.input}>
-              <option value="">Sin vincular</option>
-              {presupuestos.map(p => <option key={p.id} value={p.id}>{p.nombre} — {p.cliente}</option>)}
-            </select>
+            <input
+              style={S.input}
+              value={pptoSearch}
+              onChange={e=>{ setPptoSearch(e.target.value); setPptoDropdownOpen(true); if(!e.target.value) selectPpto(''); }}
+              onFocus={()=>setPptoDropdownOpen(true)}
+              onBlur={()=>setTimeout(()=>setPptoDropdownOpen(false), 150)}
+              placeholder="Escribí para buscar por número, nombre o cliente…"
+            />
+            {pptoDropdownOpen && (
+              <div style={{ position:'absolute', zIndex:20, top:'100%', left:0, right:0, background:'#fff', border:'1px solid #ddd', borderRadius:9, marginTop:4, maxHeight:260, overflowY:'auto', boxShadow:'0 4px 14px rgba(0,0,0,.12)' }}>
+                <div onMouseDown={()=>selectPpto('')} style={{ padding:'9px 12px', fontSize:13, cursor:'pointer', color:'#888', borderBottom:'1px solid #f0f0f0' }}>Sin vincular</div>
+                {pptosFiltrados.length === 0 && <div style={{ padding:'9px 12px', fontSize:13, color:'#bbb' }}>Sin resultados</div>}
+                {pptosFiltrados.map(p => (
+                  <div key={p.id} onMouseDown={()=>selectPpto(p.id)} style={{ padding:'9px 12px', fontSize:13, cursor:'pointer', borderBottom:'1px solid #f7f7f7' }}>
+                    {p.nomenclatura && <strong style={{ color:'#0d3b5e' }}>{p.nomenclatura}</strong>} {p.nomenclatura && '— '}{p.nombre} <span style={{ color:'#999' }}>— {p.cliente}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label style={S.label}>Nombre del evento *</label>
@@ -182,9 +211,15 @@ export default function ActasEntrega({ userEmail }) {
               <input type="date" style={S.input} value={form.fecha_evento} onChange={e=>setForm(f=>({...f,fecha_evento:e.target.value}))}/>
             </div>
           </div>
-          <div>
-            <label style={S.label}>Lugar</label>
-            <input style={S.input} value={form.lugar} onChange={e=>setForm(f=>({...f,lugar:e.target.value}))}/>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div>
+              <label style={S.label}>Lugar del evento</label>
+              <input style={S.input} value={form.lugar} onChange={e=>setForm(f=>({...f,lugar:e.target.value}))}/>
+            </div>
+            <div>
+              <label style={S.label}>Lugar de entrega</label>
+              <input style={S.input} value={form.lugar_entrega} onChange={e=>setForm(f=>({...f,lugar_entrega:e.target.value}))} placeholder="Ej: Planta Norte Quito"/>
+            </div>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
             <div>

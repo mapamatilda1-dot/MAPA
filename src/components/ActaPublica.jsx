@@ -103,7 +103,7 @@ export default function ActaPublica({ token }) {
   const [step, setStep] = useState('form'); // form -> firma_entrega -> firma_recibe -> done
 
   const [form, setForm] = useState({
-    persona_entrega: '', persona_recibe: '', listado_items: '', fotos: [],
+    persona_entrega: '', persona_recibe: '', listado_items: '', fotos: [], lugar_entrega: '',
   });
   const [firmaEntrega, setFirmaEntrega] = useState(null);
   const [firmaRecibe, setFirmaRecibe] = useState(null);
@@ -121,6 +121,7 @@ export default function ActaPublica({ token }) {
       persona_recibe: data.persona_recibe || '',
       listado_items: data.listado_items || '',
       fotos: data.fotos || [],
+      lugar_entrega: data.lugar_entrega || '',
     });
     if (data.estado === 'firmada') setStep('done');
     setLoading(false);
@@ -173,6 +174,7 @@ export default function ActaPublica({ token }) {
       persona_recibe: form.persona_recibe,
       listado_items: form.listado_items,
       fotos: form.fotos,
+      lugar_entrega: form.lugar_entrega,
       firma_entrega_url: urlEntrega,
       firma_recibe_url: urlRecibe,
       estado: 'firmada',
@@ -213,6 +215,7 @@ export default function ActaPublica({ token }) {
           {acta.cliente_nombre && <span>🏢 {acta.cliente_nombre}</span>}
           {acta.fecha_evento && <span>📅 {acta.fecha_evento}</span>}
           {acta.lugar && <span>📍 {acta.lugar}</span>}
+          {acta.lugar_entrega && <span>🚚 Entrega en: {acta.lugar_entrega}</span>}
         </div>
       </div>
 
@@ -257,6 +260,10 @@ export default function ActaPublica({ token }) {
           <div style={{ marginBottom:14 }}>
             <label style={S.label}>Persona que recibe *</label>
             <input style={S.input} value={form.persona_recibe} onChange={e=>setForm(p=>({...p,persona_recibe:e.target.value}))} placeholder="Nombre completo"/>
+          </div>
+          <div style={{ marginBottom:14 }}>
+            <label style={S.label}>Lugar de entrega</label>
+            <input style={S.input} value={form.lugar_entrega} onChange={e=>setForm(p=>({...p,lugar_entrega:e.target.value}))} placeholder="Ej: Planta Norte Quito"/>
           </div>
           <div style={{ marginBottom:14 }}>
             <label style={S.label}>Listado de lo entregado</label>

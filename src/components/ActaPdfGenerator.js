@@ -41,6 +41,10 @@ export function generateActaPdfHTML(acta) {
           '<div style="font-size:13px;color:#333;margin-top:2px;">' + (acta.fecha_evento||'—') + '</div></div>' +
         '<div><div style="font-size:10px;color:#0d6e69;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Lugar</div>' +
           '<div style="font-size:13px;color:#333;margin-top:2px;">' + (acta.lugar||'—') + '</div></div>' +
+        (acta.lugar_entrega ? (
+        '<div><div style="font-size:10px;color:#0d6e69;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Lugar de entrega</div>' +
+          '<div style="font-size:13px;color:#333;margin-top:2px;">' + acta.lugar_entrega + '</div></div>'
+        ) : '') +
       '</div>' +
 
       '<div style="padding:20px 28px;">' +
@@ -57,14 +61,14 @@ export function generateActaPdfHTML(acta) {
 
       '<div style="padding:20px 28px;display:grid;grid-template-columns:1fr 1fr;gap:24px;border-top:1px solid #eee;">' +
         '<div style="text-align:center;">' +
-          '<div style="font-size:11px;color:#8aa0b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Entrega</div>' +
+          '<div style="font-size:11px;color:#000;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Entrega</div>' +
           (acta.firma_entrega_url
             ? '<img src="' + acta.firma_entrega_url + '" style="width:100%;max-height:90px;object-fit:contain;border-bottom:1px solid #999;padding-bottom:6px;"/>'
             : '<div style="height:90px;border-bottom:1px solid #999;"></div>') +
           '<div style="font-size:13px;font-weight:700;color:#0d3b5e;margin-top:8px;">' + (acta.persona_entrega||'—') + '</div>' +
         '</div>' +
         '<div style="text-align:center;">' +
-          '<div style="font-size:11px;color:#8aa0b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Recibe</div>' +
+          '<div style="font-size:11px;color:#000;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Recibe</div>' +
           (acta.firma_recibe_url
             ? '<img src="' + acta.firma_recibe_url + '" style="width:100%;max-height:90px;object-fit:contain;border-bottom:1px solid #999;padding-bottom:6px;"/>'
             : '<div style="height:90px;border-bottom:1px solid #999;"></div>') +
