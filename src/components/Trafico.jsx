@@ -22,6 +22,22 @@ function dueTs(t) {
   const hora = t.hora_entrega ? t.hora_entrega.slice(0,5) : '23:59';
   return new Date(`${t.fecha_entrega}T${hora}:00`).getTime();
 }
+// Fecha/hora "efectiva" de una tarea: la más próxima entre la propia tarea
+// y sus subtareas pendientes (cada una puede tener su propia fecha).
+function effectiveDue(t) {
+  let best = null, bestTs = Infinity;
+  if (t.fecha_entrega) { bestTs = dueTs(t); best = { fecha: t.fecha_entrega, hora: t.hora_entrega }; }
+  (t.subtareas||[]).forEach(s => {
+    if (s.completada || !s.fecha_entrega) return;
+    const ts = dueTs(s);
+    if (ts < bestTs) { bestTs = ts; best = { fecha: s.fecha_entrega, hora: s.hora_entrega }; }
+  });
+  return best;
+}
+function taskDueTs(t) {
+  const eff = effectiveDue(t);
+  return eff ? dueTs(eff) : Infinity;
+}
 function getDays(dateStr) {
   if (!dateStr) return 999;
   const t = new Date(); t.setHours(0,0,0,0);
@@ -82,19 +98,38 @@ function emptyForm() {
   };
 }
 
-function SubtareasChecklist({ subtareas, onToggle, onAdd, onRemove, compact }) {
+function SubtareasChecklist({ subtareas, equipo, onToggle, onAdd, onRemove, onUpdate, compact }) {
   const [nueva, setNueva] = useState('');
   const done = subtareas.filter(s=>s.completada).length;
   return (
     <div onClick={e=>e.stopPropagation()}>
       {subtareas.length > 0 && (
-        <div style={{ display:'flex', flexDirection:'column', gap:4, marginTop:6 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:compact?6:12, marginTop:6 }}>
           {subtareas.map(s => (
-            <label key={s.id} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, cursor:'pointer', color: s.completada ? '#aaa' : '#444', textDecoration: s.completada ? 'line-through' : 'none' }}>
-              <input type="checkbox" checked={!!s.completada} onChange={()=>onToggle(s.id)} style={{ width:13, height:13, cursor:'pointer', flexShrink:0 }}/>
-              {s.titulo}
-              {!compact && <button onClick={()=>onRemove(s.id)} style={{ marginLeft:'auto', background:'none', border:'none', color:'#ccc', cursor:'pointer', fontSize:12 }}>✕</button>}
-            </label>
+            <div key={s.id}>
+              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, cursor:'pointer', color: s.completada ? '#aaa' : '#444', textDecoration: s.completada ? 'line-through' : 'none' }}>
+                <input type="checkbox" checked={!!s.completada} onChange={()=>onToggle(s.id)} style={{ width:13, height:13, cursor:'pointer', flexShrink:0 }}/>
+                <span style={{ flex:1 }}>{s.titulo}</span>
+                {!compact && <button onClick={()=>onRemove(s.id)} style={{ background:'none', border:'none', color:'#ccc', cursor:'pointer', fontSize:12, flexShrink:0 }}>✕</button>}
+              </label>
+              {!compact && (
+                <div style={{ display:'flex', gap:6, marginTop:4, marginLeft:19 }}>
+                  <select value={s.asignado_nombre||''} onChange={e=>{
+                    const ej = (equipo||[]).find(x=>x.nombre===e.target.value);
+                    onUpdate(s.id, { asignado_nombre: e.target.value, asignado_email: ej?.email || '' });
+                  }} style={{ ...inp, fontSize:11, padding:'5px 7px', flex:1 }}>
+                    <option value="">Sin asignar</option>
+                    {(equipo||[]).map(e => <option key={e.id} value={e.nombre}>{e.nombre}</option>)}
+                  </select>
+                  <input type="date" value={s.fecha_entrega||''} onChange={e=>onUpdate(s.id,{fecha_entrega:e.target.value})} style={{ ...inp, fontSize:11, padding:'5px 7px', flex:1 }}/>
+                </div>
+              )}
+              {compact && (s.asignado_nombre || s.fecha_entrega) && !s.completada && (
+                <div style={{ fontSize:10, color:'#999', marginLeft:19, marginTop:1 }}>
+                  {s.asignado_nombre && `👤 ${s.asignado_nombre}`}{s.asignado_nombre && s.fecha_entrega ? ' · ' : ''}{s.fecha_entrega && fmtDate(s.fecha_entrega)}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -110,7 +145,8 @@ function SubtareasChecklist({ subtareas, onToggle, onAdd, onRemove, compact }) {
 }
 
 function TaskCard({ t, onOpen, onDelete, canDelete, onToggleSub, expanded, onToggleExpand }) {
-  const days = getDays(t.fecha_entrega);
+  const eff = effectiveDue(t);
+  const days = getDays(eff?.fecha);
   const overdue = t.estado!=='hecho' && days < 0;
   const done = (t.subtareas||[]).filter(s=>s.completada).length;
   const total = (t.subtareas||[]).length;
@@ -130,8 +166,8 @@ function TaskCard({ t, onOpen, onDelete, canDelete, onToggleSub, expanded, onTog
       </div>
       {t.brief_nombre && <div style={{ fontSize:11, color:'#7c3aed', marginTop:5 }}>◇ {t.brief_nombre}</div>}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8 }}>
-        <span style={{ fontSize:11, color:'#777' }}>{t.asignado_nombre ? `👤 ${t.asignado_nombre}` : '👤 Sin asignar'}</span>
-        <span style={{ fontSize:11, color:'#999' }}>{fmtDate(t.fecha_entrega)}{t.hora_entrega ? ' · '+fmtHora(t.hora_entrega) : ''}</span>
+        <span style={{ fontSize:11, color:'#777' }}>{total===0 ? (t.asignado_nombre ? `👤 ${t.asignado_nombre}` : '👤 Sin asignar') : '👤 ver subtareas'}</span>
+        <span style={{ fontSize:11, color:'#999' }}>{eff ? fmtDate(eff.fecha)+(eff.hora ? ' · '+fmtHora(eff.hora) : '') : '—'}</span>
       </div>
       {total > 0 && (
         <div style={{ marginTop:8 }}>
@@ -219,13 +255,16 @@ export default function Trafico({ userRole, userEmail }) {
   }
 
   function addSubtareaForm(titulo) {
-    setForm(f => ({ ...f, subtareas:[...f.subtareas, { id:uid(), titulo, completada:false }] }));
+    setForm(f => ({ ...f, subtareas:[...f.subtareas, { id:uid(), titulo, completada:false, asignado_nombre:'', asignado_email:'', fecha_entrega:'', hora_entrega:'' }] }));
   }
   function removeSubtareaForm(id) {
     setForm(f => ({ ...f, subtareas: f.subtareas.filter(s=>s.id!==id) }));
   }
   function toggleSubtareaForm(id) {
     setForm(f => ({ ...f, subtareas: f.subtareas.map(s => s.id===id ? {...s, completada:!s.completada} : s) }));
+  }
+  function updateSubtareaForm(id, patch) {
+    setForm(f => ({ ...f, subtareas: f.subtareas.map(s => s.id===id ? {...s, ...patch} : s) }));
   }
 
   async function saveTarea() {
@@ -367,14 +406,15 @@ export default function Trafico({ userRole, userEmail }) {
 
   const filtered = useMemo(() => {
     let list = tareas;
-    if (soloMias) list = list.filter(t => t.asignado_email === userEmail);
-    if (filtroAsig) list = list.filter(t => t.asignado_nombre === filtroAsig);
+    if (soloMias) list = list.filter(t => t.asignado_email === userEmail || (t.subtareas||[]).some(s=>s.asignado_email===userEmail));
+    if (filtroAsig) list = list.filter(t => t.asignado_nombre === filtroAsig || (t.subtareas||[]).some(s=>s.asignado_nombre===filtroAsig));
     if (ocultarHechas) list = list.filter(t => t.estado !== 'hecho');
     return list;
   }, [tareas, soloMias, filtroAsig, ocultarHechas, userEmail]);
 
-  // Agrupar por cliente, ordenando cada columna por fecha/hora, y las
-  // columnas entre sí por la tarea pendiente más próxima a vencer.
+  // Agrupar por cliente, ordenando cada columna por fecha/hora efectiva
+  // (tarea o su subtarea pendiente más próxima), y las columnas entre sí
+  // por la tarea pendiente más próxima a vencer.
   const columnas = useMemo(() => {
     const grupos = {};
     filtered.forEach(t => {
@@ -383,24 +423,66 @@ export default function Trafico({ userRole, userEmail }) {
       grupos[key].push(t);
     });
     const arr = Object.entries(grupos).map(([cliente, items]) => {
-      items.sort((a,b) => dueTs(a) - dueTs(b));
+      items.sort((a,b) => taskDueTs(a) - taskDueTs(b));
       const pendientes = items.filter(t => t.estado !== 'hecho');
-      const proxima = pendientes.length ? Math.min(...pendientes.map(dueTs)) : Infinity;
+      const proxima = pendientes.length ? Math.min(...pendientes.map(taskDueTs)) : Infinity;
       return { cliente, items, proxima };
     });
     arr.sort((a,b) => a.proxima - b.proxima);
     return arr;
   }, [filtered]);
 
-  const listaPendientes = useMemo(() => {
-    return filtered
-      .filter(t => t.estado !== 'hecho')
-      .slice()
-      .sort((a,b) => dueTs(a) - dueTs(b));
+  // Lista de pendientes agrupada por proyecto: si una tarea tiene subtareas,
+  // cada subtarea pendiente aparece como su propia línea (con su responsable
+  // y fecha propios); si no tiene subtareas, aparece la tarea completa.
+  const pendientesAgrupados = useMemo(() => {
+    const items = [];
+    filtered.forEach(t => {
+      if (t.estado === 'hecho') return;
+      const subsPend = (t.subtareas||[]).filter(s=>!s.completada);
+      if (subsPend.length > 0) {
+        subsPend.forEach(s => {
+          const usaFechaSub = !!s.fecha_entrega;
+          items.push({
+            key: t.id+'_'+s.id, tareaId: t.id,
+            titulo: s.titulo, tareaTitulo: t.titulo,
+            asignado_nombre: s.asignado_nombre || t.asignado_nombre,
+            fecha_entrega: s.fecha_entrega || t.fecha_entrega,
+            hora_entrega: usaFechaSub ? s.hora_entrega : t.hora_entrega,
+            proyecto: t.brief_nombre || 'Sin proyecto',
+            ts: dueTs(usaFechaSub ? s : t),
+          });
+        });
+      } else {
+        items.push({
+          key: t.id, tareaId: t.id,
+          titulo: t.titulo, tareaTitulo: null,
+          asignado_nombre: t.asignado_nombre,
+          fecha_entrega: t.fecha_entrega, hora_entrega: t.hora_entrega,
+          proyecto: t.brief_nombre || 'Sin proyecto',
+          ts: dueTs(t),
+        });
+      }
+    });
+    const grupos = {};
+    items.forEach(it => {
+      if (!grupos[it.proyecto]) grupos[it.proyecto] = [];
+      grupos[it.proyecto].push(it);
+    });
+    const arr = Object.entries(grupos).map(([proyecto, its]) => {
+      its.sort((a,b) => a.ts - b.ts);
+      return { proyecto, items: its, proxima: its.length ? its[0].ts : Infinity };
+    });
+    arr.sort((a,b) => a.proxima - b.proxima);
+    return arr;
   }, [filtered]);
 
-  const vencidas = filtered.filter(t => t.estado!=='hecho' && getDays(t.fecha_entrega) < 0).length;
-  const prontas  = filtered.filter(t => t.estado!=='hecho' && getDays(t.fecha_entrega) >= 0 && getDays(t.fecha_entrega) <= 3).length;
+  const vencidas = filtered.filter(t => t.estado!=='hecho' && getDays(effectiveDue(t)?.fecha) < 0).length;
+  const prontas  = filtered.filter(t => {
+    if (t.estado==='hecho') return false;
+    const d = getDays(effectiveDue(t)?.fecha);
+    return d >= 0 && d <= 3;
+  }).length;
 
   if (loading) return <div style={{ textAlign:'center', padding:'3rem', color:'#8aa0b8' }}>Cargando tareas...</div>;
 
@@ -464,24 +546,32 @@ export default function Trafico({ userRole, userEmail }) {
           </div>
         </div>
 
-        {/* Lista lateral (compu) / abajo (celular) de pendientes por urgencia */}
+        {/* Lista lateral (compu) / abajo (celular) de pendientes por urgencia, agrupada por proyecto */}
         <div style={{ flex:'1 1 280px', minWidth:260 }}>
           <div style={{ background:'#fff', border:'1px solid #e8e8e8', borderRadius:12, padding:14, position:'sticky', top:12 }}>
-            <div style={{ fontSize:13, fontWeight:700, color:'#0d3b5e', marginBottom:10 }}>📌 Pendientes por urgencia</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:600, overflowY:'auto' }}>
-              {listaPendientes.map(t => {
-                const days = getDays(t.fecha_entrega);
-                return (
-                  <div key={t.id} onClick={()=>openEdit(t)} style={{ cursor:'pointer', borderBottom:'1px solid #f0f0f0', paddingBottom:8 }}>
-                    <div style={{ fontSize:12, fontWeight:600, color:'#0d3b5e' }}>{t.titulo}</div>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:3 }}>
-                      <span style={{ fontSize:11, color:'#999' }}>{t.cliente_nombre || 'Sin cliente'}{t.asignado_nombre ? ' · '+t.asignado_nombre : ''}</span>
-                      <span style={{ fontSize:11, fontWeight:600, color: days<0?'#dc2626': days<=3?'#d97706':'#8aa0b8' }}>{fmtDate(t.fecha_entrega)}{t.hora_entrega?' '+fmtHora(t.hora_entrega):''}</span>
-                    </div>
+            <div style={{ fontSize:13, fontWeight:700, color:'#0d3b5e', marginBottom:10 }}>📌 Pendientes por proyecto</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:16, maxHeight:600, overflowY:'auto' }}>
+              {pendientesAgrupados.map(({ proyecto, items }) => (
+                <div key={proyecto}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#7c3aed', textTransform:'uppercase', letterSpacing:.4, marginBottom:6 }}>◇ {proyecto}</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {items.map(it => {
+                      const days = getDays(it.fecha_entrega);
+                      return (
+                        <div key={it.key} onClick={()=>{ const t=tareas.find(x=>x.id===it.tareaId); if(t) openEdit(t); }} style={{ cursor:'pointer', borderBottom:'1px solid #f0f0f0', paddingBottom:8 }}>
+                          <div style={{ fontSize:12, fontWeight:600, color:'#0d3b5e' }}>{it.titulo}</div>
+                          {it.tareaTitulo && <div style={{ fontSize:10, color:'#aaa' }}>de: {it.tareaTitulo}</div>}
+                          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:3 }}>
+                            <span style={{ fontSize:11, color:'#999' }}>{it.asignado_nombre || 'Sin asignar'}</span>
+                            <span style={{ fontSize:11, fontWeight:600, color: days<0?'#dc2626': days<=3?'#d97706':'#8aa0b8' }}>{fmtDate(it.fecha_entrega)}{it.hora_entrega?' '+fmtHora(it.hora_entrega):''}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-              {listaPendientes.length === 0 && <div style={{ fontSize:12, color:'#c0c8d0' }}>No hay tareas pendientes 🎉</div>}
+                </div>
+              ))}
+              {pendientesAgrupados.length === 0 && <div style={{ fontSize:12, color:'#c0c8d0' }}>No hay tareas pendientes 🎉</div>}
             </div>
           </div>
         </div>
@@ -542,7 +632,8 @@ export default function Trafico({ userRole, userEmail }) {
 
           <div>
             <label style={lbl}>Subtareas</label>
-            <SubtareasChecklist subtareas={form.subtareas} onToggle={toggleSubtareaForm} onAdd={addSubtareaForm} onRemove={removeSubtareaForm}/>
+            <p style={{ fontSize:11, color:'#999', margin:'0 0 6px' }}>Si la tarea tiene subtareas, cada una puede tener su propio responsable y fecha. El "Asignar a" / "Fecha" de arriba quedan como generales de la tarea (se usan si una subtarea no tiene los suyos propios, o si la tarea no tiene subtareas).</p>
+            <SubtareasChecklist subtareas={form.subtareas} equipo={equipo} onToggle={toggleSubtareaForm} onAdd={addSubtareaForm} onRemove={removeSubtareaForm} onUpdate={updateSubtareaForm}/>
           </div>
 
           {!form.asignado_email && form.asignado_nombre && (
