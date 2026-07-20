@@ -48,6 +48,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
   const [popupPpto, setPopupPpto] = useState(null);
   const [showInformePopup, setShowInformePopup] = useState(false);
   const [expedienteId, setExpedienteId] = useState(null);
+  const [expedientePptoId, setExpedientePptoId] = useState(null);
   const [vincularPpto, setVincularPpto] = useState(null);
   const [solicitudPptoId, setSolicitudPptoId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -253,10 +254,11 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
               {p.fecha_evento && <span>📅 {p.fecha_evento}</span>}
               {p.ciudad && <span>📍 {p.ciudad}</span>}
               <span>📦 {(p.items||[]).filter(it=>!it._type).length} ítems</span>
-              {p.brief_id 
+              {p.brief_id
                 ? <span style={{ color:'#7c3aed', cursor:'pointer', fontWeight:500 }} onClick={e=>{ e.stopPropagation(); setExpedienteId(p.brief_id); }}>📁 Ver expediente</span>
-                : <span style={{ color:'#aaa', cursor:'pointer', fontSize:11 }} onClick={e=>{ e.stopPropagation(); setVincularPpto(p); }}>🔗 Vincular proyecto</span>
+                : <span style={{ color:'#7c3aed', cursor:'pointer', fontWeight:500 }} onClick={e=>{ e.stopPropagation(); setExpedientePptoId(p.id); }}>📁 Ver expediente</span>
               }
+              {!p.brief_id && <span style={{ color:'#aaa', cursor:'pointer', fontSize:11 }} onClick={e=>{ e.stopPropagation(); setVincularPpto(p); }}>🔗 Vincular proyecto</span>}
             </div>
           </div>
           <div style={{ textAlign:'right' }} onClick={() => setPopupPpto(p)}>
@@ -483,6 +485,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
       )}
 
       {expedienteId && <ExpedientePanel briefId={expedienteId} onClose={()=>setExpedienteId(null)}/>}
+      {expedientePptoId && <ExpedientePanel presupuestoId={expedientePptoId} onClose={()=>setExpedientePptoId(null)}/>}
     </div>
   );
 }

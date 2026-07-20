@@ -48,7 +48,7 @@ function EmptyMsg({ msg }) {
   return <div style={{ fontSize:12, color:'#aaa', padding:'8px 0', fontStyle:'italic' }}>{msg}</div>;
 }
 
-export default function ExpedientePanel({ briefId, onClose }) {
+export default function ExpedientePanel({ briefId, presupuestoId, onClose }) {
   const [brief, setBrief]           = useState(null);
   const [propuestas, setPropuestas] = useState([]);
   const [presupuestos, setPresupuestos] = useState([]);
@@ -64,12 +64,40 @@ export default function ExpedientePanel({ briefId, onClose }) {
   const [loading, setLoading]       = useState(true);
 
   useEffect(() => {
-    if (!briefId) return;
+    if (!briefId && !presupuestoId) return;
     loadAll();
-  }, [briefId]);
+  }, [briefId, presupuestoId]);
 
   async function loadAll() {
     setLoading(true);
+
+    if (!briefId && presupuestoId) {
+      // Expediente abierto directamente desde un presupuesto sin proyecto vinculado
+      const { data: pp } = await supabase.from('presupuestos').select('*').eq('id', presupuestoId).single();
+      setBrief(null); setPropuestas([]); setImplementaciones([]); setCambiosBrief([]); setProformas([]);
+      setPresupuestos(pp ? [pp] : []);
+      if (pp) {
+        const ppIds = [pp.id];
+        const [{ data: liqData }, { data: verData }, { data: solData }, { data: actData }, { data: scoutData }, { data: infData }] = await Promise.all([
+          supabase.from('liquidaciones').select('*').in('presupuesto_id', ppIds),
+          supabase.from('versiones_ppto').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: true }),
+          supabase.from('solicitudes').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: false }),
+          supabase.from('actas_entrega').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: false }),
+          supabase.from('scoutings').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: false }),
+          supabase.from('informes').select('*').in('presupuesto_id', ppIds).order('created_at', { ascending: false }),
+        ]);
+        setLiquidaciones(liqData || []);
+        setVersiones(verData || []);
+        setSolicitudes(solData || []);
+        setActas(actData || []);
+        setScoutings(scoutData || []);
+        setInformes(infData || []);
+      } else {
+        setLiquidaciones([]); setVersiones([]); setSolicitudes([]); setActas([]); setScoutings([]); setInformes([]);
+      }
+      setLoading(false);
+      return;
+    }
     const [brR, prR, ppR, implR, cambR, pfR] = await Promise.all([
       supabase.from('briefs').select('*').eq('id', briefId).single(),
       supabase.from('propuestas').select('*').eq('brief_id', briefId).order('created_at', { ascending: false }),
@@ -113,7 +141,9 @@ export default function ExpedientePanel({ briefId, onClose }) {
     setLoading(false);
   }
 
-  if (!briefId) return null;
+  if (!briefId && !presupuestoId) return null;
+
+  const pptoSolo = !briefId && presupuestos[0];
 
   return (
     <>
@@ -133,12 +163,14 @@ export default function ExpedientePanel({ briefId, onClose }) {
         <div style={{ padding:'18px 20px 14px', borderBottom:'1px solid #eee', background:'#0d3b5e', color:'#fff', flexShrink:0 }}>
           <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8 }}>
             <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginBottom:4, textTransform:'uppercase', letterSpacing:'.06em' }}>Expediente del proyecto</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginBottom:4, textTransform:'uppercase', letterSpacing:'.06em' }}>{briefId ? 'Expediente del proyecto' : 'Expediente del presupuesto'}</div>
               {loading
                 ? <div style={{ fontSize:16, fontWeight:700 }}>Cargando…</div>
-                : <div style={{ fontSize:17, fontWeight:700, lineHeight:1.3 }}>{brief?.nombre || '—'}</div>
+                : <div style={{ fontSize:17, fontWeight:700, lineHeight:1.3 }}>{brief?.nombre || pptoSolo?.nombre || '—'}</div>
               }
               {brief && <div style={{ fontSize:12, color:'rgba(255,255,255,.7)', marginTop:4 }}>🏢 {brief.cliente_nombre}</div>}
+              {!brief && pptoSolo?.cliente && <div style={{ fontSize:12, color:'rgba(255,255,255,.7)', marginTop:4 }}>🏢 {pptoSolo.cliente}</div>}
+              {!brief && pptoSolo?.nomenclatura && <div style={{ fontSize:11, color:'rgba(255,255,255,.5)', marginTop:2, fontFamily:'monospace' }}>{pptoSolo.nomenclatura}</div>}
             </div>
             <button onClick={onClose} style={{ background:'rgba(255,255,255,.15)', border:'none', borderRadius:8, color:'#fff', fontSize:18, cursor:'pointer', padding:'4px 10px', flexShrink:0 }}>✕</button>
           </div>
@@ -150,6 +182,11 @@ export default function ExpedientePanel({ briefId, onClose }) {
               {brief.pax > 0       && <span style={{ fontSize:11, color:'rgba(255,255,255,.7)' }}>👥 {brief.pax} PAX</span>}
             </div>
           )}
+          {!briefId && !loading && (
+            <div style={{ marginTop:10, fontSize:11, color:'rgba(255,255,255,.6)', fontStyle:'italic' }}>
+              Este presupuesto no está vinculado a un proyecto — se muestra su información directamente.
+            </div>
+          )}
         </div>
 
         {/* Contenido scrollable */}
@@ -159,6 +196,7 @@ export default function ExpedientePanel({ briefId, onClose }) {
           ) : (
             <>
               {/* Datos del proyecto */}
+              {brief && (
               <Section icon="◇" title="Datos del proyecto">
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                   {[
@@ -190,8 +228,10 @@ export default function ExpedientePanel({ briefId, onClose }) {
                   </a>
                 )}
               </Section>
+              )}
 
               {/* Propuestas */}
+              {briefId && (
               <Section icon="🎨" title="Propuesta creativa" count={propuestas.length}>
                 {propuestas.length === 0
                   ? <EmptyMsg msg="Sin propuesta creativa aún"/>
@@ -211,6 +251,7 @@ export default function ExpedientePanel({ briefId, onClose }) {
                   ))
                 }
               </Section>
+              )}
 
               {/* Presupuestos */}
               <Section icon="💰" title="Presupuestos" count={presupuestos.length}>
@@ -388,6 +429,7 @@ export default function ExpedientePanel({ briefId, onClose }) {
                   })
                 }
               </Section>
+              {briefId && (
               <Section icon="🎯" title="Implementaciones" count={implementaciones.length}>
                 {implementaciones.length === 0
                   ? <EmptyMsg msg="Sin implementaciones vinculadas"/>
@@ -416,6 +458,7 @@ export default function ExpedientePanel({ briefId, onClose }) {
                   })
                 }
               </Section>
+              )}
 
               {/* Proformas */}
               {proformas.length > 0 && (
