@@ -25,6 +25,7 @@ export default function AdminPanel() {
 
   useEffect(() => {
     fetchAll();
+    fetchUsuarios();
     const saved = localStorage.getItem('matilda_logo');
     if (saved) setLogoPreview(saved);
   }, []);
@@ -139,27 +140,54 @@ export default function AdminPanel() {
     fetchAll();
   }
 
-  // ── Usuarios ───────────────────────────────────────────────
+  // ── Usuarios (vía edge function admin-usuarios, con service_role) ──
+  async function callAdminUsuarios(body) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-usuarios`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.error) throw new Error(json.error || `Error ${res.status}`);
+    return json;
+  }
+
+  async function fetchUsuarios() {
+    try {
+      const { usuarios: lista } = await callAdminUsuarios({ action: 'list' });
+      setUsuarios(lista || []);
+    } catch (e) {
+      console.error('No se pudo listar usuarios:', e);
+    }
+  }
+
   async function createUser() {
     if (!newUser.email || !newUser.password) { showToast('Email y contraseña requeridos'); return; }
-    const { error } = await supabase.auth.admin.createUser({
-      email: newUser.email,
-      password: newUser.password,
-      email_confirm: true,
-      user_metadata: { role: newUser.role },
-    });
-    if (error) { showToast('Error: ' + error.message); return; }
-    setNewUser({ email:'', password:'', role:'ventas' });
-    showToast('Usuario creado ✓');
+    try {
+      await callAdminUsuarios({ action: 'create', email: newUser.email, password: newUser.password, role: newUser.role });
+      setNewUser({ email:'', password:'', role:'ventas' });
+      showToast('Usuario creado ✓');
+      fetchUsuarios();
+    } catch (e) { showToast('Error: ' + e.message); }
   }
 
   async function updateUserRole(userId, role) {
-    const { error } = await supabase.auth.admin.updateUserById(userId, {
-      user_metadata: { role },
-    });
-    if (error) { showToast('Error: ' + error.message); return; }
-    showToast('Rol actualizado ✓');
-    setEditUser(null);
+    try {
+      await callAdminUsuarios({ action: 'updateRole', userId, role });
+      showToast('Rol actualizado ✓');
+      setEditUser(null);
+      fetchUsuarios();
+    } catch (e) { showToast('Error: ' + e.message); }
+  }
+
+  async function deleteUser(userId, email) {
+    if (!window.confirm(`¿Eliminar el acceso de ${email}? No se puede deshacer.`)) return;
+    try {
+      await callAdminUsuarios({ action: 'delete', userId });
+      showToast('Usuario eliminado ✓');
+      fetchUsuarios();
+    } catch (e) { showToast('Error: ' + e.message); }
   }
 
   // ── Logo ───────────────────────────────────────────────────
@@ -273,7 +301,29 @@ export default function AdminPanel() {
               </div>
             </div>
             <button style={{ ...S.btnPrimary, marginTop:14 }} onClick={createUser}>+ Crear usuario</button>
-            <p style={{ fontSize:12, color:'#8aa0b8', marginTop:10 }}>Para eliminar usuarios andá a Supabase → Authentication → Users.</p>
+          </div>
+
+          <div style={S.card}>
+            <h3 style={{ fontSize:15, fontWeight:700, color:'#0d3b5e', marginBottom:14 }}>Usuarios actuales ({usuarios.length})</h3>
+            <table style={S.table}>
+              <thead><tr>{['Email','Rol','Creado',''].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+              <tbody>
+                {usuarios.map(u => (
+                  <tr key={u.id}>
+                    <td style={S.td}>{u.email}</td>
+                    <td style={S.td}>
+                      <select value={u.role} onChange={e=>updateUserRole(u.id, e.target.value)} style={{ ...S.select, fontSize:12, padding:'5px 8px' }}>
+                        <option value="">Sin rol</option>
+                        {ROLES_LIST.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                      </select>
+                    </td>
+                    <td style={S.td}>{u.created_at ? new Date(u.created_at).toLocaleDateString('es-EC') : '—'}</td>
+                    <td style={S.td}><button style={S.btnRed} onClick={()=>deleteUser(u.id, u.email)}>🗑</button></td>
+                  </tr>
+                ))}
+                {usuarios.length===0 && <tr><td colSpan={4} style={{ ...S.td, textAlign:'center', color:'#8aa0b8' }}>No se pudo cargar la lista de usuarios</td></tr>}
+              </tbody>
+            </table>
           </div>
 
           {/* Tabla de roles por rol */}
