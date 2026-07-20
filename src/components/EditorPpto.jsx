@@ -600,6 +600,33 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     if(error){showToast('Error: '+error.message);return;}
     try{sessionStorage.removeItem(SESSION_KEY);sessionStorage.removeItem(SESSION_TAB);}catch{}
     showToast('Guardado ✓');
+    // Si el presupuesto ya está aprobado (o más adelante en el flujo) y tiene
+    // fecha de evento, mantener sincronizado su registro en el calendario de
+    // implementación — por si la fecha se editó después de la aprobación.
+    if (ESTADOS_CIERRE.includes(payload.estado) && payload.fecha_evento) {
+      const pptoId = p.id || data?.id;
+      if (pptoId) {
+        const fechaFin = (() => {
+          if (!payload.dias_evento || payload.dias_evento <= 1) return payload.fecha_evento;
+          const d = new Date(payload.fecha_evento + 'T00:00:00');
+          d.setDate(d.getDate() + (payload.dias_evento - 1));
+          return d.toISOString().slice(0,10);
+        })();
+        const implPayload = {
+          nombre: payload.nombre || payload.cliente || 'Evento',
+          ciudad: payload.ciudad || '',
+          cliente_id: payload.cliente_id || null,
+          cliente_nombre: payload.cliente || '',
+          presupuesto_id: pptoId,
+          presupuesto_nombre: payload.nombre || '',
+          fecha_evento: payload.fecha_evento,
+          fecha_evento_fin: fechaFin,
+        };
+        const { data: existente } = await supabase.from('implementaciones').select('id').eq('presupuesto_id', pptoId).maybeSingle();
+        if (existente) await supabase.from('implementaciones').update(implPayload).eq('id', existente.id);
+        else await supabase.from('implementaciones').insert(implPayload);
+      }
+    }
     // Notificar al productor si fue asignado/cambiado
     if (p._notify_productor && p.productor_email) {
       try {
@@ -846,7 +873,30 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             if (p.id) {
               await supabase.from('presupuestos').update({ estado: nuevoEstado }).eq('id', p.id);
               await saveVersion({ ...p, estado: nuevoEstado }, nuevoEstado);
-              if (nuevoEstado === 'aprobado') notifyPresupuestoAprobado(p);
+              if (nuevoEstado === 'aprobado') {
+                notifyPresupuestoAprobado(p);
+                if (p.fecha_evento) {
+                  const fechaFin = (() => {
+                    if (!p.dias_evento || p.dias_evento <= 1) return p.fecha_evento;
+                    const d = new Date(p.fecha_evento + 'T00:00:00');
+                    d.setDate(d.getDate() + (p.dias_evento - 1));
+                    return d.toISOString().slice(0,10);
+                  })();
+                  const implPayload = {
+                    nombre: p.nombre || p.cliente || 'Evento',
+                    ciudad: p.ciudad || '',
+                    cliente_id: p.cliente_id || null,
+                    cliente_nombre: p.cliente || '',
+                    presupuesto_id: p.id,
+                    presupuesto_nombre: p.nombre || '',
+                    fecha_evento: p.fecha_evento,
+                    fecha_evento_fin: fechaFin,
+                  };
+                  const { data: existente } = await supabase.from('implementaciones').select('id').eq('presupuesto_id', p.id).maybeSingle();
+                  if (existente) await supabase.from('implementaciones').update(implPayload).eq('id', existente.id);
+                  else await supabase.from('implementaciones').insert(implPayload);
+                }
+              }
             }
           }}>
           {ESTADOS_PPTO.map(e=><option key={e} value={e} disabled={!canChangeEstadoPpto(userRole,e)&&p.estado!==e}>{ESTADOS_PPTO_LABELS[e]}</option>)}
