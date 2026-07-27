@@ -724,11 +724,12 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
           ${td(c.cantidad,'#1a1a2e',false,'center',bg)}
           ${td(c.dias,'#1a1a2e',false,'center',bg)}
           ${td(fmtN(c.costoUnit),'#8b1a1a',false,'right',bg)}
-          ${td(fmtN(c.costoTotal),'#8b1a1a',true,'right',bg)}
+          ${td(fmtN(c.costoTotalConAdicionales),'#8b1a1a',true,'right',bg)}
           ${td(fmtN(c.precioU),'#0d3b5e',false,'right',bg)}
           ${td(fmtN(c.precio),'#0d3b5e',true,'right',bg)}
           ${td(it.proveedor||'')}
           ${td(it.num_factura_prov||'')}
+          ${td((it.proveedores_adicionales||[]).map(pr=>`${pr.razon_social||'—'} (${fmtN(pr.costo||0)})`).join(' | '))}
           ${tieneReal?td(fmtN(c.costoRealUnit),'#1a6e3e',false,'right',bg):td('—','#bbbbbb',false,'right',bg)}
           ${tieneReal?td(fmtN(c.costoRealTotal),'#1a6e3e',false,'right',bg):td('—','#bbbbbb',false,'right',bg)}
           ${tieneReal?td(fmtN(c.ahorro),c.ahorro>=0?'#1a6e3e':'#c8264a',true,'right',bg):td('—','#bbbbbb',false,'right',bg)}
@@ -803,7 +804,7 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
       ${th('Cant','#ffffff','center')}${th('Días','#ffffff','center')}
       ${th('C.Unit','#ffcccc','right')}${th('C.Total','#ffcccc','right')}
       ${th('P.Unit','#aaddff','right')}${th('P.Total','#aaddff','right')}
-      ${th('Proveedor')}${th('# Factura')}
+      ${th('Proveedor')}${th('# Factura')}${th('Proveedores adicionales','#ffcccc','left')}
       ${th('C.Real Unit','#aaffcc','right')}${th('C.Real Total','#aaffcc','right')}${th('Ahorro','#aaffcc','right')}
       ${th('Margen','#ffffaa','right')}${th('% Margen','#ffffaa','right')}
       ${th('OH+BCO','#ffddaa','right')}${th('Total Costo','#ffddaa','right')}
@@ -1211,7 +1212,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                           
                           {it.categoria&&<span style={{fontSize:11,background:'#e8f0f8',color:'#0d3b5e',padding:'2px 7px',borderRadius:4,fontWeight:600}}>{it.categoria}</span>}
                           {tieneReal&&<span style={{fontSize:11,background:'#edf7ed',color:'#2e8b4e',padding:'2px 7px',borderRadius:4,fontWeight:600,border:'1px solid #2e8b4e44'}}>Ahorro: {fmt(c.ahorro)}</span>}
-                          <span style={{fontSize:12,color:'#8aa0b8'}}>Costo: <strong>{fmt(c.costoTotal)}</strong></span>
+                          <span style={{fontSize:12,color:'#8aa0b8'}}>Costo: <strong>{fmt(c.costoTotalConAdicionales)}</strong></span>
                           <span style={{fontSize:12,color:'#065f46',fontWeight:600}}>Precio: <strong>{fmt(c.precio)}</strong></span>
                           <span style={{fontSize:11,color:c.margen>=0?'#2e8b4e':'#c8264a',fontWeight:600}}>{fmtPct(c.margenPct)}</span>
                           {!bloqueado&&<button style={{...S.btnRed,padding:'3px 7px'}} onClick={e=>{e.stopPropagation();delItem(it.id);}}>🗑</button>}
@@ -1247,6 +1248,47 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                                   <div><Label>BCO %</Label><input type="number" step="0.1" style={S.input} value={it.bco_pct??0} onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'bco_pct',e.target.value)}/></div>
                                   <div><Label>Total c/OH+BCO</Label><input style={{...S.inputRO,fontWeight:700,color:'#c2410c'}} readOnly value={fmt(c.totalCosto)}/></div>
                                 </div>
+                              </div>
+
+                              {/* MULTI-PROVEEDOR — justo después del costo del proveedor principal */}
+                              <div style={{gridColumn:'1/-1',background:'#f8fafc',borderRadius:8,padding:'10px 12px',border:'1px solid #dde6ef'}}>
+                                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                                  <div style={{fontSize:12,fontWeight:700,color:'#5a7a9a'}}>🏭 Proveedores adicionales para este mismo rubro</div>
+                                  <button onClick={()=>{
+                                    const provs = [...(it.proveedores_adicionales||[]), {id:crypto.randomUUID(),razon_social:'',factura:'',costo:0}];
+                                    updItem(it.id,'proveedores_adicionales',provs);
+                                  }} style={{fontSize:11,padding:'3px 10px',borderRadius:6,border:'1px solid #0d3b5e',background:'transparent',color:'#0d3b5e',cursor:'pointer',fontFamily:'inherit'}}>
+                                    + Agregar proveedor
+                                  </button>
+                                </div>
+                                {(it.proveedores_adicionales||[]).length === 0 && (
+                                  <div style={{fontSize:12,color:'#aaa',fontStyle:'italic'}}>Sin proveedores adicionales — el costo del rubro es solo el de arriba</div>
+                                )}
+                                {(it.proveedores_adicionales||[]).map((prov,pi) => (
+                                  <div key={prov.id} style={{display:'grid',gridTemplateColumns:'1fr 1fr auto auto',gap:8,marginBottom:8,padding:'8px',background:'#fff',borderRadius:6,border:'1px solid #eee'}}>
+                                    <div><Label>Razón social</Label>
+                                      <input style={S.input} value={prov.razon_social||''} placeholder="Nombre del proveedor"
+                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],razon_social:e.target.value};updItem(it.id,'proveedores_adicionales',ps);}}/>
+                                    </div>
+                                    <div><Label># Factura</Label>
+                                      <input style={S.input} value={prov.factura||''} placeholder="001-001-000123"
+                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],factura:e.target.value};updItem(it.id,'proveedores_adicionales',ps);}}/>
+                                    </div>
+                                    <div><Label>Costo ($)</Label>
+                                      <input type="number" step="0.01" style={S.input} value={prov.costo||0}
+                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],costo:Number(e.target.value)};updItem(it.id,'proveedores_adicionales',ps);}}/>
+                                    </div>
+                                    <div style={{display:'flex',alignItems:'flex-end',paddingBottom:2}}>
+                                      <button onClick={()=>{const ps=(it.proveedores_adicionales||[]).filter((_,i)=>i!==pi);updItem(it.id,'proveedores_adicionales',ps);}}
+                                        style={{background:'#fee2e2',border:'none',borderRadius:6,color:'#dc2626',cursor:'pointer',padding:'7px 10px',fontSize:13}}>✕</button>
+                                    </div>
+                                  </div>
+                                ))}
+                                {(it.proveedores_adicionales||[]).length > 0 && (
+                                  <div style={{fontSize:12,color:'#5a7a9a',marginTop:4,padding:'6px 10px',background:'#eef4fb',borderRadius:6}}>
+                                    Costo adicional total: <strong>{fmt(c.costoAdicionales)}</strong> · Costo del rubro completo (proveedor principal + adicionales): <strong style={{color:'#c2410c'}}>{fmt(c.costoTotalConAdicionales)}</strong> — el precio al cliente no cambia
+                                  </div>
+                                )}
                               </div>
 
                               {/* COSTO REAL */}
@@ -1366,47 +1408,6 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                                     </div>
                                   );
                                 })()}
-                              </div>
-
-                              {/* MULTI-PROVEEDOR */}
-                              <div style={{gridColumn:'1/-1',background:'#f8fafc',borderRadius:8,padding:'10px 12px',border:'1px solid #dde6ef'}}>
-                                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-                                  <div style={{fontSize:12,fontWeight:700,color:'#5a7a9a'}}>🏭 Proveedores adicionales</div>
-                                  <button onClick={()=>{
-                                    const provs = [...(it.proveedores_adicionales||[]), {id:crypto.randomUUID(),razon_social:'',factura:'',costo:0}];
-                                    updItem(it.id,'proveedores_adicionales',provs);
-                                  }} style={{fontSize:11,padding:'3px 10px',borderRadius:6,border:'1px solid #0d3b5e',background:'transparent',color:'#0d3b5e',cursor:'pointer',fontFamily:'inherit'}}>
-                                    + Agregar proveedor
-                                  </button>
-                                </div>
-                                {(it.proveedores_adicionales||[]).length === 0 && (
-                                  <div style={{fontSize:12,color:'#aaa',fontStyle:'italic'}}>Sin proveedores adicionales — el precio al cliente es uno solo</div>
-                                )}
-                                {(it.proveedores_adicionales||[]).map((prov,pi) => (
-                                  <div key={prov.id} style={{display:'grid',gridTemplateColumns:'1fr 1fr auto auto',gap:8,marginBottom:8,padding:'8px',background:'#fff',borderRadius:6,border:'1px solid #eee'}}>
-                                    <div><Label>Razón social</Label>
-                                      <input style={S.input} value={prov.razon_social||''} placeholder="Nombre del proveedor"
-                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],razon_social:e.target.value};updItem(it.id,'proveedores_adicionales',ps);}}/>
-                                    </div>
-                                    <div><Label># Factura</Label>
-                                      <input style={S.input} value={prov.factura||''} placeholder="001-001-000123"
-                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],factura:e.target.value};updItem(it.id,'proveedores_adicionales',ps);}}/>
-                                    </div>
-                                    <div><Label>Costo ($)</Label>
-                                      <input type="number" step="0.01" style={S.input} value={prov.costo||0}
-                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],costo:Number(e.target.value)};updItem(it.id,'proveedores_adicionales',ps);}}/>
-                                    </div>
-                                    <div style={{display:'flex',alignItems:'flex-end',paddingBottom:2}}>
-                                      <button onClick={()=>{const ps=(it.proveedores_adicionales||[]).filter((_,i)=>i!==pi);updItem(it.id,'proveedores_adicionales',ps);}}
-                                        style={{background:'#fee2e2',border:'none',borderRadius:6,color:'#dc2626',cursor:'pointer',padding:'7px 10px',fontSize:13}}>✕</button>
-                                    </div>
-                                  </div>
-                                ))}
-                                {(it.proveedores_adicionales||[]).length > 0 && (
-                                  <div style={{fontSize:12,color:'#5a7a9a',marginTop:4,padding:'6px 10px',background:'#eef4fb',borderRadius:6}}>
-                                    Costo adicional total: <strong>{fmt((it.proveedores_adicionales||[]).reduce((a,p)=>a+Number(p.costo||0),0))}</strong> — el precio al cliente no cambia
-                                  </div>
-                                )}
                               </div>
 
                               {/* Foto de referencia */}
@@ -1704,7 +1705,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                       if(!cats[cat])cats[cat]={items:0,costoProv:0,oh:0,bco:0,totalCosto:0,precio:0};
                       const c=calcItem(it);
                       cats[cat].items+=1;
-                      cats[cat].costoProv+=c.costoTotal;
+                      cats[cat].costoProv+=c.costoTotalConAdicionales;
                       cats[cat].oh+=c.ohVal;
                       cats[cat].bco+=c.bcoVal;
                       cats[cat].totalCosto+=c.totalCosto;
@@ -1836,7 +1837,7 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                     <td style={{padding:'6px',textAlign:'center'}}>{c.dias}</td>
                     {previewMode==='financiero'&&<>
                       <td style={{padding:'6px',textAlign:'right',color:'#c8264a'}}>{fmt(c.costoUnit)}</td>
-                      <td style={{padding:'6px',textAlign:'right',color:'#c8264a',fontWeight:600}}>{fmt(c.costoTotal)}</td>
+                      <td style={{padding:'6px',textAlign:'right',color:'#c8264a',fontWeight:600}}>{fmt(c.costoTotalConAdicionales)}</td>
                     </>}
                     <td style={{padding:'6px',textAlign:'right'}}>{fmt(c.precioU)}</td>
                     <td style={{padding:'6px 10px',textAlign:'right',fontWeight:700}}>{fmt(c.precio)}</td>

@@ -350,7 +350,8 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
       const c = calcItem(it);
       const tieneReal = it.costo_real_unit !== null && it.costo_real_unit !== undefined;
       const bg = i % 2 === 1 ? '#f8fafc' : '#fff';
-      return `<tr style="border-bottom:1px solid #eef2f7;background:${bg};font-size:10px;">
+      const tieneAdicionales = (it.proveedores_adicionales||[]).length > 0;
+      const filaPrincipal = `<tr style="border-bottom:1px solid #eef2f7;background:${bg};font-size:10px;">
         <td style="padding:6px 10px;">
           <div style="font-weight:700;color:#1a1a2e;">${it.item || ''}</div>
           ${it.detalle ? '<div style="font-size:9px;color:#6b7a99;margin-top:1px;">' + renderDetalle(it.detalle) + '</div>' : ''}
@@ -358,17 +359,34 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
         <td style="padding:6px 5px;text-align:center;">${c.cantidad}</td>
         <td style="padding:6px 5px;text-align:center;">${c.dias}</td>
         <td style="padding:6px 5px;text-align:right;color:#8b1a1a;">${fmt(c.costoUnit)}</td>
-        <td style="padding:6px 5px;text-align:right;color:#8b1a1a;font-weight:600;">${fmt(c.costoTotal)}</td>
+        <td style="padding:6px 5px;text-align:right;color:#8b1a1a;font-weight:600;">${fmt(c.costoTotalConAdicionales)}${tieneAdicionales ? '<div style="font-size:8px;font-weight:400;color:#a35a5a;">(' + fmt(c.costoTotal) + ' + ' + fmt(c.costoAdicionales) + ' adic.)</div>' : ''}</td>
         <td style="padding:6px 5px;text-align:right;color:#0d3b5e;">${fmt(c.precioU)}</td>
         <td style="padding:6px 5px;text-align:right;color:#0d3b5e;font-weight:600;">${fmt(c.precio)}</td>
-        <td style="padding:6px 5px;text-align:right;font-weight:600;color:${(c.precio-c.costoTotal)>=0?'#1a6e3e':'#8b1a1a'};">${fmt(c.precio-c.costoTotal)}<div style="font-size:8px;">(${c.margenPct.toFixed(1)}%)</div></td>
-        <td style="padding:6px 8px;font-size:9px;color:#5a7a9a;">${it.proveedor||''}</td>
+        <td style="padding:6px 5px;text-align:right;font-weight:600;color:${(c.precio-c.costoTotalConAdicionales)>=0?'#1a6e3e':'#8b1a1a'};">${fmt(c.precio-c.costoTotalConAdicionales)}<div style="font-size:8px;">(${c.margenPct.toFixed(1)}%)</div></td>
+        <td style="padding:6px 8px;font-size:9px;color:#5a7a9a;">${it.proveedor||''}${tieneAdicionales ? ' <span style="color:#c2410c;font-weight:700;">+' + it.proveedores_adicionales.length + '</span>' : ''}</td>
         <td style="padding:6px 8px;font-size:9px;color:#5a7a9a;">${it.num_factura_prov||''}</td>
         <td style="padding:6px 5px;text-align:right;color:#1a6e3e;">${tieneReal?fmt(c.costoRealUnit):'—'}</td>
         <td style="padding:6px 5px;text-align:right;color:#1a6e3e;font-weight:600;">${tieneReal?fmt(c.costoRealTotal):'—'}</td>
         <td style="padding:6px 5px;text-align:right;color:#1a6e3e;">${tieneReal?fmt(c.ahorro):'—'}</td>
         <td style="padding:6px 5px;text-align:right;font-weight:600;color:${tieneReal?((c.precio-c.costoRealTotal)>=0?'#1a6e3e':'#8b1a1a'):'#888'};">${tieneReal?fmt(c.precio-c.costoRealTotal):'—'}</td>
       </tr>`;
+      const filasProveedores = !tieneAdicionales ? '' : [
+        `<tr style="background:${bg};font-size:9px;">
+          <td style="padding:2px 10px 2px 24px;color:#a35a5a;">↳ ${it.proveedor || 'Proveedor principal'}</td>
+          <td colspan="3"></td>
+          <td style="padding:2px 5px;text-align:right;color:#a35a5a;">${fmt(c.costoTotal)}</td>
+          <td colspan="7"></td>
+        </tr>`,
+        ...it.proveedores_adicionales.map(pr => `<tr style="background:${bg};font-size:9px;">
+          <td style="padding:2px 10px 2px 24px;color:#a35a5a;">↳ ${pr.razon_social || 'Proveedor adicional'}</td>
+          <td colspan="3"></td>
+          <td style="padding:2px 5px;text-align:right;color:#a35a5a;">${fmt(pr.costo||0)}</td>
+          <td colspan="4"></td>
+          <td style="padding:2px 8px;color:#a35a5a;">${pr.factura||''}</td>
+          <td colspan="3"></td>
+        </tr>`),
+      ].join('');
+      return filaPrincipal + filasProveedores;
     }).join('');
     return subcatRow + rows;
   }).join('');
@@ -378,7 +396,7 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
     itemRows = spVisibles.map(function(sp) {
       var spItems = sp.grupos.flatMap(function(g){return g.items;});
       var spPrecio = spItems.reduce(function(a,it){return a+calcItem(it).precio;},0);
-      var spCosto = spItems.reduce(function(a,it){return a+calcItem(it).costoTotal;},0);
+      var spCosto = spItems.reduce(function(a,it){return a+calcItem(it).costoTotalConAdicionales;},0);
       var spFee = spPrecio * ((ppto.fee_agencia||0)/100);
       var spGrupos = groupBySubcat(sp.grupos.flatMap(function(g){var r=[];r.push({_type:'subcat',subcategoria:g.subcat});g.items.forEach(function(it){r.push(it);});return r;}));
       var spNombre = sp.nombre || '';
@@ -577,7 +595,7 @@ export function generateExcelFinancieroData(ppto) {
   rows.push([]);
   rows.push([
     'Subpresupuesto','Subcategoría','Categoría','Ítem','Detalle','Cantidad','Días',
-    'Costo Unit.','Costo Total',
+    'Costo Unit.','Costo Total (proveedor principal)','Proveedores adicionales','Costo Total (con adicionales)',
     'Precio Unit.','Precio Total',
     'Proveedor','# Factura Proveedor',
     'Costo Real Unit.','Costo Real Total','Ahorro',
@@ -597,6 +615,8 @@ export function generateExcelFinancieroData(ppto) {
       currentSubppto, it.subcategoria||'', it.categoria||'', it.item||'', it.detalle||'',
       c.cantidad, c.dias,
       c.costoUnit, c.costoTotal,
+      (it.proveedores_adicionales||[]).map(pr=>`${pr.razon_social||'—'}: ${pr.costo||0}${pr.factura?' (Fact. '+pr.factura+')':''}`).join(' | '),
+      c.costoTotalConAdicionales,
       c.precioU, c.precio,
       it.proveedor||'', it.num_factura_prov||'',
       tieneReal?c.costoRealUnit:'', tieneReal?c.costoRealTotal:'', tieneReal?c.ahorro:'',

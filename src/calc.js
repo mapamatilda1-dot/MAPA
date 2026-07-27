@@ -27,9 +27,16 @@ export function calcItem(it) {
   // Costo cotizado — compatibilidad con campo antiguo 'costo'
   const costoUnit  = r2(it.costo_unit ?? it.costo ?? 0);
   const costoTotal = r2(costoUnit * cantidad * dias);
-  const ohVal      = r2(costoTotal * (oh  / 100));
-  const bcoVal     = r2(costoTotal * (bco / 100));
-  const totalCosto = r2(costoTotal + ohVal + bcoVal);
+
+  // Proveedores adicionales del mismo rubro — cada uno con su costo total
+  // ya cotizado (no se multiplica por cantidad/días). El costo real del
+  // rubro es la suma del proveedor principal + todos los adicionales.
+  const costoAdicionales = r2((it.proveedores_adicionales || []).reduce((a, pr) => a + Number(pr.costo || 0), 0));
+  const costoTotalConAdicionales = r2(costoTotal + costoAdicionales);
+
+  const ohVal      = r2(costoTotalConAdicionales * (oh  / 100));
+  const bcoVal     = r2(costoTotalConAdicionales * (bco / 100));
+  const totalCosto = r2(costoTotalConAdicionales + ohVal + bcoVal);
 
   // Costo real
   const tieneReal      = it.costo_real_unit !== undefined && it.costo_real_unit !== null;
@@ -58,7 +65,7 @@ export function calcItem(it) {
   const hasWarning = precio > 0 && totalCosto > precio;
 
   return {
-    costoUnit, costoTotal, ohVal, bcoVal, totalCosto,
+    costoUnit, costoTotal, costoAdicionales, costoTotalConAdicionales, ohVal, bcoVal, totalCosto,
     costoRealUnit, costoRealTotal, ohRealVal, bcoRealVal, totalCostoReal, ahorro,
     precioU, cantidad, dias, precio,
     margen, margenPct, margenReal, margenRealPct,
@@ -74,7 +81,7 @@ export function calcPpto(p) {
   (p.items || []).forEach(it => {
     if (it._type === 'subcat') return;
     const c = calcItem(it);
-    subtotalCostoBase += c.costoTotal;
+    subtotalCostoBase += c.costoTotalConAdicionales;
     subtotalOH        += c.ohVal;
     subtotalBCO       += c.bcoVal;
     subtotalCosto     += c.totalCosto;
