@@ -26,6 +26,11 @@ const TOOLS = [
     input_schema: { type: 'object', properties: { query: { type: 'string', description: 'palabra clave: nombre del presupuesto, cliente o número' } }, required: ['query'] },
   },
   {
+    name: 'ver_items_de_presupuesto',
+    description: 'Dado el nombre (o parte del nombre), cliente o número de un presupuesto puntual, devuelve TODOS sus ítems con costo interno y precio al cliente. Usar cuando la pregunta menciona un presupuesto/proyecto específico y buscar_items_cotizados no encontró el ítem por palabra clave exacta — así se puede revisar la lista completa de ese presupuesto.',
+    input_schema: { type: 'object', properties: { query: { type: 'string', description: 'nombre, cliente o número del presupuesto' } }, required: ['query'] },
+  },
+  {
     name: 'buscar_items_cotizados',
     description: 'Busca ítems específicos dentro de presupuestos por palabra clave (ej: "modelo", "DJ", "catering", "tarima") para saber qué precio se le cotizó/cobró al cliente por ese ítem en distintos proyectos. Devuelve precio unitario, cantidad, presupuesto y cliente.',
     input_schema: { type: 'object', properties: { query: { type: 'string', description: 'palabra clave del ítem a buscar' } }, required: ['query'] },
@@ -84,7 +89,7 @@ async function ejecutarTool(name, input) {
 
   if (name === 'buscar_items_cotizados') {
     const { data } = await supabase.from('presupuestos')
-      .select('nombre,cliente,fecha_evento,items')
+      .select('nombre,cliente,nomenclatura,fecha_evento,items')
       .order('created_at', { ascending: false })
       .limit(400);
     const resultados = [];
@@ -94,9 +99,11 @@ async function ejecutarTool(name, input) {
         const texto = norm(`${it.item || ''} ${it.detalle || ''}`);
         if (texto.includes(q)) {
           resultados.push({
-            item: it.item, detalle: it.detalle, precio_unitario: it.precio_unit,
+            item: it.item, detalle: it.detalle,
+            costo_unitario: it.costo_unit,
+            precio_unitario_al_cliente: it.precio_unit,
             cantidad: it.cantidad, dias: it.dias,
-            presupuesto: p.nombre, cliente: p.cliente, fecha_evento: p.fecha_evento,
+            presupuesto: p.nombre, nomenclatura: p.nomenclatura, cliente: p.cliente, fecha_evento: p.fecha_evento,
           });
         }
       });
@@ -147,6 +154,24 @@ async function ejecutarTool(name, input) {
     return resultados.slice(0, 8);
   }
 
+
+  if (name === 'ver_items_de_presupuesto') {
+    const { data } = await supabase.from('presupuestos')
+      .select('nombre,cliente,nomenclatura,estado,fecha_evento,items')
+      .order('created_at', { ascending: false })
+      .limit(500);
+    const candidatos = (data || []).filter(p => norm(`${p.nombre || ''} ${p.cliente || ''} ${p.nomenclatura || ''}`).includes(q));
+    if (candidatos.length === 0) return { error: 'No se encontró ningún presupuesto con ese nombre/cliente/número' };
+    return candidatos.slice(0, 3).map(p => ({
+      presupuesto: p.nombre, nomenclatura: p.nomenclatura, cliente: p.cliente, estado: p.estado, fecha_evento: p.fecha_evento,
+      items: (p.items || []).filter(it => it._type !== 'subcat').map(it => ({
+        item: it.item, detalle: it.detalle,
+        costo_unitario: it.costo_unit, precio_unitario_al_cliente: it.precio_unit,
+        cantidad: it.cantidad, dias: it.dias,
+      })),
+    }));
+  }
+
   return { error: 'Herramienta no reconocida: ' + name };
 }
 
@@ -159,9 +184,10 @@ Reglas:
 - IMPORTANTE: buscar_gastos_historicos y buscar_referencias_historicas son DOS fuentes distintas y complementarias (liquidaciones formales vs. historial cargado aparte, como Excels o fotos subidas). Ante CUALQUIER pregunta sobre gastos, rutas, carreras, movilización, alimentación o costos históricos — sea "¿cuánto costó X?", "¿tenés algo de X?", "¿cuánto debería costar X?" o similar — buscá SIEMPRE en las dos herramientas antes de responder. Nunca digas que no hay información habiendo consultado una sola.
 - Si te preguntan cuánto debería costar algo (ej. una carrera/ruta) basándote en el historial, calculá un promedio o rango aproximado a partir de lo que encontraste en ambas fuentes, y aclará que es una estimación basada en el historial (citá 2-3 ejemplos concretos con fecha y monto que la respalden).
 - Si te piden un link (de Canva, etc.), dalo completo y clickeable tal cual lo encontraste.
-- Si te preguntan cuánto se le cobró/cotizó a un cliente por algo, usá buscar_items_cotizados y citá el presupuesto y precio exacto.
-- Respondé en español, directo y conciso. Sin relleno ni disculpas innecesarias.
-- Si después de buscar con varias palabras clave no encontrás nada relevante, decilo claramente en vez de inventar.`;
+- Distinción CLAVE: "costo", "costo unitario", "cuánto nos cuesta/pagamos" = costo_unitario (interno, lo que paga la agencia al proveedor). "Precio", "cuánto cobramos/cotizamos al cliente" = precio_unitario_al_cliente. Nunca confundas uno por el otro, y aclará cuál es cuál en tu respuesta si hay ambigüedad.
+- Si te preguntan por un ítem dentro de un presupuesto específico (te dan el nombre del proyecto/presupuesto), usá primero buscar_items_cotizados con la palabra del ítem; si no aparece nada de ese presupuesto puntual, usá ver_items_de_presupuesto con el nombre del proyecto para revisar la lista COMPLETA de ítems de ese presupuesto y buscar ahí el que corresponda (puede tener un nombre distinto al que usó la persona, ej. "Modelo AAA" vs "Modelo" vs "Talento").
+- PROHIBIDO ABSOLUTO: nunca inventes cifras de "prácticas del sector", "precios típicos del mercado", rangos generales, ni ningún dato que no hayas obtenido de las herramientas. Si después de buscar con varias palabras clave y revisar el presupuesto puntual (si corresponde) no encontrás el dato, decí exactamente que no está registrado en el sistema — nunca completes el vacío con una estimación de conocimiento general.
+- Respondé en español, directo y conciso. Sin relleno ni disculpas innecesarias.`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
