@@ -42,10 +42,11 @@ export default function AsistenteIA() {
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      const historialAcotado = historial.slice(-12); // últimos ~6 intercambios, para no acumular tokens sin control
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-asistente-openai`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ pregunta: texto, historial }),
+        body: JSON.stringify({ pregunta: texto, historial: historialAcotado }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json.error) throw new Error(json.error || `Error ${res.status}`);
