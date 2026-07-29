@@ -301,7 +301,7 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
       const subtot=items.reduce((a,g)=>a+(g.total||0),0);
       const itemRows=items.map((g,i)=>`
         <tr style="background:${i%2?'#fafcfe':'#fff'};border-bottom:1px solid #eef2f7;font-size:10px;">
-          <td style="padding:5px 10px;">${g.concepto}</td>
+          <td style="padding:5px 10px;">${g.concepto}${g.notas ? '<div style="font-size:9px;color:#888;margin-top:2px;font-style:italic;">'+g.notas.replace(/\n/g,'<br/>')+'</div>' : ''}</td>
           <td style="padding:5px 6px;text-align:right;">${fmt(g.subtotal0)}</td>
           <td style="padding:5px 6px;text-align:right;">${fmt(g.subtotal15)}</td>
           <td style="padding:5px 6px;text-align:right;font-size:9px;color:#666;">${g.iva_pct??15}%</td>
@@ -430,10 +430,10 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
         const items=grupos[cat]||[];
         if(!items.length)return;
         rows.push([cat.toUpperCase()]);
-        rows.push(['Concepto','Sub 0%','Sub 15%','IVA %','IVA','Total','RUC','Proveedor','Fecha Factura','# Factura','# Autorización']);
-        items.forEach(g=>rows.push([g.concepto,g.subtotal0,g.subtotal15,g.iva_pct??15,g.iva,g.total,g.ruc_proveedor,g.nombre_proveedor,g.fecha_factura,g.num_factura,g.num_autorizacion]));
+        rows.push(['Concepto','Sub 0%','Sub 15%','IVA %','IVA','Total','RUC','Proveedor','Fecha Factura','# Factura','# Autorización','Detalle']);
+        items.forEach(g=>rows.push([g.concepto,g.subtotal0,g.subtotal15,g.iva_pct??15,g.iva,g.total,g.ruc_proveedor,g.nombre_proveedor,g.fecha_factura,g.num_factura,g.num_autorizacion,g.notas||'']));
         const subtot=items.reduce((a,g)=>a+(g.total||0),0);
-        rows.push([`Subtotal ${cat}`,'','','','',subtot,'','','','','']);
+        rows.push([`Subtotal ${cat}`,'','','','',subtot,'','','','','','']);
         rows.push([]);
       });
       rows.push(['TOTAL GENERAL','','','','',t.justificado]);
@@ -442,7 +442,7 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
       rows.push(['Total justificado:',t.justificado]);
       rows.push(['Saldo:',t.saldo]);
       const ws=XLSX.utils.aoa_to_sheet(rows);
-      ws['!cols']=[{wch:40},{wch:12},{wch:12},{wch:8},{wch:10},{wch:12},{wch:15},{wch:25},{wch:14},{wch:20},{wch:20}];
+      ws['!cols']=[{wch:40},{wch:12},{wch:12},{wch:8},{wch:10},{wch:12},{wch:15},{wch:25},{wch:14},{wch:20},{wch:20},{wch:40}];
       const wb=XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb,ws,'Liquidación');
       XLSX.writeFile(wb,`liquidacion_${liq.responsable||'liq'}.xlsx`);
@@ -450,7 +450,7 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
       // CSV fallback
       const t=totalesLiq(liq);const grupos=agruparPorCat(liq.gastos||[]);
       const rows=[['Evento:',liq.evento],['Responsable:',liq.responsable]];
-      CATS_LIQUIDACION.forEach(cat=>{const items=grupos[cat]||[];if(!items.length)return;rows.push([cat]);rows.push(['Concepto','Sub 0%','Sub 15%','IVA %','IVA','Total','RUC','Proveedor','Fecha Factura','# Factura','# Autorización']);items.forEach(g=>rows.push([g.concepto,g.subtotal0,g.subtotal15,g.iva_pct??15,g.iva,g.total,g.ruc_proveedor,g.nombre_proveedor,g.fecha_factura,g.num_factura,g.num_autorizacion]));});
+      CATS_LIQUIDACION.forEach(cat=>{const items=grupos[cat]||[];if(!items.length)return;rows.push([cat]);rows.push(['Concepto','Sub 0%','Sub 15%','IVA %','IVA','Total','RUC','Proveedor','Fecha Factura','# Factura','# Autorización','Detalle']);items.forEach(g=>rows.push([g.concepto,g.subtotal0,g.subtotal15,g.iva_pct??15,g.iva,g.total,g.ruc_proveedor,g.nombre_proveedor,g.fecha_factura,g.num_factura,g.num_autorizacion,g.notas||'']));});
       rows.push(['TOTAL','','','','',t.justificado]);rows.push(['Saldo:',t.saldo]);
       const csv=rows.map(r=>r.map(c=>String(c??'')).join(',')).join('\n');
       const blob=new Blob(['\uFEFF'+csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`liquidacion.csv`;a.click();URL.revokeObjectURL(url);
@@ -612,6 +612,11 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
                             </div>
                             <button style={S.btnRed} onClick={()=>delGasto(g.id)}>🗑</button>
                           </div>
+
+                            <div style={{gridColumn:'1/-1',marginBottom:8}}>
+                              <Label>Detalle (opcional — ej: ruta y monto por tramo en movilización, desglose de alimentación, etc.)</Label>
+                              <textarea style={{...S.input,minHeight:44,resize:'vertical'}} value={g.notas||''} onChange={e=>updGasto(g.id,'notas',e.target.value)} placeholder="Ej: Quito-Ambato $8, Ambato-Baños $5, regreso $10..."/>
+                            </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8,marginBottom:8}}>
                   <div><Label>Subtotal 0%</Label><input type="number" style={S.input} value={g.subtotal0} onChange={e=>updGasto(g.id,'subtotal0',e.target.value)}/></div>
                   <div>
@@ -686,6 +691,11 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
                           </div>
                           <button style={S.btnRed} onClick={()=>delGasto(g.id)}>🗑</button>
                         </div>
+
+                            <div style={{gridColumn:'1/-1',marginBottom:8}}>
+                              <Label>Detalle (opcional — ej: ruta y monto por tramo en movilización, desglose de alimentación, etc.)</Label>
+                              <textarea style={{...S.input,minHeight:44,resize:'vertical'}} value={g.notas||''} onChange={e=>updGasto(g.id,'notas',e.target.value)} placeholder="Ej: Quito-Ambato $8, Ambato-Baños $5, regreso $10..."/>
+                            </div>
                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8,marginBottom:8}}>
                           <div><Label>Subtotal 0%</Label><input type="number" style={S.input} value={g.subtotal0} onWheel={e=>e.target.blur()} onChange={e=>updGasto(g.id,'subtotal0',e.target.value)}/></div>
                           <div><Label>Subtotal con IVA</Label><input type="number" style={S.input} value={g.subtotal15} onWheel={e=>e.target.blur()} onChange={e=>updGasto(g.id,'subtotal15',e.target.value)}/></div>
