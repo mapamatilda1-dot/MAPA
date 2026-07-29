@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from './lib/supabase';
+import * as XLSX from 'xlsx';
 
 const inp = { fontFamily:'inherit', fontSize:13, padding:'10px 14px', border:'1px solid #ddd', borderRadius:10, width:'100%', outline:'none', color:'#1a1a1a', boxSizing:'border-box' };
 
@@ -22,8 +23,10 @@ export default function AsistenteIA() {
   const [refForm, setRefForm] = useState({ titulo:'', categoria:'movilizacion', contenido:'' });
   const [savingRef, setSavingRef] = useState(false);
   const [imagenes, setImagenes] = useState([]); // File[]
+  const [excelFile, setExcelFile] = useState(null); // File | null
   const [progreso, setProgreso] = useState(null); // {actual, total} o null
   const fileInputRef = useRef(null);
+  const excelInputRef = useRef(null);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -53,6 +56,36 @@ export default function AsistenteIA() {
     setLoading(false);
   }
 
+  function leerExcelComoFilas(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const wb = XLSX.read(ev.target.result, { type: 'array' });
+          const hoja = wb.Sheets[wb.SheetNames[0]];
+          const filas = XLSX.utils.sheet_to_json(hoja, { defval: '' });
+          resolve(filas);
+        } catch (e) { reject(e); }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // Convierte las filas en bloques de texto legibles ("Col: valor | Col2: valor2"),
+  // agrupados de a 150 filas por referencia para no armar un texto gigante.
+  function filasATextoEnBloques(filas, filasPorBloque = 150) {
+    const lineas = filas.map(fila =>
+      Object.entries(fila).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+        .map(([k, v]) => `${k}: ${v}`).join(' | ')
+    ).filter(Boolean);
+    const bloques = [];
+    for (let i = 0; i < lineas.length; i += filasPorBloque) {
+      bloques.push(lineas.slice(i, i + filasPorBloque).join('\n'));
+    }
+    return bloques;
+  }
+
   function fileToBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -76,7 +109,7 @@ export default function AsistenteIA() {
 
   async function guardarReferencia() {
     if (!refForm.titulo.trim()) return;
-    if (!refForm.contenido.trim() && imagenes.length === 0) return;
+    if (!refForm.contenido.trim() && imagenes.length === 0 && !excelFile) return;
     setSavingRef(true);
     const { data: { user } } = await supabase.auth.getUser();
     const email = user?.email || '';
@@ -90,6 +123,23 @@ export default function AsistenteIA() {
         });
         if (error) throw error;
         guardadas++;
+      }
+
+      if (excelFile) {
+        const filas = await leerExcelComoFilas(excelFile);
+        if (filas.length === 0) {
+          sinDatos++;
+        } else {
+          const bloques = filasATextoEnBloques(filas);
+          for (let i = 0; i < bloques.length; i++) {
+            const titulo = bloques.length > 1 ? `${refForm.titulo.trim()} — parte ${i + 1}/${bloques.length}` : refForm.titulo.trim();
+            const { error } = await supabase.from('referencias_ia').insert({
+              titulo, categoria: refForm.categoria, contenido: bloques[i], created_by: email,
+            });
+            if (error) throw error;
+            guardadas++;
+          }
+        }
       }
 
       if (imagenes.length > 0) {
@@ -123,9 +173,10 @@ export default function AsistenteIA() {
     setSavingRef(false);
     setRefForm({ titulo:'', categoria:'movilizacion', contenido:'' });
     setImagenes([]);
+    setExcelFile(null);
     setShowRefForm(false);
     let resumen = `✓ Cargué ${guardadas} referencia(s).`;
-    if (sinDatos) resumen += ` ${sinDatos} foto(s) no tenían datos legibles.`;
+    if (sinDatos) resumen += ` ${sinDatos} archivo/foto no tenía datos legibles.`;
     if (fallidas) resumen += ` ${fallidas} foto(s) fallaron al procesar — probá subirlas de nuevo.`;
     setHistorial(h => [...h, { role:'assistant', text: resumen + ' Ya las puedo usar para responder preguntas.' }]);
   }
@@ -178,10 +229,24 @@ export default function AsistenteIA() {
                 style={{...inp, fontSize:12, minHeight:70, resize:'vertical'}}/>
 
               <div>
+                <input ref={excelInputRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}}
+                  onChange={e=>setExcelFile(e.target.files?.[0] || null)}/>
+                <button onClick={()=>excelInputRef.current?.click()} style={{ padding:'7px 12px', borderRadius:8, border:'1px dashed #2e8b4e', background:'#fff', fontSize:12, color:'#2e8b4e', cursor:'pointer', width:'100%' }}>
+                  📊 {excelFile ? `${excelFile.name} — tocar para cambiar` : 'Subir un Excel/CSV con el historial'}
+                </button>
+                {excelFile && (
+                  <div style={{ fontSize:11, color:'#888', marginTop:4, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span>Cada fila se guarda como referencia — no hace falta IA para leerlo.</span>
+                    <button onClick={()=>setExcelFile(null)} style={{ background:'none', border:'none', color:'#c8264a', cursor:'pointer', fontSize:11 }}>Quitar</button>
+                  </div>
+                )}
+              </div>
+
+              <div>
                 <input ref={fileInputRef} type="file" accept="image/*" multiple style={{display:'none'}}
                   onChange={e=>setImagenes(prev=>[...prev, ...Array.from(e.target.files||[])])}/>
                 <button onClick={()=>fileInputRef.current?.click()} style={{ padding:'7px 12px', borderRadius:8, border:'1px dashed #0d3b5e', background:'#fff', fontSize:12, color:'#0d3b5e', cursor:'pointer', width:'100%' }}>
-                  📷 {imagenes.length > 0 ? `${imagenes.length} foto(s) elegidas — agregar más` : 'Subir fotos del historial (podés elegir varias a la vez)'}
+                  📷 {imagenes.length > 0 ? `${imagenes.length} foto(s) elegidas — agregar más` : 'O subir fotos del historial (podés elegir varias a la vez)'}
                 </button>
                 {imagenes.length > 0 && (
                   <div style={{ fontSize:11, color:'#888', marginTop:4, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -201,8 +266,8 @@ export default function AsistenteIA() {
               )}
 
               <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-                <button onClick={()=>{ setShowRefForm(false); setImagenes([]); }} disabled={savingRef} style={{ padding:'6px 12px', borderRadius:8, border:'1px solid #ddd', background:'#fff', fontSize:12, cursor:'pointer' }}>Cancelar</button>
-                <button onClick={guardarReferencia} disabled={savingRef || !refForm.titulo.trim() || (!refForm.contenido.trim() && imagenes.length===0)} style={{ padding:'6px 14px', borderRadius:8, border:'none', background:'#0d3b5e', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', opacity:(savingRef||!refForm.titulo.trim()||(!refForm.contenido.trim()&&imagenes.length===0))?0.5:1 }}>
+                <button onClick={()=>{ setShowRefForm(false); setImagenes([]); setExcelFile(null); }} disabled={savingRef} style={{ padding:'6px 12px', borderRadius:8, border:'1px solid #ddd', background:'#fff', fontSize:12, cursor:'pointer' }}>Cancelar</button>
+                <button onClick={guardarReferencia} disabled={savingRef || !refForm.titulo.trim() || (!refForm.contenido.trim() && imagenes.length===0 && !excelFile)} style={{ padding:'6px 14px', borderRadius:8, border:'none', background:'#0d3b5e', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', opacity:(savingRef||!refForm.titulo.trim()||(!refForm.contenido.trim()&&imagenes.length===0&&!excelFile))?0.5:1 }}>
                   {savingRef ? 'Procesando…' : 'Guardar'}
                 </button>
               </div>
