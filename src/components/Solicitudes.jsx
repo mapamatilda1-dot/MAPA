@@ -490,6 +490,7 @@ function SolicitudEditor({ solicitud, presupuesto_id_inicial, presupuestos, user
           </div>
         </div>
       )}
+      {!bloqueado && (
         <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
           <Btn variant="secondary" onClick={onCancel}>Cancelar</Btn>
           <Btn variant="secondary" onClick={handleSave} disabled={saving}>💾 Guardar borrador</Btn>
