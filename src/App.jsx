@@ -20,6 +20,7 @@ import ActasEntrega from './components/ActasEntrega';
 import ScoutingPublico from './components/ScoutingPublico';
 import ScoutingTab from './components/ScoutingTab';
 import InformePublico from './components/InformePublico';
+import AsistenteIA from './AsistenteIA';
 
 // Placeholders — se reemplazarán en las fases siguientes
 const Placeholder = ({ nombre }) => (
@@ -272,6 +273,8 @@ export default function App() {
       <main style={{ flex: 1, padding: '1.5rem', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
         {renderContent()}
       </main>
+
+      <AsistenteIA/>
     </div>
   );
 }
