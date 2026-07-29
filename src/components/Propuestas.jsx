@@ -93,11 +93,15 @@ export default function Propuestas({ userRole, userEmail, briefFiltroId }) {
     if (!form.cliente_id)    { alert('Seleccioná un cliente o brief'); return; }
     setSaving(true);
     const cl = clientes.find(c => c.id === form.cliente_id);
+    // Postgres rechaza '' como uuid — si no hay proyecto vinculado, mandar null
+    const payload = { ...form, brief_id: form.brief_id || null, cliente_nombre: cl?.nombre || '' };
     if (modal === 'new') {
-      const { data: newProp } = await supabase.from('propuestas').insert({ ...form, cliente_nombre: cl?.nombre || '', created_by: userEmail }).select().single();
+      const { data: newProp, error } = await supabase.from('propuestas').insert({ ...payload, created_by: userEmail }).select().single();
+      if (error) { setSaving(false); alert('No se pudo guardar la propuesta: ' + error.message); return; }
       if (newProp) notifyPropuestaNueva({ ...newProp, cliente: cl?.nombre || '' });
     } else {
-      await supabase.from('propuestas').update({ ...form, cliente_nombre: cl?.nombre || '' }).eq('id', modal.id);
+      const { error } = await supabase.from('propuestas').update(payload).eq('id', modal.id);
+      if (error) { setSaving(false); alert('No se pudo guardar la propuesta: ' + error.message); return; }
     }
     setSaving(false);
     setModal(null);
