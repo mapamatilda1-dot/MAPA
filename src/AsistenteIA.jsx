@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from './lib/supabase';
 
 const inp = { fontFamily:'inherit', fontSize:13, padding:'10px 14px', border:'1px solid #ddd', borderRadius:10, width:'100%', outline:'none', color:'#1a1a1a', boxSizing:'border-box' };
 
