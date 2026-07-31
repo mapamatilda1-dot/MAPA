@@ -353,6 +353,31 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     const pptoId = ppto?.id || 'new';
     if (pptoId === pptoIdRef.current) return;
     pptoIdRef.current = pptoId;
+
+    // Si hay un borrador sin guardar de ESTE MISMO presupuesto (de una sesión
+    // anterior que no se guardó, ej. por un corte de conexión), preguntar
+    // antes de descartarlo en vez de perderlo en silencio.
+    let borradorRecuperado = null;
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        const draftId = draft?.id || 'new';
+        if (draftId === pptoId) {
+          const quiereRecuperar = window.confirm(
+            '⚠️ Encontramos cambios sin guardar de una sesión anterior en este presupuesto (puede ser porque no se guardaron a tiempo).\n\n¿Querés recuperarlos?\n\nAceptar = recuperar los cambios sin guardar\nCancelar = descartarlos y cargar la última versión guardada'
+          );
+          if (quiereRecuperar) borradorRecuperado = draft;
+        }
+      }
+    } catch {}
+
+    if (borradorRecuperado) {
+      setP(borradorRecuperado);
+      try { const savedTab = sessionStorage.getItem(SESSION_TAB); if (savedTab) setTab(savedTab); } catch {}
+      return;
+    }
+
     try { sessionStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_TAB); } catch {}
     if (ppto?.id) {
       // Siempre cargar datos frescos desde DB para evitar que se muestren datos viejos del prop
