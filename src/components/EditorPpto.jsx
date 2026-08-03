@@ -349,6 +349,7 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
   }, [tab]);
 
   const pptoIdRef = useRef(null);
+  const loadedUpdatedAtRef = useRef(null); // para detectar si otra persona editó mientras estaba abierto
   useEffect(() => {
     const pptoId = ppto?.id || 'new';
     if (pptoId === pptoIdRef.current) return;
@@ -392,6 +393,7 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
           dias:            it.dias            ?? 1,
         }));
         setP({...JSON.parse(JSON.stringify(source)), items});
+        loadedUpdatedAtRef.current = source.updated_at || null;
       });
     } else if (!ppto) {
       setP({
@@ -601,6 +603,23 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
   async function save(){
     if(!p.nombre&&!p.cliente){showToast('Ingresa nombre o cliente');return;}
     if(!canEditPpto(userRole,p.estado)){showToast('⚠️ Este presupuesto está bloqueado');return;}
+
+    // Detectar edición concurrente: si alguien más (u otra pestaña) guardó
+    // este mismo presupuesto después de que lo abriste, avisar antes de
+    // pisar sus cambios en vez de sobrescribir en silencio.
+    if (p.id && loadedUpdatedAtRef.current) {
+      const { data: actual } = await supabase.from('presupuestos').select('updated_at').eq('id', p.id).single();
+      if (actual && actual.updated_at && actual.updated_at !== loadedUpdatedAtRef.current) {
+        const continuar = window.confirm(
+          '⚠️ Este presupuesto fue modificado por otra persona (o en otra pestaña) mientras lo tenías abierto.\n\n' +
+          'Si continuás, tu versión va a REEMPLAZAR esos cambios más recientes.\n\n' +
+          'Aceptar = guardar igual (se pierde lo del otro cambio)\n' +
+          'Cancelar = no guardar — recomendado: copiá tus cambios aparte, recargá la página para traer la versión más reciente, y volvé a aplicarlos'
+        );
+        if (!continuar) return;
+      }
+    }
+
     // Warning check: costo > precio
     const tots=calcPpto(p);
     if(tots.hasWarning){
@@ -625,6 +644,15 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     if(error){showToast('Error: '+error.message);return;}
     try{sessionStorage.removeItem(SESSION_KEY);sessionStorage.removeItem(SESSION_TAB);}catch{}
     showToast('Guardado ✓');
+    // Actualizar la referencia de "última vez que sé que se guardó", para
+    // que la próxima vez se compare contra este guardado y no contra el viejo.
+    {
+      const idParaRefrescar = p.id || data?.id;
+      if (idParaRefrescar) {
+        supabase.from('presupuestos').select('updated_at').eq('id', idParaRefrescar).single()
+          .then(({ data: refreshed }) => { if (refreshed) loadedUpdatedAtRef.current = refreshed.updated_at; });
+      }
+    }
     // Si el presupuesto ya está aprobado (o más adelante en el flujo) y tiene
     // fecha de evento, mantener sincronizado su registro en el calendario de
     // implementación — por si la fecha se editó después de la aprobación.
