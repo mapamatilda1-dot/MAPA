@@ -48,7 +48,7 @@ function EmptyMsg({ msg }) {
   return <div style={{ fontSize:12, color:'#aaa', padding:'8px 0', fontStyle:'italic' }}>{msg}</div>;
 }
 
-export default function ExpedientePanel({ briefId, presupuestoId, onClose }) {
+export default function ExpedientePanel({ briefId, presupuestoId, userRole, onClose }) {
   const [brief, setBrief]           = useState(null);
   const [propuestas, setPropuestas] = useState([]);
   const [presupuestos, setPresupuestos] = useState([]);
@@ -575,6 +575,23 @@ export default function ExpedientePanel({ briefId, presupuestoId, onClose }) {
                                 }
                               }} style={{fontSize:11,color:'#c8264a',fontWeight:500,background:'none',border:'none',cursor:'pointer',padding:0,fontFamily:'inherit'}}>
                                 📄 Ver PDF →
+                              </button>
+                            )}
+                            {v.pdf_financiero_path && userRole === 'admin' && (
+                              <button onClick={async()=>{
+                                try {
+                                  const { data, error } = await supabase.storage.from('versiones-pdf-financiero').createSignedUrl(v.pdf_financiero_path, 120);
+                                  if (error || !data?.signedUrl) { alert('No se pudo abrir el PDF financiero: ' + (error?.message||'')); return; }
+                                  const res = await fetch(data.signedUrl);
+                                  const html = await res.text();
+                                  const w = window.open('','_blank');
+                                  w.document.write(html);
+                                  w.document.close();
+                                } catch(e) {
+                                  alert('No se pudo abrir el PDF financiero: ' + e.message);
+                                }
+                              }} style={{fontSize:11,color:'#0d3b5e',fontWeight:500,background:'none',border:'none',cursor:'pointer',padding:0,fontFamily:'inherit'}}>
+                                💰 Ver PDF financiero (admin) →
                               </button>
                             )}
                           </div>

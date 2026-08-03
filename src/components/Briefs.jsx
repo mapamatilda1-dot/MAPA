@@ -552,7 +552,7 @@ export default function Briefs({ userRole, userEmail }) {
         )}
       </Modal>
 
-      {expedienteId && <ExpedientePanel briefId={expedienteId} onClose={()=>setExpedienteId(null)}/>}
+      {expedienteId && <ExpedientePanel briefId={expedienteId} userRole={userRole} onClose={()=>setExpedienteId(null)}/>}
 
       {/* Modal cambios solicitados */}
       {modalCambios && (

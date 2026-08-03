@@ -484,8 +484,8 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
         </div>
       )}
 
-      {expedienteId && <ExpedientePanel briefId={expedienteId} onClose={()=>setExpedienteId(null)}/>}
-      {expedientePptoId && <ExpedientePanel presupuestoId={expedientePptoId} onClose={()=>setExpedientePptoId(null)}/>}
+      {expedienteId && <ExpedientePanel briefId={expedienteId} userRole={userRole} onClose={()=>setExpedienteId(null)}/>}
+      {expedientePptoId && <ExpedientePanel presupuestoId={expedientePptoId} userRole={userRole} onClose={()=>setExpedientePptoId(null)}/>}
     </div>
   );
 }

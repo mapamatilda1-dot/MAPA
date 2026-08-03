@@ -727,11 +727,24 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
       const fileName = `${(ppto.nomenclatura||ppto.id).replace(/[^a-zA-Z0-9-_]/g,'_')}_v${Date.now()}.html`;
       await supabase.storage.from('versiones-pdf').upload(fileName, blob, { contentType:'text/html' });
       const { data:urlData } = supabase.storage.from('versiones-pdf').getPublicUrl(fileName);
+
+      // PDF financiero — mismo momento, mismo número de versión, pero a un
+      // bucket PRIVADO (solo lectura para rol admin vía signed URL).
+      let pdfFinancieroPath = '';
+      try {
+        const htmlFin = generatePdfFinancieroHTML(ppto, logoUrl);
+        const blobFin = new Blob([htmlFin], { type:'text/html' });
+        const fileNameFin = `${(ppto.nomenclatura||ppto.id).replace(/[^a-zA-Z0-9-_]/g,'_')}_v${Date.now()}_financiero.html`;
+        const { error: errFin } = await supabase.storage.from('versiones-pdf-financiero').upload(fileNameFin, blobFin, { contentType:'text/html' });
+        if (!errFin) pdfFinancieroPath = fileNameFin;
+      } catch (eFin) { console.warn('No se pudo guardar el PDF financiero:', eFin); }
+
       const { count } = await supabase.from('versiones_ppto').select('*',{count:'exact',head:true}).eq('presupuesto_id',ppto.id);
       await supabase.from('versiones_ppto').insert({
         presupuesto_id: ppto.id, estado,
         version_num: (count||0)+1,
         pdf_url: urlData?.publicUrl||'',
+        pdf_financiero_path: pdfFinancieroPath,
         created_by: ppto.ejecutivo_email||ppto.created_by||'',
       });
     } catch(e) { console.warn('No se pudo guardar versión:', e); }
