@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { notifyPresupuestoAprobado, notifyPresupuestoCerrado } from '../notifyHelper';
 import { S, Label, Badge, Toast, Modal } from '../styles.jsx';
-import { calcItem, calcPpto, genNomenclatura, fmt, fmtPct, fmtDate } from '../calc';
+import { calcItem, calcPpto, genNomenclatura, extraerNumeroNomenclatura, fmt, fmtPct, fmtDate } from '../calc';
 import { generatePdfClienteHTML, generatePdfFinancieroHTML, generateExcelFinancieroData } from './PdfCliente';
 import AlcanceTab from './AlcanceTab';
 import InformeEditor from './InformeEditor';
@@ -627,8 +627,14 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
       // Still save but show warning — don't return
     }
     setSaving(true);
-    let nomenclatura=p.nomenclatura;
-    if(!nomenclatura){
+    // El nombre de archivo central se regenera con el nombre/cliente ACTUALES
+    // en cada guardado (para que siempre refleje el nombre vigente), pero el
+    // número de secuencia se mantiene si el presupuesto ya tenía uno asignado.
+    const numeroExistente = extraerNumeroNomenclatura(p.nomenclatura);
+    let nomenclatura;
+    if (numeroExistente) {
+      nomenclatura = genNomenclatura(p.nombre, p.cliente, numeroExistente);
+    } else {
       const{count}=await supabase.from('presupuestos').select('*',{count:'exact',head:true});
       nomenclatura=genNomenclatura(p.nombre,p.cliente,(count||0)+1);
     }

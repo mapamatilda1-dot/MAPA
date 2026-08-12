@@ -131,7 +131,24 @@ export function genNomenclatura(nombre, cliente, seq) {
   const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEPT','OCT','NOV','DIC'];
   const mes  = MESES[now.getMonth()];
   const num  = String(seq).padStart(3, '0');
-  const nom  = (nombre  || '').toUpperCase().replace(/[^A-ZÁÉÍÓÚÑ0-9 ]/gi, '').trim().substring(0, 25);
-  const cli  = (cliente || '').toUpperCase().replace(/[^A-ZÁÉÍÓÚÑ0-9 ]/gi, '').trim().substring(0, 20);
+  // Mayúsculas, sin tildes en vocales (la Ñ se respeta), sin caracteres que
+  // rompan un nombre de archivo. El resto del texto (espacios, puntuación,
+  // largo) se mantiene tal cual lo escribió la persona.
+  const limpiarParaArchivo = (s) => {
+    let r = (s || '').trim();
+    r = r.replace(/[áàâäã]/gi, 'a').replace(/[éèêë]/gi, 'e').replace(/[íìîï]/gi, 'i').replace(/[óòôöõ]/gi, 'o').replace(/[úùûü]/gi, 'u');
+    r = r.replace(/[\/\\:*?"<>|]/g, '');
+    r = r.replace(/\s+/g, ' ').trim();
+    return r.toUpperCase();
+  };
+  const nom = limpiarParaArchivo(nombre);
+  const cli = limpiarParaArchivo(cliente);
   return `MATILDA-${num}-${nom}-${cli}-${mes}-${anio}`;
+}
+
+// Saca el número de secuencia (###) ya asignado dentro de una nomenclatura
+// existente, para poder regenerar el resto del nombre sin cambiar el número.
+export function extraerNumeroNomenclatura(nomenclatura) {
+  const m = (nomenclatura || '').match(/^MATILDA-(\d+)-/);
+  return m ? m[1] : null;
 }
