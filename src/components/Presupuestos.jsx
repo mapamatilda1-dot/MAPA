@@ -116,9 +116,6 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
 
   async function duplicatePpto(ppto) {
     if (!window.confirm(`¿Duplicar "${ppto.nombre || ppto.cliente}"?`)) return;
-    const { count } = await supabase.from('presupuestos').select('*', { count:'exact', head:true });
-    const { genNomenclatura } = await import('../calc');
-    const newNom = genNomenclatura(ppto.nombre, ppto.cliente, (count || 0) + 1);
 
     // Mantener todos los ítems con sus costos intactos
     // Solo resetear campos de trazabilidad de ejecución
@@ -139,7 +136,12 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
     const { error } = await supabase.from('presupuestos').insert({
       ...ppto,
       id:           undefined,
-      nomenclatura: newNom,
+      // La nomenclatura (identificador/nombre de archivo central) queda
+      // vacía a propósito — como el "Nombre del presupuesto" también se
+      // limpia acá abajo, no tiene sentido que arrastre el nombre del
+      // presupuesto anterior. Se genera de nuevo, ya con el nombre correcto,
+      // la primera vez que se guarde este duplicado (ver EditorPpto.jsx).
+      nomenclatura: '',
       nombre:       '',          // título vacío — es un nuevo presupuesto
       fecha_evento: null,        // fecha limpia
       brief_id:     null,        // proyecto vinculado limpio
@@ -175,6 +177,45 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
     const list = pptos.filter(p => selectedIds.has(p.id));
     for (const p of list) await duplicatePpto(p);
     clearSelect();
+  }
+
+  async function mergeSelected() {
+    const list = pptos.filter(p => selectedIds.has(p.id));
+    if (list.length < 2) { showToast('Seleccioná al menos 2 presupuestos para unir'); return; }
+    if (!window.confirm(`¿Unir ${list.length} presupuestos en uno solo? Se crea un presupuesto NUEVO con todos los ítems (uno abajo del otro, mismas subcategorías, costos y precios) — los originales no se tocan ni se borran.`)) return;
+
+    // Concatenar los items de cada presupuesto, uno abajo del otro, en el
+    // mismo orden en que aparecen en la lista. Se respetan las subcategorías
+    // tal cual estaban en cada uno. Se generan IDs nuevos para evitar
+    // choques entre ítems que venían de presupuestos distintos.
+    const itemsUnidos = list.flatMap(p => (p.items || []).map(it => ({ ...it, id: crypto.randomUUID() })));
+
+    const clientesUnicos = [...new Set(list.map(p => p.cliente).filter(Boolean))];
+    const primero = list[0];
+
+    const { error } = await supabase.from('presupuestos').insert({
+      nombre:       list.map(p => p.nombre || p.nomenclatura || 'Sin nombre').join(' + '),
+      cliente:      clientesUnicos.length === 1 ? clientesUnicos[0] : primero.cliente,
+      cliente_id:   clientesUnicos.length === 1 ? primero.cliente_id : null,
+      nomenclatura: '', // se genera solo al guardar, con nombre/número propios
+      fecha_evento: primero.fecha_evento || null,
+      ciudad:       primero.ciudad || '',
+      lugar:        primero.lugar || '',
+      dias_evento:  primero.dias_evento || 1,
+      personas:     list.reduce((a, p) => a + (p.personas || 0), 0) || null,
+      oh_pct:       primero.oh_pct,
+      bco_pct:      primero.bco_pct,
+      fee_agencia:  primero.fee_agencia,
+      apply_rebate: primero.apply_rebate,
+      rebate_pct:   primero.rebate_pct,
+      estado:       'borrador',
+      ejecutado:    false,
+      brief_id:     null,
+      items: itemsUnidos,
+    });
+    if (error) { showToast('Error: ' + error.message); return; }
+    clearSelect(); fetchAll();
+    showToast(`✓ Presupuesto unido creado con ${itemsUnidos.length} ítems — revisá el nombre y guardalo`);
   }
 
   function exportExcel() {
@@ -355,6 +396,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
           <span style={{ color:'#fff', fontWeight:700, fontSize:13 }}>{selectedIds.size} seleccionado(s)</span>
           <button style={{ ...S.btnSm, background:'#fff', color:'#0d3b5e' }} onClick={() => { if (selectedIds.size===1) { const p=pptos.find(x=>selectedIds.has(x.id)); if(p){setEditing(p);clearSelect();} } else showToast('Seleccioná solo 1 para editar'); }}>✏️ Editar</button>
           <button style={{ ...S.btnSm, background:'#3dbfb8', color:'#fff', border:'none' }} onClick={duplicateSelected}>📋 Duplicar</button>
+          {selectedIds.size >= 2 && <button style={{ ...S.btnSm, background:'#7c3aed', color:'#fff', border:'none' }} onClick={mergeSelected}>🔗 Unir</button>}
           {userRole === 'admin' && <button style={{ ...S.btnSm, background:'#c8264a', color:'#fff', border:'none' }} onClick={deleteSelected}>🗑 Eliminar</button>}
           <button style={{ ...S.btnSm, background:'none', color:'#8ab4d4', border:'1px solid #4a6a8a' }} onClick={clearSelect}>✕ Cancelar</button>
         </div>
