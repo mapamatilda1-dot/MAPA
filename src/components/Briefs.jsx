@@ -4,6 +4,7 @@ import { notifyBriefNuevo } from '../notifyHelper';
 import { canCreateBrief, canEditBrief, canDeleteBrief, ESTADOS_BRIEF, ESTADOS_BRIEF_LABELS, ESTADOS_BRIEF_COLORS } from '../roles';
 import ExpedientePanel from './ExpedientePanel';
 import ListadoProduccion from './ListadoProduccion';
+import LOGO_BASE64 from '../logoBase64';
 
 const TIPOS_EVENTO = ['Corporativo', 'Lanzamiento', 'Fiesta', 'Congreso', 'Capacitación', 'Otro'];
 
@@ -17,6 +18,90 @@ function getDays(dateStr) {
   const t = new Date(); t.setHours(0,0,0,0);
   const [y,m,d] = dateStr.split('-').map(Number);
   return Math.ceil((new Date(y,m-1,d) - t) / 86400000);
+}
+
+function generatePdfBriefHTML(brief) {
+  const logoTag = `<img src="${LOGO_BASE64}" style="height:90px;object-fit:contain;background:transparent;" alt="Matilda Event Designers" />`;
+
+  const infoFields = [
+    ['Cliente', brief.cliente_nombre],
+    ['Estado', ESTADOS_BRIEF_LABELS[brief.estado] || brief.estado],
+    ['Tipo de evento', brief.tipo_evento],
+    ['Fecha de entrega', fmtDate(brief.fecha_entrega)],
+    ['Fecha del evento', fmtDate(brief.fecha_evento)],
+    ['Ciudad', brief.ciudad],
+    ['Lugar', brief.lugar],
+    ['PAX', brief.pax ? brief.pax + ' personas' : ''],
+    ['Días', brief.dias_evento ? brief.dias_evento + ' días' : ''],
+    ['Ejecutivo', brief.ejecutivo_nombre],
+  ].filter(([,v]) => v).map(([l,v]) => `
+    <div>
+      <div style="font-size:9px;color:#3dbfb8;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:3px;">${l}</div>
+      <div style="font-size:13px;font-weight:700;color:#0d3b5e;">${v}</div>
+    </div>`).join('');
+
+  const descripcionBlock = brief.descripcion ? `
+    <div style="padding:20px 36px;border-bottom:1px solid #eef2f7;">
+      <div style="font-size:10px;color:#8aa0b8;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Descripción / Objetivos</div>
+      <div style="font-size:13px;color:#333;line-height:1.7;white-space:pre-wrap;">${brief.descripcion}</div>
+    </div>` : '';
+
+  const canvaBlock = brief.link_canva ? `
+    <div style="padding:20px 36px;border-bottom:1px solid #eef2f7;">
+      <div style="font-size:10px;color:#8aa0b8;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Propuesta creativa</div>
+      <a href="${brief.link_canva}" style="font-size:13px;color:#7c3aed;word-break:break-all;">◈ ${brief.link_canva}</a>
+    </div>` : '';
+
+  const archivoBlock = brief.archivo_url ? `
+    <div style="padding:20px 36px;border-bottom:1px solid #eef2f7;">
+      <div style="font-size:10px;color:#8aa0b8;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Brief adjunto</div>
+      <a href="${brief.archivo_url}" style="font-size:13px;color:#2563eb;word-break:break-all;">📎 ${brief.archivo_nombre || 'Ver archivo'}</a>
+    </div>` : '';
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<title>${brief.nombre || 'Brief'}</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:Arial,sans-serif; background:#fff; color:#1a1a2e; font-size:13px; }
+  @media print {
+    body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .no-print { display:none; }
+  }
+</style>
+</head>
+<body style="padding:0;">
+<button class="no-print" onclick="window.print()"
+  style="position:fixed;top:16px;right:16px;background:#c8264a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;z-index:999;">
+  ⬇ Descargar PDF
+</button>
+<div style="max-width:800px;margin:0 auto;padding:0;">
+  <!-- HEADER -->
+  <div style="background:#0d3b5e;padding:22px 36px;display:flex;justify-content:space-between;align-items:center;">
+    <div style="background:#0d3b5e;">${logoTag}</div>
+    <div style="text-align:right;">
+      <div style="color:#3dbfb8;font-size:9px;letter-spacing:2px;font-weight:700;text-transform:uppercase;margin-bottom:5px;">Brief de Proyecto</div>
+      <div style="color:#fff;font-size:14px;font-weight:700;">${brief.nombre || ''}</div>
+      <div style="color:#8ab4d4;font-size:11px;margin-top:4px;">Guayaquil, ${fmtDate(new Date().toISOString().slice(0,10))}</div>
+    </div>
+  </div>
+  <div style="background:#c8264a;height:3px;"></div>
+  <!-- INFO -->
+  <div style="padding:18px 36px 14px;background:#f8fafc;border-bottom:1px solid #dde6ef;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">${infoFields}</div>
+  </div>
+  ${descripcionBlock}
+  ${canvaBlock}
+  ${archivoBlock}
+  <!-- FOOTER -->
+  <div style="background:#0d3b5e;padding:16px 36px;text-align:center;margin-top:10px;">
+    <div style="font-size:10px;color:#3dbfb8;letter-spacing:1px;font-style:italic;">"Donde la estrategia se convierte en experiencia."</div>
+  </div>
+</div>
+</body>
+</html>`;
 }
 
 const lbl = { fontSize:12, fontWeight:500, color:'#666', textTransform:'uppercase', letterSpacing:'.04em', marginBottom:5, display:'block' };
@@ -334,6 +419,12 @@ export default function Briefs({ userRole, userEmail }) {
             <div style={{ fontSize:12, color:'#8aa0b8' }}>{detailBrief.cliente_nombre} · {ESTADOS_BRIEF_LABELS[detailBrief.estado] || detailBrief.estado}</div>
           </div>
           <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
+            <button onClick={()=>{
+              const html = generatePdfBriefHTML(detailBrief);
+              const w = window.open('', '_blank');
+              if (!w) { alert('El navegador bloqueó la ventana emergente. Permitila para ver el PDF.'); return; }
+              w.document.write(html); w.document.close();
+            }} style={{ padding:'6px 14px', borderRadius:8, border:'1px solid #ddd', background:'#fff', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>📄 Descargar PDF</button>
             {canEdit && <button onClick={()=>{ setEditBrief(detailBrief); setView('form'); }} style={{ padding:'6px 14px', borderRadius:8, border:'1px solid #ddd', background:'#fff', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>✏️ Editar</button>}
           </div>
         </div>
@@ -487,6 +578,12 @@ export default function Briefs({ userRole, userEmail }) {
                     {b.link_canva && (
                       <a href={b.link_canva} target="_blank" rel="noreferrer" style={{ fontSize:12, color:'#7c3aed', textDecoration:'none' }}>◈ Ver Canva ↗</a>
                     )}
+                    <span style={{ fontSize:12, color:'#c8264a', cursor:'pointer', fontWeight:500 }} onClick={()=>{
+                      const html = generatePdfBriefHTML(b);
+                      const w = window.open('', '_blank');
+                      if (!w) { alert('El navegador bloqueó la ventana emergente. Permitila para ver el PDF.'); return; }
+                      w.document.write(html); w.document.close();
+                    }}>📄 PDF</span>
                     <span style={{ fontSize:12, color:'#7c3aed', cursor:'pointer', fontWeight:500 }} onClick={()=>setExpedienteId(b.id)}>📁 Ver expediente</span>
                   </div>
                 </div>
