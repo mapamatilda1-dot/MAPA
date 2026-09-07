@@ -146,7 +146,7 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=t
     <div style="border:1px solid #dde6ef;border-top:none;border-radius:0 0 8px 8px;padding:20px;display:flex;flex-wrap:wrap;gap:20px;">
       ${fotosGaleria.map(f => `
         <div style="width:230px;text-align:center;">
-          <img src="${f.url}" style="width:230px;height:230px;object-fit:cover;border-radius:8px;border:1px solid #dde6ef;display:block;" />
+          <img src="${f.url}" style="width:230px;height:230px;object-fit:contain;background:#fff;border-radius:8px;border:1px solid #dde6ef;display:block;" />
           <div style="margin-top:6px;font-size:11px;font-weight:600;color:#0d3b5e;">${f.nombre}</div>
         </div>`).join('')}
     </div>
