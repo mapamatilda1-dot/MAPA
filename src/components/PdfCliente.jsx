@@ -70,9 +70,7 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=t
 
   const renderItemRow = (it, i) => {
     const c = calcItem(it);
-    const fotoCell = it.foto_referencia
-      ? `<br><img src="${it.foto_referencia}" style="max-height:60px;max-width:100px;margin-top:4px;border-radius:3px;object-fit:cover;border:1px solid #dde6ef;" />`
-      : '';
+    const fotoCell = '';
     return `<tr style="border-bottom:1px solid #eef2f7;background:${i%2===1?'#fafcfe':'#fff'};">
       <td style="padding:8px 14px;">
         <div style="font-weight:700;color:#1a1a2e;font-size:12px;">${it.item || ''}</div>
@@ -129,6 +127,30 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=t
         <span style="font-size:12px;color:#6b7a99;">Fee de agencia (${ppto.fee_agencia}%)</span>
         <span style="font-size:12px;font-weight:600;">${fmt(totales.feeAgencia)}</span>
        </div>` : '';
+
+  // Galería de imágenes de referencia — al final del documento, en grande,
+  // en vez de una miniatura chica dentro de cada fila (se ve mejor y no
+  // desarma el ancho de la tabla).
+  const fotosGaleria = [
+    ...items.filter(it => it._type !== 'subcat' && it._type !== 'subppto' && it.foto_referencia)
+      .map(it => ({ nombre: it.item || '', url: it.foto_referencia })),
+    ...(ppto.opciones_adicionales||[]).flatMap(op => (op.items||[])
+      .filter(it => it.imagen_url)
+      .map(it => ({ nombre: it.item || '', url: it.imagen_url }))),
+  ];
+  const galeriaImagenesBlock = fotosGaleria.length > 0 ? `
+  <div style="margin:0 36px 20px;">
+    <div style="background:#0d3b5e;color:#fff;padding:10px 16px;border-radius:8px 8px 0 0;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">
+      📸 Imágenes de referencia
+    </div>
+    <div style="border:1px solid #dde6ef;border-top:none;border-radius:0 0 8px 8px;padding:20px;display:flex;flex-wrap:wrap;gap:20px;">
+      ${fotosGaleria.map(f => `
+        <div style="width:230px;text-align:center;">
+          <img src="${f.url}" style="width:230px;height:230px;object-fit:cover;border-radius:8px;border:1px solid #dde6ef;display:block;" />
+          <div style="margin-top:6px;font-size:11px;font-weight:600;color:#0d3b5e;">${f.nombre}</div>
+        </div>`).join('')}
+    </div>
+  </div>` : '';
 
   const infoFields = [
     ['Cliente', ppto.cliente],
@@ -268,6 +290,7 @@ export function generatePdfClienteHTML(ppto, logoUrlOverride, mostrarSeparados=t
     </div>
   </div>` : ''}
 
+  ${galeriaImagenesBlock}
   <div style="margin:0 36px 16px;background:#fdf8ee;border:1px solid #e8d8a0;border-radius:6px;padding:12px 16px;">
     <div style="font-size:10px;color:#7a5500;line-height:1.7;">
       <strong>NOTA:</strong> LA PRESENTE COTIZACIÓN TIENE UNA VIGENCIA DE 30 DÍAS CALENDARIO A PARTIR DE LA FECHA DE EMISIÓN.<br>
