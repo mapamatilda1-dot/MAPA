@@ -52,7 +52,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
   const [vincularPpto, setVincularPpto] = useState(null);
   const [solicitudPptoId, setSolicitudPptoId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
-  const [exportPeriod, setExportPeriod] = useState({ type:'mes', mes:new Date().getMonth()+1, anio:new Date().getFullYear() });
+  const [exportPeriod, setExportPeriod] = useState({ type:'mes', mes:new Date().getMonth()+1, anio:new Date().getFullYear(), cliente:'todos', estado:'todos' });
   // Filtro por usuario — Producción ve solo los suyos por defecto, Admin ve todos
   const [soloMios, setSoloMios]   = useState(userRole === 'produccion');
   const [loading, setLoading]     = useState(false);
@@ -218,16 +218,49 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
     showToast(`✓ Presupuesto unido creado con ${itemsUnidos.length} ítems — revisá el nombre y guardalo`);
   }
 
+  // Año/mes "efectivos" de un presupuesto: usa fecha_evento si existe,
+  // si no cae a created_at, y si tampoco hay, intenta sacarlo de la
+  // nomenclatura (ej: "...-JUL-26"). Misma lógica que ya usa el filtro
+  // de la lista de abajo, para que la exportación nunca quede vacía
+  // por presupuestos sin fecha_evento cargada.
+  function anioEfectivo(p) {
+    const fuente = p.fecha_evento || p.created_at || '';
+    if (fuente) {
+      const y = parseInt(fuente.slice(0, 4), 10);
+      if (!isNaN(y)) return y;
+    }
+    const m = (p.nomenclatura || '').match(/-(\d{2})$/);
+    if (m) return 2000 + parseInt(m[1], 10);
+    return null;
+  }
+  function mesEfectivo(p) {
+    const fuente = p.fecha_evento || p.created_at || '';
+    if (fuente) {
+      const mm = parseInt(fuente.slice(5, 7), 10);
+      if (!isNaN(mm)) return mm;
+    }
+    const MESES_COD = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEPT','OCT','NOV','DIC'];
+    const m = (p.nomenclatura || '').match(/-([A-ZÁÉÍÓÚ]{3,4})-\d{2}$/);
+    if (m) { const idx = MESES_COD.indexOf(m[1]); if (idx >= 0) return idx + 1; }
+    return null;
+  }
+
   function exportExcel() {
     const filtrados = pptos.filter(p => {
-      if (!p.fecha_evento) return false;
-      const [y, m] = p.fecha_evento.split('-').map(Number);
+      const y = anioEfectivo(p);
+      if (y === null) return false;
+      if (exportPeriod.cliente !== 'todos' && p.cliente !== exportPeriod.cliente) return false;
+      if (exportPeriod.estado !== 'todos' && p.estado !== exportPeriod.estado) return false;
       if (exportPeriod.type === 'anio') return y === exportPeriod.anio;
+      const m = mesEfectivo(p);
       return y === exportPeriod.anio && m === exportPeriod.mes;
     });
+    const periodoTxt = exportPeriod.type === 'anio' ? `${exportPeriod.anio}` : `${exportPeriod.mes}/${exportPeriod.anio}`;
+    const clienteTxt = exportPeriod.cliente !== 'todos' ? ` — Cliente: ${exportPeriod.cliente}` : '';
+    const estadoTxt = exportPeriod.estado !== 'todos' ? ` — Estado: ${ESTADOS_PPTO_LABELS[exportPeriod.estado]||exportPeriod.estado}` : '';
     const rows = [
       ['INFORME MATILDA EVENT DESIGNERS'],
-      [`Período: ${exportPeriod.type === 'anio' ? exportPeriod.anio : `${exportPeriod.mes}/${exportPeriod.anio}`}`], [''],
+      [`Período: ${periodoTxt}${clienteTxt}${estadoTxt}`], [''],
       ['Código','Cliente','Evento','Fecha evento','Estado','Ejecutado','PAX','Subtotal Precio','Fee','Subtotal s/IVA','IVA 15%','Total c/IVA','Subtotal Costo','Margen','% Margen'],
       ...filtrados.map(p => { const t = calcPpto(p); return [p.nomenclatura, p.cliente, p.nombre, p.fecha_evento, ESTADOS_PPTO_LABELS[p.estado]||p.estado, p.ejecutado?'Sí':'No', p.personas, t.subtotalPrecio, t.feeAgencia, t.totalSinIva, t.iva15, t.totalConIva, t.subtotalCosto, t.margenTotal, t.margenPct.toFixed(1)+'%']; }),
       [''], ['TOTALES','','','','','','', filtrados.reduce((a,p)=>a+calcPpto(p).subtotalPrecio,0),'', filtrados.reduce((a,p)=>a+calcPpto(p).totalSinIva,0),'', filtrados.reduce((a,p)=>a+calcPpto(p).totalConIva,0), filtrados.reduce((a,p)=>a+calcPpto(p).subtotalCosto,0), filtrados.reduce((a,p)=>a+calcPpto(p).margenTotal,0),''],
@@ -235,7 +268,9 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
     const csv = rows.map(r => r.map(c => { const s = String(c ?? '').replace(/"/g, '""'); return s.includes(',') ? `"${s}"` : s; }).join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob); const a = document.createElement('a');
-    a.href = url; a.download = `informe_matilda_${exportPeriod.anio}${exportPeriod.type === 'mes' ? '_' + String(exportPeriod.mes).padStart(2,'0') : ''}.csv`;
+    const clienteSlug = exportPeriod.cliente !== 'todos' ? '_' + exportPeriod.cliente.replace(/[^a-zA-Z0-9]/g,'_') : '';
+    const estadoSlug = exportPeriod.estado !== 'todos' ? '_' + exportPeriod.estado : '';
+    a.href = url; a.download = `informe_matilda_${exportPeriod.anio}${exportPeriod.type === 'mes' ? '_' + String(exportPeriod.mes).padStart(2,'0') : ''}${clienteSlug}${estadoSlug}.csv`;
     a.click(); URL.revokeObjectURL(url);
   }
 
@@ -340,6 +375,18 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
             </select>
           )}
           <input type="number" style={{ ...S.input, width:80 }} value={exportPeriod.anio} onChange={e => setExportPeriod(p => ({...p, anio:parseInt(e.target.value)||anioActual}))}/>
+          {canDownloadExcel(userRole) && (
+            <select style={{ ...S.select, width:'auto', maxWidth:180 }} value={exportPeriod.cliente} onChange={e => setExportPeriod(p => ({...p, cliente:e.target.value}))}>
+              <option value="todos">Todos los clientes</option>
+              {clientes.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+            </select>
+          )}
+          {canDownloadExcel(userRole) && (
+            <select style={{ ...S.select, width:'auto' }} value={exportPeriod.estado} onChange={e => setExportPeriod(p => ({...p, estado:e.target.value}))}>
+              <option value="todos">Todos los estados</option>
+              {ESTADOS_PPTO.map(e => <option key={e} value={e}>{ESTADOS_PPTO_LABELS[e]}</option>)}
+            </select>
+          )}
           {canDownloadExcel(userRole) && <button style={S.btnPrimary} onClick={exportExcel}>📊 Exportar</button>}
           <button style={{ ...S.btnPrimary, background:'#c8264a' }} onClick={() => setEditing('new')}>+ Nuevo presupuesto</button>
         </div>
