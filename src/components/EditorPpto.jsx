@@ -1486,11 +1486,13 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                               <div style={{gridColumn:'1/-1',background:'#f8fafc',borderRadius:8,padding:'10px 12px',border:'1px dashed #c8d8e8'}}>
                                 <Label>📸 Foto de referencia (aparece en PDF y vista cliente)</Label>
                                 <input type="file" accept="image/*" style={{marginTop:6,fontSize:13,display:'block'}}
-                                  onChange={e=>{
+                                  onChange={async e=>{
                                     const file=e.target.files[0];if(!file)return;
-                                    const reader=new FileReader();
-                                    reader.onload=ev=>updItem(it.id,'foto_referencia',ev.target.result);
-                                    reader.readAsDataURL(file);
+                                    const nombreArchivo = `${crypto.randomUUID()}_${file.name}`.replace(/[^a-zA-Z0-9._-]/g,'_');
+                                    const { error } = await supabase.storage.from('fotos-referencia').upload(nombreArchivo, file);
+                                    if (error) { alert('No se pudo subir la foto: ' + error.message); return; }
+                                    const { data: urlData } = supabase.storage.from('fotos-referencia').getPublicUrl(nombreArchivo);
+                                    updItem(it.id,'foto_referencia', urlData.publicUrl);
                                   }}/>
                                 {it.foto_referencia&&(
                                   <div style={{marginTop:8,display:'flex',alignItems:'flex-start',gap:10}}>

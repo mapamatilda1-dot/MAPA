@@ -589,11 +589,13 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
                             <div style={{background:'#f5f3ff',borderRadius:8,padding:'8px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
                               <span style={{fontSize:12,color:'#7c3aed',fontWeight:700}}>🧾 Nota de venta / Manual</span>
                               <label style={{cursor:'pointer'}}>
-                                <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{
+                                <input type="file" accept="image/*" style={{display:'none'}} onChange={async e=>{
                                   const file=e.target.files[0]; if(!file) return;
-                                  const reader=new FileReader();
-                                  reader.onload=ev=>updGasto(g.id,'foto_nota',ev.target.result);
-                                  reader.readAsDataURL(file);
+                                  const nombreArchivo = `${crypto.randomUUID()}_${file.name}`.replace(/[^a-zA-Z0-9._-]/g,'_');
+                                  const { error } = await supabase.storage.from('fotos-referencia').upload(nombreArchivo, file);
+                                  if (error) { alert('No se pudo subir la foto: ' + error.message); return; }
+                                  const { data: urlData } = supabase.storage.from('fotos-referencia').getPublicUrl(nombreArchivo);
+                                  updGasto(g.id,'foto_nota', urlData.publicUrl);
                                 }}/>
                                 <span style={{padding:'5px 12px',background:'#7c3aed',color:'#fff',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>
                                   {g.foto_nota?'✓ Foto cargada':'Subir foto'}
@@ -676,7 +678,7 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
                         </div>}
                         {g.tiene_xml===false&&<div style={{background:'#f5f3ff',borderRadius:8,padding:'8px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
                           <span style={{fontSize:12,color:'#7c3aed',fontWeight:700}}>🧾 Nota de venta</span>
-                          <label style={{cursor:'pointer'}}><input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>updGasto(g.id,'foto_nota',ev.target.result);reader.readAsDataURL(file);}}/>
+                          <label style={{cursor:'pointer'}}><input type="file" accept="image/*" style={{display:'none'}} onChange={async e=>{const file=e.target.files[0];if(!file)return;const nombreArchivo=`${crypto.randomUUID()}_${file.name}`.replace(/[^a-zA-Z0-9._-]/g,'_');const {error}=await supabase.storage.from('fotos-referencia').upload(nombreArchivo,file);if(error){alert('No se pudo subir la foto: '+error.message);return;}const {data:urlData}=supabase.storage.from('fotos-referencia').getPublicUrl(nombreArchivo);updGasto(g.id,'foto_nota',urlData.publicUrl);}}/>
                             <span style={{padding:'5px 12px',background:'#7c3aed',color:'#fff',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>{g.foto_nota?'✓ Foto':'Subir foto'}</span>
                           </label>
                           {g.foto_nota&&<img src={g.foto_nota} alt="" style={{height:36,borderRadius:4}}/>}
@@ -724,11 +726,13 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
             <div style={{background:'#f0f7ff',borderRadius:8,padding:'10px 14px',border:'1px dashed #3dbfb8'}}>
               <Label>Comprobante de depósito (imagen)</Label>
               <input type="file" accept="image/*" style={{marginTop:6,fontSize:13}}
-                onChange={e=>{
+                onChange={async e=>{
                   const file=e.target.files[0];if(!file)return;
-                  const reader=new FileReader();
-                  reader.onload=ev=>setEditing(p=>({...p,comprobante_url:ev.target.result}));
-                  reader.readAsDataURL(file);
+                  const nombreArchivo = `${crypto.randomUUID()}_${file.name}`.replace(/[^a-zA-Z0-9._-]/g,'_');
+                  const { error } = await supabase.storage.from('fotos-referencia').upload(nombreArchivo, file);
+                  if (error) { alert('No se pudo subir la foto: ' + error.message); return; }
+                  const { data: urlData } = supabase.storage.from('fotos-referencia').getPublicUrl(nombreArchivo);
+                  setEditing(p=>({...p,comprobante_url:urlData.publicUrl}));
                 }}/>
               {editing.comprobante_url&&<img src={editing.comprobante_url} alt="comprobante" style={{marginTop:8,maxHeight:100,borderRadius:4,border:'1px solid #dde6ef'}}/>}
             </div>
