@@ -556,7 +556,7 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
   const [openResumenProv, setOpenResumenProv] = useState(false);
   const resumenProveedores = useMemo(() => {
     const mapa = new Map(); // key normalizado -> {nombre, rubros:Set, costo}
-    (p.items||[]).forEach(it => {
+    (p?.items||[]).forEach(it => {
       if (it._type==='subcat' || it._type==='subppto') return;
       proveedoresDe(it).forEach(pr => {
         const nombre = (pr.razon_social||'').trim();
@@ -570,7 +570,7 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     });
     return [...mapa.values()].map(e => ({ nombre:e.nombre, rubros:e.rubros.size, costo:e.costo }))
       .sort((a,b) => b.costo - a.costo);
-  }, [p.items]);
+  }, [p?.items]);
 
   // ── Duplicar subcategoría (con todos sus ítems) en el mismo presupuesto ──
   function duplicarSubcategoria(subcatId, nombreActual) {
