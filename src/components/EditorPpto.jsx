@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { notifyPresupuestoAprobado, notifyPresupuestoCerrado } from '../notifyHelper';
 import { S, Label, Badge, Toast, Modal } from '../styles.jsx';
-import { calcItem, calcPpto, genNomenclatura, extraerNumeroNomenclatura, fmt, fmtPct, fmtDate } from '../calc';
+import { calcItem, calcPpto, genNomenclatura, extraerNumeroNomenclatura, proveedoresDe, fmt, fmtPct, fmtDate } from '../calc';
 import { generatePdfClienteHTML, generatePdfFinancieroHTML, generateExcelFinancieroData } from './PdfCliente';
 import AlcanceTab from './AlcanceTab';
 import InformeEditor from './InformeEditor';
@@ -462,6 +462,7 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     showToast('Campos completados desde el proyecto ✓');
   }
 
+  const normProv = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').trim().toUpperCase();
   const dragRef = useRef(null);
   const [selectedItems, setSelectedItems] = useState(new Set());
 
@@ -489,7 +490,7 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
         dias: it.dias || 1,
         precio_unit: it.precio_unit || 0,
         costo_unit: it.costo_unit || 0,
-        razon_social: it.proveedor || '',
+        razon_social: proveedoresDe(it)[0]?.razon_social || '',
         imagen_url: it.foto_referencia || '',
       })),
     };
@@ -519,6 +520,57 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     setSelectedItems(new Set());
     showToast('✓ Ítem(s) duplicado(s) en el mismo presupuesto');
   }
+
+  // ── Proveedores y facturas por ítem (pop-up) ─────────────────────
+  const [provModalItemId, setProvModalItemId] = useState(null);
+
+  function abrirProveedoresModal(it) {
+    if (!Array.isArray(it.proveedores)) {
+      // Materializa (una sola vez) el detalle migrado desde los campos antiguos,
+      // sin perder nada — los campos legados quedan intactos en el registro.
+      updItem(it.id, 'proveedores', proveedoresDe(it));
+    }
+    setProvModalItemId(it.id);
+  }
+  function addProveedor(itemId) {
+    setP(prev => ({ ...prev, items: prev.items.map(x => x.id!==itemId ? x : {
+      ...x,
+      proveedores: [...(x.proveedores||[]), { id:crypto.randomUUID(), razon_social:'', factura:'', costo:0, condicion_pago:'Contado', dias_credito:'', abono_pct:50, dias_credito_saldo:'' }],
+    })}));
+  }
+  function updProveedor(itemId, provId, field, value) {
+    setP(prev => ({ ...prev, items: prev.items.map(x => x.id!==itemId ? x : {
+      ...x,
+      proveedores: (x.proveedores||[]).map(pr => pr.id!==provId ? pr : { ...pr, [field]: value }),
+    })}));
+  }
+  function delProveedor(itemId, provId) {
+    setP(prev => ({ ...prev, items: prev.items.map(x => x.id!==itemId ? x : {
+      ...x,
+      proveedores: (x.proveedores||[]).filter(pr => pr.id!==provId),
+    })}));
+  }
+
+  // ── Resumen de costos por proveedor (dentro de este mismo presupuesto) ──
+  const [filtroProveedor, setFiltroProveedor] = useState('');
+  const [openResumenProv, setOpenResumenProv] = useState(false);
+  const resumenProveedores = useMemo(() => {
+    const mapa = new Map(); // key normalizado -> {nombre, rubros:Set, costo}
+    (p.items||[]).forEach(it => {
+      if (it._type==='subcat' || it._type==='subppto') return;
+      proveedoresDe(it).forEach(pr => {
+        const nombre = (pr.razon_social||'').trim();
+        if (!nombre) return;
+        const key = normProv(nombre);
+        if (!mapa.has(key)) mapa.set(key, { nombre, rubros:new Set(), costo:0 });
+        const entry = mapa.get(key);
+        entry.rubros.add(it.id);
+        entry.costo += Number(pr.costo||0);
+      });
+    });
+    return [...mapa.values()].map(e => ({ nombre:e.nombre, rubros:e.rubros.size, costo:e.costo }))
+      .sort((a,b) => b.costo - a.costo);
+  }, [p.items]);
 
   // ── Duplicar subcategoría (con todos sus ítems) en el mismo presupuesto ──
   function duplicarSubcategoria(subcatId, nombreActual) {
@@ -841,9 +893,9 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
           ${td(fmtN(c.costoTotalConAdicionales),'#8b1a1a',true,'right',bg)}
           ${td(fmtN(c.precioU),'#0d3b5e',false,'right',bg)}
           ${td(fmtN(c.precio),'#0d3b5e',true,'right',bg)}
-          ${td(it.proveedor||'')}
-          ${td(it.num_factura_prov||'')}
-          ${td((it.proveedores_adicionales||[]).map(pr=>`${pr.razon_social||'—'} (${fmtN(pr.costo||0)})`).join(' | '))}
+          ${td(proveedoresDe(it)[0]?.razon_social||'')}
+          ${td(proveedoresDe(it)[0]?.factura||'')}
+          ${td(proveedoresDe(it).map(pr=>`${pr.razon_social||'—'} (${fmtN(pr.costo||0)})`).join(' | '))}
           ${tieneReal?td(fmtN(c.costoRealUnit),'#1a6e3e',false,'right',bg):td('—','#bbbbbb',false,'right',bg)}
           ${tieneReal?td(fmtN(c.costoRealTotal),'#1a6e3e',false,'right',bg):td('—','#bbbbbb',false,'right',bg)}
           ${tieneReal?td(fmtN(c.ahorro),c.ahorro>=0?'#1a6e3e':'#c8264a',true,'right',bg):td('—','#bbbbbb',false,'right',bg)}
@@ -1192,6 +1244,30 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             </div>
           </div>
 
+          {/* Resumen de costos por proveedor (dentro de este presupuesto) */}
+          {resumenProveedores.length > 0 && (
+            <div style={{marginBottom:16,background:'#fff',border:'1px solid #dde6ef',borderRadius:8,overflow:'hidden'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 14px',background:'#eef4fb',cursor:'pointer'}} onClick={()=>setOpenResumenProv(v=>!v)}>
+                <span style={{fontSize:12,fontWeight:700,color:'#0d3b5e',flex:1}}>💼 Resumen por proveedor ({resumenProveedores.length})</span>
+                {filtroProveedor && <span onClick={e=>{e.stopPropagation();setFiltroProveedor('');}} style={{fontSize:11,background:'#c8264a',color:'#fff',padding:'2px 8px',borderRadius:4,cursor:'pointer'}}>✕ Quitar filtro: {filtroProveedor}</span>}
+                <span style={{fontSize:12,color:'#5a7a9a'}}>{openResumenProv?'▲':'▼'}</span>
+              </div>
+              {openResumenProv && (
+                <div style={{padding:'6px 14px 10px'}}>
+                  {resumenProveedores.map(r=>(
+                    <div key={r.nombre} onClick={()=>setFiltroProveedor(prev=>prev===r.nombre?'':r.nombre)}
+                      style={{display:'flex',alignItems:'center',gap:10,padding:'6px 8px',borderRadius:6,cursor:'pointer',
+                        background: filtroProveedor===r.nombre?'#fff3cd':'transparent'}}>
+                      <span style={{flex:1,fontSize:13,fontWeight:600,color:'#1a1a2e'}}>{r.nombre}</span>
+                      <span style={{fontSize:12,color:'#8aa0b8'}}>{r.rubros} rubro(s)</span>
+                      <span style={{fontSize:13,fontWeight:700,color:'#0d3b5e',minWidth:90,textAlign:'right'}}>{fmt(r.costo)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Lista agrupada por subcategoría */}
           {(()=>{
             // Construir subpresupuestos → grupos → items (3 niveles)
@@ -1318,8 +1394,9 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                   {grupo.items.map((it,ii)=>{
                     const c=calcItem(it); const open=openItem===it.id;
                     const tieneReal=it.costo_real_unit!==null&&it.costo_real_unit!==undefined;
+                    const coincideFiltroProv = !filtroProveedor || proveedoresDe(it).some(pr=>normProv(pr.razon_social)===normProv(filtroProveedor));
                     return(
-                      <div key={it.id} style={{borderBottom:ii<grupo.items.length-1?'1px solid #eef2f7':'none',background:c.hasWarning?'#fff8f8':'#fff'}}
+                      <div key={it.id} style={{borderBottom:ii<grupo.items.length-1?'1px solid #eef2f7':'none',background:c.hasWarning?'#fff8f8':'#fff',opacity:coincideFiltroProv?1:0.35}}
                         onDragOver={e=>{e.preventDefault();e.stopPropagation();}}
                         onDrop={e=>{e.preventDefault();e.stopPropagation();if(dragRef.current?.type==='item'&&dragRef.current.id!==it.id)moveItem(dragRef.current.id,it.id,it.subcategoria);}}>
                         {/* Cabecera ítem */}
@@ -1374,45 +1451,15 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                                 </div>
                               </div>
 
-                              {/* MULTI-PROVEEDOR — justo después del costo del proveedor principal */}
-                              <div style={{gridColumn:'1/-1',background:'#f8fafc',borderRadius:8,padding:'10px 12px',border:'1px solid #dde6ef'}}>
-                                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-                                  <div style={{fontSize:12,fontWeight:700,color:'#5a7a9a'}}>🏭 Proveedores adicionales para este mismo rubro</div>
-                                  <button onClick={()=>{
-                                    const provs = [...(it.proveedores_adicionales||[]), {id:crypto.randomUUID(),razon_social:'',factura:'',costo:0}];
-                                    updItem(it.id,'proveedores_adicionales',provs);
-                                  }} style={{fontSize:11,padding:'3px 10px',borderRadius:6,border:'1px solid #0d3b5e',background:'transparent',color:'#0d3b5e',cursor:'pointer',fontFamily:'inherit'}}>
-                                    + Agregar proveedor
-                                  </button>
+                              {/* PROVEEDORES Y FACTURAS — resumen + botón que abre el detalle en pop-up */}
+                              <div style={{gridColumn:'1/-1',background:'#f8fafc',borderRadius:8,padding:'10px 12px',border:'1px solid #dde6ef',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
+                                <div style={{fontSize:12,color:'#5a7a9a'}}>
+                                  🏭 {proveedoresDe(it).length} proveedor(es) · Asignado: <strong style={{color:c.excedeAsignacionProveedores?'#c8264a':'#2e8b4e'}}>{fmt(c.costoAsignadoProveedores)}</strong> de <strong>{fmt(c.costoTotalConAdicionales)}</strong>
+                                  {c.excedeAsignacionProveedores && <span style={{color:'#c8264a',fontWeight:700}}> ⚠️ supera el costo del rubro</span>}
                                 </div>
-                                {(it.proveedores_adicionales||[]).length === 0 && (
-                                  <div style={{fontSize:12,color:'#aaa',fontStyle:'italic'}}>Sin proveedores adicionales — el costo del rubro es solo el de arriba</div>
-                                )}
-                                {(it.proveedores_adicionales||[]).map((prov,pi) => (
-                                  <div key={prov.id} style={{display:'grid',gridTemplateColumns:'1fr 1fr auto auto',gap:8,marginBottom:8,padding:'8px',background:'#fff',borderRadius:6,border:'1px solid #eee'}}>
-                                    <div><Label>Razón social</Label>
-                                      <input style={S.input} value={prov.razon_social||''} placeholder="Nombre del proveedor"
-                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],razon_social:e.target.value};updItem(it.id,'proveedores_adicionales',ps);}}/>
-                                    </div>
-                                    <div><Label># Factura</Label>
-                                      <input style={S.input} value={prov.factura||''} placeholder="001-001-000123"
-                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],factura:e.target.value};updItem(it.id,'proveedores_adicionales',ps);}}/>
-                                    </div>
-                                    <div><Label>Costo ($)</Label>
-                                      <input type="number" step="0.01" style={S.input} value={prov.costo||0}
-                                        onChange={e=>{const ps=[...(it.proveedores_adicionales||[])];ps[pi]={...ps[pi],costo:Number(e.target.value)};updItem(it.id,'proveedores_adicionales',ps);}}/>
-                                    </div>
-                                    <div style={{display:'flex',alignItems:'flex-end',paddingBottom:2}}>
-                                      <button onClick={()=>{const ps=(it.proveedores_adicionales||[]).filter((_,i)=>i!==pi);updItem(it.id,'proveedores_adicionales',ps);}}
-                                        style={{background:'#fee2e2',border:'none',borderRadius:6,color:'#dc2626',cursor:'pointer',padding:'7px 10px',fontSize:13}}>✕</button>
-                                    </div>
-                                  </div>
-                                ))}
-                                {(it.proveedores_adicionales||[]).length > 0 && (
-                                  <div style={{fontSize:12,color:'#5a7a9a',marginTop:4,padding:'6px 10px',background:'#eef4fb',borderRadius:6}}>
-                                    Costo adicional total: <strong>{fmt(c.costoAdicionales)}</strong> · Costo del rubro completo (proveedor principal + adicionales): <strong style={{color:'#c2410c'}}>{fmt(c.costoTotalConAdicionales)}</strong> — el precio al cliente no cambia
-                                  </div>
-                                )}
+                                <button onClick={()=>abrirProveedoresModal(it)} style={{fontSize:12,padding:'6px 14px',borderRadius:6,border:'1px solid #0d3b5e',background:'#0d3b5e',color:'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>
+                                  🧾 Ver detalle de proveedores y facturas
+                                </button>
                               </div>
 
                               {/* COSTO REAL */}
@@ -1486,13 +1533,11 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                                 <span style={{fontSize:15,fontWeight:700,color:c.margen>=0?'#2e8b4e':'#c8264a'}}>{fmt(c.margen)} ({fmtPct(c.margenPct)})</span>
                               </div>
 
-                              <div><Label>Razón social proveedor</Label><input style={S.input} value={it.proveedor||''} onChange={e=>updItem(it.id,'proveedor',e.target.value)} onBlur={save}/></div>
-                              <div><Label># Factura proveedor</Label><input style={S.input} value={it.num_factura_prov||''} onChange={e=>updItem(it.id,'num_factura_prov',e.target.value)} onBlur={save} placeholder="Ej: 001-001-000123456"/></div>
-                              <div><Label>Info general</Label><input style={S.input} value={it.info||''} onChange={e=>updItem(it.id,'info',e.target.value)} onBlur={save}/></div>
+                              <div style={{gridColumn:'1/-1'}}><Label>Info general</Label><input style={S.input} value={it.info||''} onChange={e=>updItem(it.id,'info',e.target.value)} onBlur={save}/></div>
 
-                              {/* CONDICIÓN DE PAGO */}
+                              {/* CONDICIÓN DE PAGO DEL CLIENTE — alimenta el Flujo de caja (cuándo cobra Matilda) */}
                               <div style={{gridColumn:'1/-1',background:'#fdf8ee',borderRadius:8,padding:'10px 12px',border:'1px solid #e8d8a0'}}>
-                                <div style={{fontSize:12,fontWeight:700,color:'#7a5500',marginBottom:8}}>💳 Condición de pago</div>
+                                <div style={{fontSize:12,fontWeight:700,color:'#7a5500',marginBottom:8}}>💳 Condición de pago del cliente <span style={{fontWeight:400,fontSize:11,color:'#a0905a'}}>— para el Flujo de caja</span></div>
                                 <div style={{display:'flex',gap:8,marginBottom:10}}>
                                   {['Contado','Crédito','Abono'].map(op => (
                                     <button key={op} onClick={()=>updItem(it.id,'condicion_pago',op)}
@@ -1968,8 +2013,8 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                     <td style={{padding:'6px',textAlign:'right'}}>{fmt(c.precioU)}</td>
                     <td style={{padding:'6px 10px',textAlign:'right',fontWeight:700}}>{fmt(c.precio)}</td>
                     {previewMode==='financiero'&&<>
-                      <td style={{padding:'6px',fontSize:10,color:'#5a7a9a'}}>{it.proveedor}</td>
-                      <td style={{padding:'6px',fontSize:10,color:'#5a7a9a'}}>{it.num_factura_prov||''}</td>
+                      <td style={{padding:'6px',fontSize:10,color:'#5a7a9a'}}>{proveedoresDe(it)[0]?.razon_social||''}{proveedoresDe(it).length>1?` +${proveedoresDe(it).length-1}`:''}</td>
+                      <td style={{padding:'6px',fontSize:10,color:'#5a7a9a'}}>{proveedoresDe(it)[0]?.factura||''}</td>
                     </>}
                   </tr>
                 );})}
@@ -2109,6 +2154,105 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
           </div>
         </Modal>
       )}
+
+      {provModalItemId && (()=>{
+        const itProv = (p.items||[]).find(x=>x.id===provModalItemId);
+        if (!itProv) return null;
+        const cProv = calcItem(itProv);
+        const lista = itProv.proveedores || [];
+        return (
+          <Modal title={`🧾 Proveedores y facturas — ${itProv.item||'Ítem sin nombre'}`} onClose={()=>setProvModalItemId(null)}>
+            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+              <div style={{fontSize:12,color:'#5a7a9a',background:'#eef4fb',padding:'8px 10px',borderRadius:6}}>
+                Costo total del rubro (cuadro naranja): <strong>{fmt(cProv.costoTotalConAdicionales)}</strong> — repartí ese costo entre los proveedores de abajo; no hace falta que cada uno tenga su propia condición de pago.
+              </div>
+
+              {lista.map((prov, pi) => (
+                <div key={prov.id} style={{background:'#f8fafc',border:'1px solid #dde6ef',borderRadius:8,padding:'10px 12px'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr auto',gap:8,alignItems:'end'}}>
+                    <div><Label>Razón social</Label>
+                      <input style={S.input} value={prov.razon_social||''} placeholder="Nombre del proveedor"
+                        onChange={e=>updProveedor(itProv.id,prov.id,'razon_social',e.target.value)}/>
+                    </div>
+                    <div><Label># Factura</Label>
+                      <input style={S.input} value={prov.factura||''} placeholder="001-001-000123"
+                        onChange={e=>updProveedor(itProv.id,prov.id,'factura',e.target.value)}/>
+                    </div>
+                    <div><Label>Costo asignado ($)</Label>
+                      <input type="number" step="0.01" style={S.input} value={prov.costo||0} onWheel={e=>e.target.blur()}
+                        onChange={e=>updProveedor(itProv.id,prov.id,'costo',Number(e.target.value))}/>
+                    </div>
+                    <div>
+                      <button onClick={()=>{ if(lista.length>1 && !window.confirm('¿Quitar este proveedor?')) return; delProveedor(itProv.id,prov.id); }}
+                        style={{background:'#fee2e2',border:'none',borderRadius:6,color:'#dc2626',cursor:'pointer',padding:'9px 12px',fontSize:13}}>✕</button>
+                    </div>
+                  </div>
+
+                  <div style={{marginTop:8}}>
+                    <div style={{fontSize:11,fontWeight:700,color:'#7a5500',marginBottom:6}}>💳 Condición de pago</div>
+                    <div style={{display:'flex',gap:6,marginBottom:8}}>
+                      {['Contado','Crédito','Abono'].map(op => (
+                        <button key={op} onClick={()=>updProveedor(itProv.id,prov.id,'condicion_pago',op)}
+                          style={{padding:'4px 12px',borderRadius:6,border:'1px solid #c8a840',fontSize:11,cursor:'pointer',fontFamily:'inherit',fontWeight:500,
+                            background: prov.condicion_pago===op?'#7a5500':'#fff',
+                            color:      prov.condicion_pago===op?'#fff':'#7a5500',
+                          }}>{op}</button>
+                      ))}
+                    </div>
+                    {prov.condicion_pago==='Crédito' && (
+                      <div style={{maxWidth:200}}>
+                        <Label>Días de crédito</Label>
+                        <input type="number" min="0" style={S.input} value={prov.dias_credito||''} placeholder="Ej: 30" onWheel={e=>e.target.blur()}
+                          onChange={e=>updProveedor(itProv.id,prov.id,'dias_credito',e.target.value)}/>
+                      </div>
+                    )}
+                    {prov.condicion_pago==='Abono' && (()=>{
+                      const pct = Number(prov.abono_pct||50);
+                      const valorAbono = Number(prov.costo||0) * (pct/100);
+                      const saldo = Number(prov.costo||0) - valorAbono;
+                      return (
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                          <div><Label>% de abono</Label>
+                            <input type="number" min="0" max="100" style={S.input} value={prov.abono_pct||50} onWheel={e=>e.target.blur()}
+                              onChange={e=>updProveedor(itProv.id,prov.id,'abono_pct',Number(e.target.value))}/>
+                          </div>
+                          <div><Label>Valor abono</Label><input style={S.inputRO} readOnly value={fmt(valorAbono)}/></div>
+                          <div><Label>Días crédito del saldo</Label>
+                            <input type="number" min="0" style={S.input} value={prov.dias_credito_saldo||''} placeholder="Ej: 30" onWheel={e=>e.target.blur()}
+                              onChange={e=>updProveedor(itProv.id,prov.id,'dias_credito_saldo',e.target.value)}/>
+                          </div>
+                          <div style={{gridColumn:'1/-1',fontSize:11,color:'#7a5500',background:'#fff8e6',borderRadius:6,padding:'5px 8px'}}>
+                            Saldo a recibir en {prov.dias_credito_saldo||'—'} días: <strong>{fmt(saldo)}</strong>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              ))}
+
+              <button onClick={()=>addProveedor(itProv.id)} style={{alignSelf:'flex-start',fontSize:12,padding:'6px 14px',borderRadius:6,border:'1px solid #0d3b5e',background:'transparent',color:'#0d3b5e',cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>
+                + Agregar proveedor
+              </button>
+
+              <div style={{fontSize:13,padding:'10px 12px',borderRadius:6,background:cProv.excedeAsignacionProveedores?'#fdeef1':'#edf7ed',border:`1px solid ${cProv.excedeAsignacionProveedores?'#c8264a44':'#2e8b4e44'}`}}>
+                Asignado: <strong>{fmt(cProv.costoAsignadoProveedores)}</strong> de <strong>{fmt(cProv.costoTotalConAdicionales)}</strong> (costo del rubro)
+                {cProv.excedeAsignacionProveedores
+                  ? <span style={{color:'#c8264a',fontWeight:700}}> — ⚠️ supera el costo del rubro, revisá los montos (igual se puede guardar)</span>
+                  : (cProv.costoAsignadoProveedores < cProv.costoTotalConAdicionales - 0.01
+                      ? <span style={{color:'#7a5500'}}> — falta asignar {fmt(cProv.costoTotalConAdicionales - cProv.costoAsignadoProveedores)}</span>
+                      : <span style={{color:'#2e8b4e'}}> ✓ cuadra con el costo del rubro</span>)}
+              </div>
+
+              <div style={{display:'flex',justifyContent:'flex-end',marginTop:4}}>
+                <button onClick={()=>{setProvModalItemId(null);save();}} style={{padding:'8px 20px',borderRadius:8,border:'none',background:'#0d3b5e',color:'#fff',cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>
+                  Listo
+                </button>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }

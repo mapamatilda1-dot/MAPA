@@ -130,6 +130,12 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
         num_factura_prov: '',
         foto_referencia: null,
         // costo_unit se mantiene igual al original
+        // Proveedores: se mantienen razón social y costo (el estimado sigue
+        // valiendo), pero la factura queda vacía — es un presupuesto nuevo,
+        // no debería arrastrar el número de factura del original.
+        proveedores: Array.isArray(it.proveedores)
+          ? it.proveedores.map(pr => ({ ...pr, id: crypto.randomUUID(), factura: '' }))
+          : it.proveedores,
       };
     });
 

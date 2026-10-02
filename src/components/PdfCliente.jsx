@@ -1,4 +1,4 @@
-import { calcItem, calcPpto, fmt, fmtDate } from '../calc';
+import { calcItem, calcPpto, proveedoresDe, fmt, fmtDate } from '../calc';
 import LOGO_BASE64 from '../logoBase64';
 
 // Convierte *palabra* en negrita y \n en salto de línea
@@ -373,7 +373,8 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
       const c = calcItem(it);
       const tieneReal = it.costo_real_unit !== null && it.costo_real_unit !== undefined;
       const bg = i % 2 === 1 ? '#f8fafc' : '#fff';
-      const tieneAdicionales = (it.proveedores_adicionales||[]).length > 0;
+      const listaProv = proveedoresDe(it);
+      const tieneAdicionales = listaProv.length > 1;
       const filaPrincipal = `<tr style="border-bottom:1px solid #eef2f7;background:${bg};font-size:10px;">
         <td style="padding:6px 10px;">
           <div style="font-weight:700;color:#1a1a2e;">${it.item || ''}</div>
@@ -382,33 +383,25 @@ export function generatePdfFinancieroHTML(ppto, logoUrlOverride) {
         <td style="padding:6px 5px;text-align:center;">${c.cantidad}</td>
         <td style="padding:6px 5px;text-align:center;">${c.dias}</td>
         <td style="padding:6px 5px;text-align:right;color:#8b1a1a;">${fmt(c.costoUnit)}</td>
-        <td style="padding:6px 5px;text-align:right;color:#8b1a1a;font-weight:600;">${fmt(c.costoTotalConAdicionales)}${tieneAdicionales ? '<div style="font-size:8px;font-weight:400;color:#a35a5a;">(' + fmt(c.costoTotal) + ' + ' + fmt(c.costoAdicionales) + ' adic.)</div>' : ''}</td>
+        <td style="padding:6px 5px;text-align:right;color:#8b1a1a;font-weight:600;">${fmt(c.costoTotalConAdicionales)}${c.excedeAsignacionProveedores ? '<div style="font-size:8px;font-weight:700;color:#c8264a;">⚠ asignado ' + fmt(c.costoAsignadoProveedores) + '</div>' : ''}</td>
         <td style="padding:6px 5px;text-align:right;color:#0d3b5e;">${fmt(c.precioU)}</td>
         <td style="padding:6px 5px;text-align:right;color:#0d3b5e;font-weight:600;">${fmt(c.precio)}</td>
         <td style="padding:6px 5px;text-align:right;font-weight:600;color:${(c.precio-c.costoTotalConAdicionales)>=0?'#1a6e3e':'#8b1a1a'};">${fmt(c.precio-c.costoTotalConAdicionales)}<div style="font-size:8px;">(${c.margenPct.toFixed(1)}%)</div></td>
-        <td style="padding:6px 8px;font-size:9px;color:#5a7a9a;">${it.proveedor||''}${tieneAdicionales ? ' <span style="color:#c2410c;font-weight:700;">+' + it.proveedores_adicionales.length + '</span>' : ''}</td>
-        <td style="padding:6px 8px;font-size:9px;color:#5a7a9a;">${it.num_factura_prov||''}</td>
+        <td style="padding:6px 8px;font-size:9px;color:#5a7a9a;">${listaProv[0]?.razon_social||''}${tieneAdicionales ? ' <span style="color:#c2410c;font-weight:700;">+' + (listaProv.length-1) + '</span>' : ''}</td>
+        <td style="padding:6px 8px;font-size:9px;color:#5a7a9a;">${listaProv[0]?.factura||''}</td>
         <td style="padding:6px 5px;text-align:right;color:#1a6e3e;">${tieneReal?fmt(c.costoRealUnit):'—'}</td>
         <td style="padding:6px 5px;text-align:right;color:#1a6e3e;font-weight:600;">${tieneReal?fmt(c.costoRealTotal):'—'}</td>
         <td style="padding:6px 5px;text-align:right;color:#1a6e3e;">${tieneReal?fmt(c.ahorro):'—'}</td>
         <td style="padding:6px 5px;text-align:right;font-weight:600;color:${tieneReal?((c.precio-c.costoRealTotal)>=0?'#1a6e3e':'#8b1a1a'):'#888'};">${tieneReal?fmt(c.precio-c.costoRealTotal):'—'}</td>
       </tr>`;
-      const filasProveedores = !tieneAdicionales ? '' : [
-        `<tr style="background:${bg};font-size:9px;">
-          <td style="padding:2px 10px 2px 24px;color:#a35a5a;">↳ ${it.proveedor || 'Proveedor principal'}</td>
-          <td colspan="3"></td>
-          <td style="padding:2px 5px;text-align:right;color:#a35a5a;">${fmt(c.costoTotal)}</td>
-          <td colspan="7"></td>
-        </tr>`,
-        ...it.proveedores_adicionales.map(pr => `<tr style="background:${bg};font-size:9px;">
-          <td style="padding:2px 10px 2px 24px;color:#a35a5a;">↳ ${pr.razon_social || 'Proveedor adicional'}</td>
-          <td colspan="3"></td>
+      const filasProveedores = !tieneAdicionales ? '' : listaProv.map(pr => `<tr style="background:${bg};font-size:9px;">
+          <td style="padding:2px 10px 2px 24px;color:#a35a5a;">↳ ${pr.razon_social || 'Sin nombre'} ${pr.condicion_pago?'<span style=\"color:#7a5500;\">· '+pr.condicion_pago+'</span>':''}</td>
+          <td colspan="2"></td>
           <td style="padding:2px 5px;text-align:right;color:#a35a5a;">${fmt(pr.costo||0)}</td>
-          <td colspan="4"></td>
+          <td colspan="5"></td>
           <td style="padding:2px 8px;color:#a35a5a;">${pr.factura||''}</td>
           <td colspan="3"></td>
-        </tr>`),
-      ].join('');
+        </tr>`).join('');
       return filaPrincipal + filasProveedores;
     }).join('');
     return subcatRow + rows;
@@ -618,9 +611,9 @@ export function generateExcelFinancieroData(ppto) {
   rows.push([]);
   rows.push([
     'Subpresupuesto','Subcategoría','Categoría','Ítem','Detalle','Cantidad','Días',
-    'Costo Unit.','Costo Total (proveedor principal)','Proveedores adicionales','Costo Total (con adicionales)',
+    'Costo Unit.','Costo Total del rubro','Proveedores (desglose + condición de pago)','Asignado a proveedores',
     'Precio Unit.','Precio Total',
-    'Proveedor','# Factura Proveedor',
+    'Proveedor principal','# Factura Proveedor',
     'Costo Real Unit.','Costo Real Total','Ahorro',
     'Margen','% Margen','Margen Real','% Margen Real',
     'OH%','OH $','BCO%','BCO $','Total Costo c/OH+BCO',
@@ -633,15 +626,16 @@ export function generateExcelFinancieroData(ppto) {
     if(it._type==='subppto'){currentSubppto=it.subpresupuesto||'';return;}
     if(it._type==='subcat')return;
     const c=calcItem(it);
+    const listaProv=proveedoresDe(it);
     const tieneReal=it.costo_real_unit!==null&&it.costo_real_unit!==undefined;
     rows.push([
       currentSubppto, it.subcategoria||'', it.categoria||'', it.item||'', it.detalle||'',
       c.cantidad, c.dias,
       c.costoUnit, c.costoTotal,
-      (it.proveedores_adicionales||[]).map(pr=>`${pr.razon_social||'—'}: ${pr.costo||0}${pr.factura?' (Fact. '+pr.factura+')':''}`).join(' | '),
-      c.costoTotalConAdicionales,
+      listaProv.map(pr=>`${pr.razon_social||'—'}: ${pr.costo||0}${pr.condicion_pago?' ('+pr.condicion_pago+')':''}${pr.factura?' Fact. '+pr.factura:''}`).join(' | '),
+      c.costoAsignadoProveedores,
       c.precioU, c.precio,
-      it.proveedor||'', it.num_factura_prov||'',
+      listaProv[0]?.razon_social||'', listaProv[0]?.factura||'',
       tieneReal?c.costoRealUnit:'', tieneReal?c.costoRealTotal:'', tieneReal?c.ahorro:'',
       c.margen, c.margenPct.toFixed(1)+'%',
       tieneReal?c.margenReal:'', tieneReal?c.margenRealPct.toFixed(1)+'%':'',

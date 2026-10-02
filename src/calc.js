@@ -18,6 +18,60 @@ export function fmtDate(d) {
 // Helper: round to 2 decimal places to avoid floating point errors
 const r2 = n => Math.round(Number(n) * 100) / 100;
 
+// Devuelve la lista de proveedores de un ítem (razón social, factura, costo
+// asignado, condición de pago hacia ESE proveedor), fusionando el "proveedor
+// principal" y los "proveedores adicionales" legados en una sola lista.
+//
+// Nota importante: la condición de pago de cada proveedor (cuándo Matilda le
+// paga a ÉL) es un dato nuevo, independiente de it.condicion_pago — ese campo
+// de nivel-ítem es el del FLUJO DE CAJA (cuándo el CLIENTE le paga a Matilda,
+// calculado sobre precio_unit) y se mantiene intacto, sin tocarlo acá.
+//
+// Si el ítem ya tiene it.proveedores (array), se usa tal cual — esa es la
+// fuente de verdad una vez que alguien abrió el detalle y lo editó.
+//
+// Si no existe todavía (ítems creados antes de este cambio), se arma al vuelo
+// a partir de los campos antiguos SIN perder ninguna información: proveedor/
+// num_factura_prov pasan a ser la primera fila, y cada entrada de
+// proveedores_adicionales pasa a ser una fila más — todas con condición de
+// pago "Contado" por defecto (no existía ese dato por proveedor antes).
+// Esta función NO escribe nada — es de solo lectura; quien la use decide
+// cuándo materializar el resultado en it.proveedores.
+export function proveedoresDe(it) {
+  if (Array.isArray(it.proveedores)) return it.proveedores;
+  const cantidad = r2(it.cantidad ?? 1);
+  const dias     = r2(it.dias    ?? 1);
+  const costoUnit = r2(it.costo_unit ?? it.costo ?? 0);
+  const costoTotalRubro = r2(costoUnit * cantidad * dias);
+  const adicionalesLegado = it.proveedores_adicionales || [];
+  const sumaAdicionalesLegado = r2(adicionalesLegado.reduce((a, pr) => a + Number(pr.costo || 0), 0));
+  const nuevoId = () => (typeof crypto!=='undefined'&&crypto.randomUUID) ? crypto.randomUUID() : String(Math.random());
+  const principal = {
+    id: nuevoId(),
+    razon_social: it.proveedor || '',
+    factura: it.num_factura_prov || '',
+    // Si ya había proveedores adicionales (modelo viejo, aditivo), al proveedor
+    // principal le queda la porción restante para que el total siga cuadrando
+    // con el costo cotizado (cuadro naranja) y no aparezca una advertencia falsa.
+    costo: r2(Math.max(costoTotalRubro - sumaAdicionalesLegado, 0)),
+    condicion_pago: 'Contado',
+    dias_credito: '',
+    abono_pct: 50,
+    dias_credito_saldo: '',
+  };
+  const adicionales = adicionalesLegado.map(pr => ({
+    id: pr.id || nuevoId(),
+    razon_social: pr.razon_social || '',
+    factura: pr.factura || '',
+    costo: r2(Number(pr.costo || 0)),
+    condicion_pago: 'Contado',
+    dias_credito: '',
+    abono_pct: 50,
+    dias_credito_saldo: '',
+  }));
+  return [principal, ...adicionales];
+}
+
 export function calcItem(it) {
   const oh       = r2(it.oh_pct  ?? 15);
   const bco      = r2(it.bco_pct ?? 5.5);
@@ -28,11 +82,23 @@ export function calcItem(it) {
   const costoUnit  = r2(it.costo_unit ?? it.costo ?? 0);
   const costoTotal = r2(costoUnit * cantidad * dias);
 
-  // Proveedores adicionales del mismo rubro — cada uno con su costo total
-  // ya cotizado (no se multiplica por cantidad/días). El costo real del
-  // rubro es la suma del proveedor principal + todos los adicionales.
-  const costoAdicionales = r2((it.proveedores_adicionales || []).reduce((a, pr) => a + Number(pr.costo || 0), 0));
-  const costoTotalConAdicionales = r2(costoTotal + costoAdicionales);
+  // costoTotalConAdicionales = el costo TOTAL del rubro (el del cuadro naranja).
+  // Modelo nuevo (it.proveedores ya existe): los proveedores reparten ese costo
+  // entre sí — ya no suman costo extra. Modelo viejo (compatibilidad, mientras
+  // nadie abrió el detalle de ese ítem): los proveedores_adicionales sí sumaban.
+  let costoAdicionales, costoTotalConAdicionales;
+  if (Array.isArray(it.proveedores)) {
+    costoAdicionales = 0;
+    costoTotalConAdicionales = costoTotal;
+  } else {
+    costoAdicionales = r2((it.proveedores_adicionales || []).reduce((a, pr) => a + Number(pr.costo || 0), 0));
+    costoTotalConAdicionales = r2(costoTotal + costoAdicionales);
+  }
+
+  // Cuánto se ha repartido entre los proveedores (principal + adicionales) vs.
+  // el costo total del rubro — para la advertencia visual en el pop-up.
+  const costoAsignadoProveedores = r2(proveedoresDe(it).reduce((a, pr) => a + Number(pr.costo || 0), 0));
+  const excedeAsignacionProveedores = costoAsignadoProveedores > costoTotalConAdicionales + 0.01;
 
   const ohVal      = r2(costoTotalConAdicionales * (oh  / 100));
   const bcoVal     = r2(costoTotalConAdicionales * (bco / 100));
@@ -65,7 +131,9 @@ export function calcItem(it) {
   const hasWarning = precio > 0 && totalCosto > precio;
 
   return {
-    costoUnit, costoTotal, costoAdicionales, costoTotalConAdicionales, ohVal, bcoVal, totalCosto,
+    costoUnit, costoTotal, costoAdicionales, costoTotalConAdicionales,
+    costoAsignadoProveedores, excedeAsignacionProveedores,
+    ohVal, bcoVal, totalCosto,
     costoRealUnit, costoRealTotal, ohRealVal, bcoRealVal, totalCostoReal, ahorro,
     precioU, cantidad, dias, precio,
     margen, margenPct, margenReal, margenRealPct,
