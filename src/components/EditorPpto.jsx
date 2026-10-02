@@ -31,123 +31,6 @@ function emptyItem(p) {
   };
 }
 
-// ── Flujo de caja ────────────────────────────────────────────
-function FlujoCaja({ p, fmt, fmtDate }) {
-  const items = (p.items||[]).filter(it=>!it._type && it.condicion_pago);
-  if (!items.length) return (
-    <div style={{marginTop:16,background:'#f8fafc',border:'1px dashed #dde6ef',borderRadius:12,padding:'16px',textAlign:'center',color:'#aaa',fontSize:13}}>
-      Sin ítems con condición de pago — agregá Contado, Crédito o Abono en cada ítem para ver el flujo de caja
-    </div>
-  );
-
-  const hoyStr = new Date().toISOString().slice(0,10);
-  // Fecha base para créditos: fecha_inicio_produccion o hoy
-  const fechaBase = p.fecha_inicio_produccion || hoyStr;
-
-  function addDays(dateStr, days) {
-    if (!dateStr) return null;
-    const d = new Date(dateStr + 'T12:00');
-    d.setDate(d.getDate() + Number(days||0));
-    return d.toISOString().slice(0,10);
-  }
-
-  // Agrupar pagos por fecha
-  const pagos = {};
-  let totalSinFlujo = 0;
-
-  items.forEach(it => {
-    const precio = Number(it.precio_unit||0) * Number(it.cantidad||0) * Number(it.dias||1);
-    const cond = it.condicion_pago;
-
-    if (cond === 'Contado') {
-      // 100% al inicio de producción
-      pagos[fechaBase] = (pagos[fechaBase]||[]);
-      pagos[fechaBase].push({ label:'Contado', monto:precio });
-    } else if (cond === 'Crédito') {
-      // 100% desde fecha base + días crédito
-      const dias = Number(it.dias_credito||0);
-      const fecha = addDays(fechaBase, dias);
-      if (fecha) {
-        pagos[fecha] = (pagos[fecha]||[]);
-        pagos[fecha].push({ label:`Crédito ${dias}d`, monto:precio });
-      } else totalSinFlujo += precio;
-    } else if (cond === 'Abono') {
-      const pct = Number(it.abono_pct||50) / 100;
-      const dias = Number(it.dias_credito_saldo||0);
-      const abono = precio * pct;
-      const saldo = precio - abono;
-      // Abono al inicio de producción
-      pagos[fechaBase] = (pagos[fechaBase]||[]);
-      pagos[fechaBase].push({ label:`Abono ${it.abono_pct||50}%`, monto:abono });
-      // Saldo tras días de crédito
-      const fechaSaldo = addDays(fechaBase, dias);
-      if (fechaSaldo) {
-        pagos[fechaSaldo] = (pagos[fechaSaldo]||[]);
-        pagos[fechaSaldo].push({ label:`Saldo ${dias}d`, monto:saldo });
-      } else totalSinFlujo += saldo;
-    } else {
-      totalSinFlujo += precio;
-    }
-  });
-
-  const fechasOrdenadas = Object.keys(pagos).sort();
-  const totalItems = items.reduce((a,it)=>a+Number(it.precio_unit||0)*Number(it.cantidad||0)*Number(it.dias||1),0);
-  const totalFlujo = fechasOrdenadas.reduce((a,f)=>a+(pagos[f]||[]).reduce((x,p)=>x+p.monto,0),0);
-
-  return (
-    <div style={{marginTop:16,background:'#fff',border:'1px solid #dde6ef',borderRadius:12,overflow:'hidden'}}>
-      <div style={{background:'#0d3b5e',padding:'10px 16px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-        <span style={{color:'#fff',fontWeight:700,fontSize:13}}>💰 Flujo de caja</span>
-        <span style={{color:'rgba(255,255,255,.6)',fontSize:11}}>
-          Base: {fmtDate(fechaBase)}{p.fecha_inicio_produccion?' (fecha inicio producción)':' (hoy — configurá la fecha en Info)'}
-        </span>
-      </div>
-      <div style={{padding:'14px 16px'}}>
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {fechasOrdenadas.map(fecha=>{
-            const entradas = pagos[fecha]||[];
-            const totalFecha = entradas.reduce((a,e)=>a+e.monto,0);
-            const esFechaBase = fecha === fechaBase;
-            return (
-              <div key={fecha} style={{padding:'10px 14px',background:esFechaBase?'#e8f5ee':'#eef4fb',borderRadius:8,border:`1px solid ${esFechaBase?'#86efac':'#c8d8e8'}`}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:entradas.length>1?6:0}}>
-                  <div>
-                    <div style={{fontSize:11,color:'#888'}}>{esFechaBase?'📅 Inicio de producción':'📅 Cobro'}</div>
-                    <div style={{fontSize:14,fontWeight:600,color:esFechaBase?'#2e8b4e':'#0d3b5e'}}>{fmtDate(fecha)}</div>
-                  </div>
-                  <div style={{textAlign:'right'}}>
-                    <div style={{fontSize:18,fontWeight:700,color:esFechaBase?'#2e8b4e':'#0d3b5e'}}>{fmt(totalFecha)}</div>
-                    <div style={{fontSize:11,color:'#888'}}>{totalItems>0?((totalFecha/totalItems)*100).toFixed(0):0}% del total</div>
-                  </div>
-                </div>
-                {entradas.length > 1 && (
-                  <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                    {entradas.map((e,i)=>(
-                      <span key={i} style={{fontSize:11,background:'rgba(0,0,0,.06)',padding:'2px 8px',borderRadius:4,color:'#555'}}>
-                        {e.label}: {fmt(e.monto)}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {totalSinFlujo > 0 && (
-            <div style={{padding:'8px 14px',background:'#fff8f8',borderRadius:8,border:'1px solid #fca5a5',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <span style={{fontSize:12,color:'#991b1b'}}>⚠️ Ítems sin condición de pago definida</span>
-              <span style={{fontWeight:700,color:'#991b1b'}}>{fmt(totalSinFlujo)}</span>
-            </div>
-          )}
-        </div>
-        <div style={{marginTop:12,paddingTop:10,borderTop:'1px solid #e8e8e8',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
-          <span style={{fontSize:13,color:'#555'}}>En flujo: <strong style={{color:'#0d3b5e'}}>{fmt(totalFlujo)}</strong></span>
-          {totalSinFlujo>0&&<span style={{fontSize:13,color:'#991b1b'}}>Sin asignar: <strong>{fmt(totalSinFlujo)}</strong></span>}
-          <span style={{fontSize:13,color:'#555'}}>Total presupuesto: <strong style={{color:'#0d3b5e'}}>{fmt(totalItems)}</strong></span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 
 
@@ -1535,50 +1418,6 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
 
                               <div style={{gridColumn:'1/-1'}}><Label>Info general</Label><input style={S.input} value={it.info||''} onChange={e=>updItem(it.id,'info',e.target.value)} onBlur={save}/></div>
 
-                              {/* CONDICIÓN DE PAGO DEL CLIENTE — alimenta el Flujo de caja (cuándo cobra Matilda) */}
-                              <div style={{gridColumn:'1/-1',background:'#fdf8ee',borderRadius:8,padding:'10px 12px',border:'1px solid #e8d8a0'}}>
-                                <div style={{fontSize:12,fontWeight:700,color:'#7a5500',marginBottom:8}}>💳 Condición de pago del cliente <span style={{fontWeight:400,fontSize:11,color:'#a0905a'}}>— para el Flujo de caja</span></div>
-                                <div style={{display:'flex',gap:8,marginBottom:10}}>
-                                  {['Contado','Crédito','Abono'].map(op => (
-                                    <button key={op} onClick={()=>updItem(it.id,'condicion_pago',op)}
-                                      style={{padding:'5px 14px',borderRadius:7,border:'1px solid',fontSize:12,cursor:'pointer',fontFamily:'inherit',fontWeight:500,
-                                        background: it.condicion_pago===op?'#7a5500':'#fff',
-                                        color:      it.condicion_pago===op?'#fff':'#7a5500',
-                                        borderColor:'#c8a840',
-                                      }}>{op}</button>
-                                  ))}
-                                </div>
-                                {it.condicion_pago==='Crédito' && (
-                                  <div style={{display:'grid',gridTemplateColumns:'1fr',gap:8}}>
-                                    <div><Label>Días de crédito</Label>
-                                      <input type="number" min="0" style={S.input} value={it.dias_credito||''} placeholder="Ej: 30" onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'dias_credito',e.target.value)}/>
-                                    </div>
-                                  </div>
-                                )}
-                                {it.condicion_pago==='Abono' && (()=>{
-                                  const pct = Number(it.abono_pct||50);
-                                  const totalItem = Number(it.costo_unit||0)*Number(it.cantidad||1)*Number(it.dias||1);
-                                  const valorAbono = totalItem * (pct/100);
-                                  const saldo = totalItem - valorAbono;
-                                  return (
-                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
-                                      <div><Label>% de abono</Label>
-                                        <input type="number" min="0" max="100" style={S.input} value={it.abono_pct||50} onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'abono_pct',Number(e.target.value))}/>
-                                      </div>
-                                      <div><Label>Valor abono</Label>
-                                        <input style={S.inputRO} readOnly value={fmt(valorAbono)}/>
-                                      </div>
-                                      <div><Label>Días crédito del saldo</Label>
-                                        <input type="number" min="0" style={S.input} value={it.dias_credito_saldo||''} placeholder="Ej: 30" onWheel={e=>e.target.blur()} onChange={e=>updItem(it.id,'dias_credito_saldo',e.target.value)}/>
-                                      </div>
-                                      <div style={{gridColumn:'1/-1',fontSize:12,color:'#7a5500',background:'#fff8e6',borderRadius:6,padding:'6px 10px'}}>
-                                        Saldo a recibir en {it.dias_credito_saldo||'—'} días: <strong>{fmt(saldo)}</strong>
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-
                               {/* Foto de referencia */}
                               <div style={{gridColumn:'1/-1',background:'#f8fafc',borderRadius:8,padding:'10px 12px',border:'1px dashed #c8d8e8'}}>
                                 <Label>📸 Foto de referencia (aparece en PDF y vista cliente)</Label>
@@ -1788,8 +1627,6 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             );
           })()}
 
-          {/* SECCION 2: Flujo de Caja */}
-          {['aprobado','pendiente_facturar','facturado'].includes(p.estado) && <FlujoCaja p={p} fmt={fmt} fmtDate={fmtDate} />}
 
           {/* SECCION 3: OH / Banco / Precio Cliente / Margen Real */}
           <div style={{border:'1px solid #dde6ef',borderRadius:12,overflow:'hidden',marginBottom:14}}>
