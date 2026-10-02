@@ -502,6 +502,24 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     showToast('✓ Ítems movidos a opciones adicionales');
   } // { type:'item'|'subcat', id, fromIndex }
 
+  // ── Duplicar ítem(s) seleccionados dentro del mismo presupuesto ──
+  function duplicarItemsEnMismoPresupuesto() {
+    if (selectedItems.size === 0) return;
+    setP(prev => {
+      const arr = prev.items||[];
+      const nuevoArr = [];
+      arr.forEach(it => {
+        nuevoArr.push(it);
+        if (selectedItems.has(it.id) && it._type!=='subcat' && it._type!=='subppto') {
+          nuevoArr.push({ ...it, id: crypto.randomUUID() });
+        }
+      });
+      return { ...prev, items: nuevoArr };
+    });
+    setSelectedItems(new Set());
+    showToast('✓ Ítem(s) duplicado(s) en el mismo presupuesto');
+  }
+
   // ── Duplicar subcategoría (con todos sus ítems) en el mismo presupuesto ──
   function duplicarSubcategoria(subcatId, nombreActual) {
     const nombreNuevo = window.prompt('Nombre de la subcategoría duplicada:', (nombreActual||'') + ' (copia)');
@@ -1159,6 +1177,11 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
               {selectedItems.size > 0 && !bloqueado && (
                 <button style={{...S.btnPrimary,background:'#f0a500',color:'#fff'}} onClick={moverAOpcionAdicional}>
                   ✦ Mover {selectedItems.size} ítem(s) a Opción adicional
+                </button>
+              )}
+              {selectedItems.size > 0 && !bloqueado && (
+                <button style={{...S.btnPrimary,background:'#2e8b4e',color:'#fff'}} onClick={duplicarItemsEnMismoPresupuesto}>
+                  🧬 Duplicar {selectedItems.size} ítem(s) aquí
                 </button>
               )}
               {selectedItems.size > 0 && (
