@@ -502,6 +502,30 @@ export default function EditorPpto({ ppto, onSave, onCancel, cfg, categorias, cl
     showToast('✓ Ítems movidos a opciones adicionales');
   } // { type:'item'|'subcat', id, fromIndex }
 
+  // ── Duplicar subcategoría (con todos sus ítems) en el mismo presupuesto ──
+  function duplicarSubcategoria(subcatId, nombreActual) {
+    const nombreNuevo = window.prompt('Nombre de la subcategoría duplicada:', (nombreActual||'') + ' (copia)');
+    if (nombreNuevo===null || !nombreNuevo.trim()) return;
+    setP(prev => {
+      const arr = prev.items||[];
+      const idx = arr.findIndex(it => it.id===subcatId && it._type==='subcat');
+      if (idx===-1) return prev;
+      // Recolectar los ítems que pertenecen a esta subcategoría (hasta el siguiente subcat/subppto)
+      const bloque = [];
+      for (let i=idx+1; i<arr.length; i++) {
+        if (arr[i]._type==='subcat' || arr[i]._type==='subppto') break;
+        bloque.push(arr[i]);
+      }
+      const nuevaSubcat = { ...arr[idx], id:crypto.randomUUID(), subcategoria:nombreNuevo.trim() };
+      const nuevosItems = bloque.map(it => ({ ...it, id:crypto.randomUUID(), subcategoria:nombreNuevo.trim() }));
+      const insertAt = idx + 1 + bloque.length; // justo después del bloque original
+      const nuevoArr = [...arr];
+      nuevoArr.splice(insertAt, 0, nuevaSubcat, ...nuevosItems);
+      return { ...prev, items: nuevoArr };
+    });
+    showToast('✓ Subcategoría duplicada');
+  }
+
   // ── Copiar ítems seleccionados a otro presupuesto ──────────────
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [otrosPresupuestos, setOtrosPresupuestos] = useState([]);
@@ -1229,6 +1253,11 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
                         it.subcategoria===grupo.subcat&&it._type!=='subcat'?{...it,subcategoria:nuevo.trim()}:it
                       )}));
                     }} style={{background:'none',border:'1px solid #ffffff44',color:'#fff',padding:'2px 8px',borderRadius:4,cursor:'pointer',fontSize:11}}>✏️</button>
+                  )}
+                  {/* Duplicar subcategoría con todos sus ítems */}
+                  {grupo.subcatId&&grupo.subcatId!=='__none__'&&(
+                    <button title="Duplicar subcategoría con todos sus ítems" onClick={()=>duplicarSubcategoria(grupo.subcatId,grupo.subcat)}
+                      style={{background:'none',border:'1px solid #ffffff44',color:'#fff',padding:'2px 8px',borderRadius:4,cursor:'pointer',fontSize:11}}>📑 Duplicar</button>
                   )}
                   {/* Agregar ítem a esta subcategoría */}
                   <button onClick={()=>{
