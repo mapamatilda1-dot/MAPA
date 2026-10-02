@@ -31,6 +31,129 @@ function emptyItem(p) {
   };
 }
 
+// ── Flujo de pago a proveedores ─────────────────────────────────
+// Cuánto hay que pagarle a cada proveedor y cuándo, según la condición de
+// pago que se definió por proveedor en el pop-up de cada ítem (Contado /
+// Crédito / Abono). No depende de cómo paga el cliente.
+function FlujoCaja({ p, fmt, fmtDate }) {
+  const filas = [];
+  (p.items||[]).forEach(it => {
+    if (it._type==='subcat' || it._type==='subppto') return;
+    proveedoresDe(it).forEach(pr => {
+      if (Number(pr.costo||0) > 0) filas.push({ item: it.item||'Sin nombre', ...pr });
+    });
+  });
+  if (!filas.length) return (
+    <div style={{marginTop:16,background:'#f8fafc',border:'1px dashed #dde6ef',borderRadius:12,padding:'16px',textAlign:'center',color:'#aaa',fontSize:13}}>
+      Sin proveedores con costo asignado — agregá proveedores en el detalle de cada ítem para ver el flujo de pagos
+    </div>
+  );
+
+  const hoyStr = new Date().toISOString().slice(0,10);
+  // Fecha base para créditos: fecha_inicio_produccion o hoy
+  const fechaBase = p.fecha_inicio_produccion || hoyStr;
+
+  function addDays(dateStr, days) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + 'T12:00');
+    d.setDate(d.getDate() + Number(days||0));
+    return d.toISOString().slice(0,10);
+  }
+
+  // Agrupar pagos por fecha
+  const pagos = {};
+  let totalSinFlujo = 0;
+
+  filas.forEach(pr => {
+    const monto = Number(pr.costo||0);
+    const nombreProv = pr.razon_social || 'Proveedor sin nombre';
+    const cond = pr.condicion_pago || 'Contado';
+
+    if (cond === 'Contado') {
+      pagos[fechaBase] = (pagos[fechaBase]||[]);
+      pagos[fechaBase].push({ label:`${nombreProv} · Contado`, monto });
+    } else if (cond === 'Crédito') {
+      const dias = Number(pr.dias_credito||0);
+      const fecha = addDays(fechaBase, dias);
+      if (fecha) {
+        pagos[fecha] = (pagos[fecha]||[]);
+        pagos[fecha].push({ label:`${nombreProv} · Crédito ${dias}d`, monto });
+      } else totalSinFlujo += monto;
+    } else if (cond === 'Abono') {
+      const pct = Number(pr.abono_pct||50) / 100;
+      const dias = Number(pr.dias_credito_saldo||0);
+      const abono = monto * pct;
+      const saldo = monto - abono;
+      pagos[fechaBase] = (pagos[fechaBase]||[]);
+      pagos[fechaBase].push({ label:`${nombreProv} · Abono ${pr.abono_pct||50}%`, monto:abono });
+      const fechaSaldo = addDays(fechaBase, dias);
+      if (fechaSaldo) {
+        pagos[fechaSaldo] = (pagos[fechaSaldo]||[]);
+        pagos[fechaSaldo].push({ label:`${nombreProv} · Saldo ${dias}d`, monto:saldo });
+      } else totalSinFlujo += saldo;
+    } else {
+      totalSinFlujo += monto;
+    }
+  });
+
+  const fechasOrdenadas = Object.keys(pagos).sort();
+  const totalProveedores = filas.reduce((a,pr)=>a+Number(pr.costo||0),0);
+  const totalFlujo = fechasOrdenadas.reduce((a,f)=>a+(pagos[f]||[]).reduce((x,p)=>x+p.monto,0),0);
+
+  return (
+    <div style={{marginTop:16,background:'#fff',border:'1px solid #dde6ef',borderRadius:12,overflow:'hidden'}}>
+      <div style={{background:'#0d3b5e',padding:'10px 16px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <span style={{color:'#fff',fontWeight:700,fontSize:13}}>💰 Flujo de pago a proveedores</span>
+        <span style={{color:'rgba(255,255,255,.6)',fontSize:11}}>
+          Base: {fmtDate(fechaBase)}{p.fecha_inicio_produccion?' (fecha inicio producción)':' (hoy — configurá la fecha en Info)'}
+        </span>
+      </div>
+      <div style={{padding:'14px 16px'}}>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {fechasOrdenadas.map(fecha=>{
+            const entradas = pagos[fecha]||[];
+            const totalFecha = entradas.reduce((a,e)=>a+e.monto,0);
+            const esFechaBase = fecha === fechaBase;
+            return (
+              <div key={fecha} style={{padding:'10px 14px',background:esFechaBase?'#e8f5ee':'#fff7ed',borderRadius:8,border:`1px solid ${esFechaBase?'#86efac':'#fcd9ae'}`}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:entradas.length>1?6:0}}>
+                  <div>
+                    <div style={{fontSize:11,color:'#888'}}>{esFechaBase?'📅 Inicio de producción':'📅 Pago a proveedor'}</div>
+                    <div style={{fontSize:14,fontWeight:600,color:esFechaBase?'#2e8b4e':'#c2410c'}}>{fmtDate(fecha)}</div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:18,fontWeight:700,color:esFechaBase?'#2e8b4e':'#c2410c'}}>{fmt(totalFecha)}</div>
+                    <div style={{fontSize:11,color:'#888'}}>{totalProveedores>0?((totalFecha/totalProveedores)*100).toFixed(0):0}% del total</div>
+                  </div>
+                </div>
+                {entradas.length > 1 && (
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                    {entradas.map((e,i)=>(
+                      <span key={i} style={{fontSize:11,background:'rgba(0,0,0,.06)',padding:'2px 8px',borderRadius:4,color:'#555'}}>
+                        {e.label}: {fmt(e.monto)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {totalSinFlujo > 0 && (
+            <div style={{padding:'8px 14px',background:'#fff8f8',borderRadius:8,border:'1px solid #fca5a5',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontSize:12,color:'#991b1b'}}>⚠️ Proveedores sin fecha calculable (crédito/abono sin días definidos)</span>
+              <span style={{fontWeight:700,color:'#991b1b'}}>{fmt(totalSinFlujo)}</span>
+            </div>
+          )}
+        </div>
+        <div style={{marginTop:12,paddingTop:10,borderTop:'1px solid #e8e8e8',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+          <span style={{fontSize:13,color:'#555'}}>En flujo: <strong style={{color:'#0d3b5e'}}>{fmt(totalFlujo)}</strong></span>
+          {totalSinFlujo>0&&<span style={{fontSize:13,color:'#991b1b'}}>Sin asignar: <strong>{fmt(totalSinFlujo)}</strong></span>}
+          <span style={{fontSize:13,color:'#555'}}>Total a proveedores: <strong style={{color:'#0d3b5e'}}>{fmt(totalProveedores)}</strong></span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 
 
@@ -1627,6 +1750,8 @@ ${p.notas?`<table><tr><td style="background:#f0f7ff;border-left:3px solid #3dbfb
             );
           })()}
 
+          {/* SECCION 2: Flujo de pago a proveedores */}
+          {['aprobado','pendiente_facturar','facturado'].includes(p.estado) && <FlujoCaja p={p} fmt={fmt} fmtDate={fmtDate} />}
 
           {/* SECCION 3: OH / Banco / Precio Cliente / Margen Real */}
           <div style={{border:'1px solid #dde6ef',borderRadius:12,overflow:'hidden',marginBottom:14}}>
