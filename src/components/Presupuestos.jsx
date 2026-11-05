@@ -56,6 +56,7 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
   // Filtro por usuario — Producción ve solo los suyos por defecto, Admin ve todos
   const [soloMios, setSoloMios]   = useState(userRole === 'produccion');
   const [loading, setLoading]     = useState(false);
+  const [loadError, setLoadError]  = useState('');
 
   useEffect(() => { fetchAll(); }, [soloMios]);
 
@@ -78,23 +79,21 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
         query = query.or('created_by.eq.' + userEmail + ',productor_email.eq.' + userEmail);
       }
     }
-    const [ppR, catR, cliR, cfgR, ejecR, prodR, brR] = await Promise.all([
-      query,
-      supabase.from('categorias').select('*').order('nombre'),
-      supabase.from('clientes').select('*').order('nombre'),
-      supabase.from('config').select('*').single(),
-      supabase.from('ejecutivos').select('*').order('nombre'),
-      supabase.from('productores').select('*').order('nombre'),
-      supabase.from('briefs').select('id, nombre, cliente_nombre, fecha_entrega, fecha_evento, dias_evento, lugar, ciudad, pax, ejecutivo_nombre, ejecutivo_email').order('nombre'),
-    ]);
-    if (ppR.data)   setPptos(ppR.data);
-    if (catR.data)  setCats(catR.data);
-    if (cliR.data)  setClis(cliR.data);
-    if (cfgR.data)  setCfg(cfgR.data);
-    if (ejecR.data) setEjecs(ejecR.data);
-    if (prodR.data) setProds(prodR.data);
-    if (brR.data)   setBriefs(brR.data);
-    setLoading(false);
+    // Cada consulta actualiza su estado apenas responde: si una tarda o falla,
+    // no bloquea la lista de presupuestos.
+    setLoadError('');
+    const tareas = [
+      query.then(r => { if (r.error) setLoadError('No se pudieron cargar los presupuestos: ' + r.error.message); else if (r.data) setPptos(r.data); }),
+      supabase.from('categorias').select('*').order('nombre').then(r => { if (r.data) setCats(r.data); }),
+      supabase.from('clientes').select('*').order('nombre').then(r => { if (r.data) setClis(r.data); }),
+      supabase.from('config').select('*').single().then(r => { if (r.data) setCfg(r.data); }),
+      supabase.from('ejecutivos').select('*').order('nombre').then(r => { if (r.data) setEjecs(r.data); }),
+      supabase.from('productores').select('*').order('nombre').then(r => { if (r.data) setProds(r.data); }),
+      supabase.from('briefs').select('id, nombre, cliente_nombre, fecha_entrega, fecha_evento, dias_evento, lugar, ciudad, pax, ejecutivo_nombre, ejecutivo_email').order('nombre').then(r => { if (r.data) setBriefs(r.data); }),
+    ];
+    // La pantalla deja de decir "Cargando" en cuanto llegan los presupuestos
+    tareas[0].catch(e => setLoadError('Error de conexión: ' + (e?.message || e))).finally(() => setLoading(false));
+    await Promise.allSettled(tareas);
   }
 
   function showToast(m) { setToast(m); setTimeout(() => setToast(''), 3000); }
@@ -460,7 +459,8 @@ export default function Presupuestos({ userRole, userEmail, logoUrl, onNavigate 
         <span style={{ fontSize:12, color:'#5a7a9a' }}>Seleccionar todos ({filtered.length})</span>
       </div>
 
-      {filtered.length === 0 && <div style={S.empty}>{pptos.length === 0 ? 'Sin presupuestos aún.' : 'Sin resultados.'}</div>}
+      {loadError && <div style={{ ...S.empty, color:'#c8264a', borderColor:'#c8264a' }}>⚠ {loadError} <button style={{ marginLeft:8 }} onClick={fetchAll}>Reintentar</button></div>}
+      {filtered.length === 0 && !loadError && <div style={S.empty}>{loading ? 'Cargando presupuestos…' : (pptos.length === 0 ? 'Sin presupuestos aún.' : 'Sin resultados.')}</div>}
 
       {/* Agrupado por cliente */}
       {(()=>{
