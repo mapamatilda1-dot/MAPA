@@ -172,6 +172,46 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
     setEditing(prev=>({...prev,gastos:[...(prev.gastos||[]),emptyGasto()]}));
   }
 
+  // Trae los gastos capturados con foto desde la app "Matilda · Gastos" (tabla gastos_captura).
+  // Si el gasto corresponde a un ítem de solicitud que aún está vacío, lo llena; si no, agrega una fila nueva.
+  async function traerCapturas(){
+    if(!editing.presupuesto_id){showToast('Primero elige el presupuesto');return;}
+    const {data:sols,error:eSol}=await supabase.from('solicitudes').select('id,created_at').eq('presupuesto_id',editing.presupuesto_id).eq('estado','pagado');
+    if(eSol){showToast('Error: '+eSol.message);return;}
+    const ids=(sols||[]).map(s=>String(s.id));
+    if(!ids.length){showToast('Este presupuesto no tiene solicitudes pagadas');return;}
+    const {data:caps,error}=await supabase.from('gastos_captura').select('*').in('solicitud_id',ids).order('created_at');
+    if(error){showToast('Error: '+error.message);return;}
+    const yaTraidos=new Set((editing.gastos||[]).map(g=>g.captura_id).filter(Boolean));
+    const nuevos=(caps||[]).filter(c=>!yaTraidos.has(c.id));
+    if(!nuevos.length){showToast('No hay gastos capturados nuevos');return;}
+    setEditing(prev=>{
+      const gastos=[...(prev.gastos||[])];
+      nuevos.forEach(c=>{
+        const solObj=(sols||[]).find(s=>String(s.id)===String(c.solicitud_id));
+        const datos={
+          // se usa el id original de la solicitud (no el texto) para que el agrupado por solicitud coincida
+          captura_id:c.id, _solicitud_id:solObj?solObj.id:c.solicitud_id, _solicitud_fecha:solObj?.created_at?.slice(0,10),
+          categoria:c.categoria||CATS_LIQUIDACION[0],
+          ruc_proveedor:c.ruc_proveedor||'', nombre_proveedor:c.nombre_proveedor||'',
+          num_factura:c.num_factura||'', num_autorizacion:c.num_autorizacion||'', fecha_factura:c.fecha_factura||'',
+          subtotal15:Number(c.subtotal15)||0, subtotal0:Number(c.subtotal0)||0, iva_pct:Number(c.iva_pct)||15,
+          iva:Number(c.iva)||0, total:Number(c.total)||0, valor_justificado:Number(c.total)||0,
+          tiene_xml:false, foto_nota:c.foto_url||'',
+        };
+        const nom=(c.solicitud_item_nombre||'').toLowerCase().trim();
+        const idx=nom?gastos.findIndex(g=>String(g._solicitud_id)===String(c.solicitud_id)&&!g.captura_id&&!g.foto_nota&&!Number(g.total)&&(g.concepto||'').toLowerCase().trim()===nom):-1;
+        if(idx>=0){
+          gastos[idx]={...gastos[idx],...datos,notas:[gastos[idx].notas,c.notas].filter(Boolean).join(' · ')};
+        }else{
+          gastos.push({...emptyGasto(),...datos,concepto:c.concepto||'',valor_asignado:0,notas:c.notas||''});
+        }
+      });
+      return {...prev,gastos};
+    });
+    showToast(nuevos.length+' gasto(s) traído(s). Revísalos y guarda la liquidación.');
+  }
+
   function updGasto(gid,k,v){
     setEditing(prev=>({
       ...prev,
@@ -517,10 +557,15 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
             <div style={S.divider}/>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <strong style={{fontSize:14,color:'#0d3b5e'}}>Gastos / Facturas</strong>
-              {/* Botón global solo cuando NO hay solicitudes pagadas */}
-              {!(editing._solicitudes_pagadas||[]).length && (
-                <button style={{...S.btnPrimary,background:'#3dbfb8',fontSize:13}} onClick={addGasto}>+ Agregar gasto</button>
-              )}
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {editing.presupuesto_id && (
+                  <button style={{...S.btnPrimary,background:'#0d3b5e',fontSize:13}} onClick={traerCapturas}>📥 Traer gastos capturados</button>
+                )}
+                {/* Botón global solo cuando NO hay solicitudes pagadas */}
+                {!(editing._solicitudes_pagadas||[]).length && (
+                  <button style={{...S.btnPrimary,background:'#3dbfb8',fontSize:13}} onClick={addGasto}>+ Agregar gasto</button>
+                )}
+              </div>
             </div>
 
             {/* Gastos agrupados por solicitud pagada */}
