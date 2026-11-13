@@ -8,6 +8,7 @@ export const ROLES = {
   creativo:   'creativo',
   produccion: 'produccion',
   financiero: 'financiero',
+  mensajero:  'mensajero', // solo la app Matilda · Gastos; sin acceso a MAPA
 };
 
 export const ROLES_LABELS = {
@@ -16,6 +17,7 @@ export const ROLES_LABELS = {
   creativo:   'Creativo',
   produccion: 'Producción',
   financiero: 'Financiero',
+  mensajero:  'Mensajero',
 };
 
 // ─── Navegación disponible por rol ───────────────────────────

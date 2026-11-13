@@ -255,6 +255,7 @@ export default function AdminPanel() {
     { id:'creativo',   label:'Creativo',    desc:'Ver briefs, crear propuestas, calendario' },
     { id:'produccion', label:'Producción',  desc:'Briefs, presupuestos completos, implementaciones' },
     { id:'financiero', label:'Financiero',  desc:'Presupuestos, liquidaciones, aprobar estados' },
+    { id:'mensajero',  label:'Mensajero',   desc:'Solo la app de Gastos (fotos de comprobantes). Sin acceso a MAPA' },
   ];
 
   return (
@@ -339,15 +340,15 @@ export default function AdminPanel() {
                 </thead>
                 <tbody>
                   {[
-                    ['CRM', '✅','✅','—','—','—'],
-                    ['Clientes', '✅','✅','—','✅','✅'],
-                    ['Proyectos/Briefs', '✅','✅','✅','✅','👁'],
-                    ['Propuestas', '✅','👁','✅','✅','—'],
-                    ['Calendario', '✅','✅','✅','✅','✅'],
-                    ['Presupuestos', '✅','—','—','✅','✅'],
-                    ['Liquidaciones', '✅','—','—','✅','✅'],
-                    ['Implementaciones', '✅','—','—','✅','✅'],
-                    ['Admin', '✅','—','—','—','—'],
+                    ['CRM', '✅','✅','—','—','—','—'],
+                    ['Clientes', '✅','✅','—','✅','✅','—'],
+                    ['Proyectos/Briefs', '✅','✅','✅','✅','👁','—'],
+                    ['Propuestas', '✅','👁','✅','✅','—','—'],
+                    ['Calendario', '✅','✅','✅','✅','✅','—'],
+                    ['Presupuestos', '✅','—','—','✅','✅','—'],
+                    ['Liquidaciones', '✅','—','—','✅','✅','—'],
+                    ['Implementaciones', '✅','—','—','✅','✅','—'],
+                    ['Admin', '✅','—','—','—','—','—'],
                   ].map(([mod,...vals]) => (
                     <tr key={mod}>
                       <td style={{ ...S.td, fontWeight:500 }}>{mod}</td>

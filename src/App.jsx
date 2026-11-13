@@ -122,6 +122,19 @@ export default function App() {
 
   if (!session) return <Login />;
 
+  // Mensajero: su cuenta es solo para la app Matilda · Gastos, no para MAPA
+  if (session.user?.app_metadata?.role === 'mensajero') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d3b5e', padding: 20 }}>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 24, maxWidth: 380, textAlign: 'center' }}>
+          <h2 style={{ margin: '0 0 8px', color: '#0d3b5e' }}>Cuenta solo para Gastos</h2>
+          <p style={{ color: '#5a7a9a', fontSize: 14 }}>Tu usuario es para la app <b>Matilda · Gastos</b> (captura de comprobantes). No tiene acceso a MAPA.</p>
+          <button onClick={() => supabase.auth.signOut()} style={{ marginTop: 12, padding: '10px 18px', borderRadius: 8, border: 'none', background: '#c8264a', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Salir</button>
+        </div>
+      </div>
+    );
+  }
+
   const role     = session.user?.user_metadata?.role || 'produccion';
   const email    = session.user?.email || '';
   const initials = email.slice(0, 2).toUpperCase();
