@@ -183,8 +183,28 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
     const {data:caps,error}=await supabase.from('gastos_captura').select('*').in('solicitud_id',ids).order('created_at');
     if(error){showToast('Error: '+error.message);return;}
     const yaTraidos=new Set((editing.gastos||[]).map(g=>g.captura_id).filter(Boolean));
-    const nuevos=(caps||[]).filter(c=>!yaTraidos.has(c.id));
-    if(!nuevos.length){showToast('No hay gastos capturados nuevos');return;}
+    const pendientes=(caps||[]).filter(c=>!yaTraidos.has(c.id));
+    if(!pendientes.length){showToast('No hay gastos capturados nuevos');return;}
+    // Duplicados: se omite el comprobante si ya existe (mismo # autorización, o mismo RUC + # factura)
+    // en esta liquidación o en cualquier otra liquidación de MAPA. Si solo coincide RUC + fecha + total, se trae con un aviso.
+    const dig=s=>String(s||'').replace(/\D/g,'');
+    const claves=g=>{const k=[];const a=dig(g.num_autorizacion);if(a.length>=10)k.push('A'+a);const r=dig(g.ruc_proveedor),f=dig(g.num_factura);if(r&&f)k.push('F'+r+'-'+f.slice(-9).padStart(9,'0'));return k;};
+    const vistas=new Set((editing.gastos||[]).flatMap(claves));
+    const nuevos=[];const omitidos=[];
+    for(const c of pendientes){
+      const ks=claves(c);
+      let motivo=ks.some(k=>vistas.has(k))?'ya está en esta liquidación':null;
+      if(!motivo){
+        const {data:dups}=await supabase.rpc('buscar_duplicado',{p_ruc:c.ruc_proveedor||'',p_factura:c.num_factura||'',p_autorizacion:c.num_autorizacion||'',p_fecha:c.fecha_factura||null,p_total:Number(c.total)||null,p_excluir:c.id,p_solo_liq:true});
+        const fuerte=(dups||[]).find(d=>d.motivo!=='mismo RUC, fecha y total');
+        if(fuerte) motivo='ya está en la liquidación de "'+(fuerte.evento||'otro evento')+'" ('+fuerte.motivo+')';
+        else if(dups&&dups.length) c._aviso='⚠ Posible duplicado de un gasto de "'+(dups[0].evento||'otra liquidación')+'" (mismo RUC, fecha y total): revisar';
+      }
+      if(motivo){omitidos.push((c.nombre_proveedor||c.ruc_proveedor||'Proveedor')+' · factura '+(c.num_factura||'s/n')+' · $'+Number(c.total||0).toFixed(2)+' → '+motivo);}
+      else{nuevos.push(c);ks.forEach(k=>vistas.add(k));}
+    }
+    if(omitidos.length) window.alert('Se omitieron '+omitidos.length+' comprobante(s) duplicado(s) que ya estaban cargados:\n\n'+omitidos.join('\n'));
+    if(!nuevos.length){showToast('No hay gastos nuevos para traer');return;}
     setEditing(prev=>{
       const gastos=[...(prev.gastos||[])];
       nuevos.forEach(c=>{
@@ -202,9 +222,9 @@ export default function Liquidaciones({ presupuestos, userRole, userEmail }) {
         const nom=(c.solicitud_item_nombre||'').toLowerCase().trim();
         const idx=nom?gastos.findIndex(g=>String(g._solicitud_id)===String(c.solicitud_id)&&!g.captura_id&&!g.foto_nota&&!Number(g.total)&&(g.concepto||'').toLowerCase().trim()===nom):-1;
         if(idx>=0){
-          gastos[idx]={...gastos[idx],...datos,notas:[gastos[idx].notas,c.notas].filter(Boolean).join(' · ')};
+          gastos[idx]={...gastos[idx],...datos,notas:[gastos[idx].notas,c.notas,c._aviso].filter(Boolean).join(' · ')};
         }else{
-          gastos.push({...emptyGasto(),...datos,concepto:c.concepto||'',valor_asignado:0,notas:c.notas||''});
+          gastos.push({...emptyGasto(),...datos,concepto:c.concepto||'',valor_asignado:0,notas:[c.notas,c._aviso].filter(Boolean).join(' · ')});
         }
       });
       return {...prev,gastos};
